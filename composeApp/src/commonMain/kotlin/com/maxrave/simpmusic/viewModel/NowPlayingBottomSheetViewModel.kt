@@ -4,6 +4,7 @@ import androidx.lifecycle.viewModelScope
 import com.maxrave.common.Config
 import com.maxrave.common.songRadioPlaylistId
 import com.maxrave.domain.data.entities.DownloadState
+import com.maxrave.domain.data.model.download.DownloadProgress
 import com.maxrave.domain.data.entities.LocalPlaylistEntity
 import com.maxrave.domain.data.entities.SongEntity
 import com.maxrave.domain.data.model.searchResult.playlists.PlaylistsResult
@@ -104,6 +105,12 @@ class NowPlayingBottomSheetViewModel(
     private var neteasePlaylistsJob: Job? = null
 
     init {
+        viewModelScope.launch {
+            // MV 导出下载在途态:共享 SharedViewModel 的进度流(菜单行三态)
+            sharedViewModel.downloadFileProgress.collectLatest { progress ->
+                _uiState.update { it.copy(mvDownloading = progress != DownloadProgress.INIT && !progress.isDone) }
+            }
+        }
         viewModelScope.launch {
             val sleepTimerJob =
                 launch {
@@ -719,6 +726,8 @@ data class NowPlayingBottomSheetUIState(
     val listNeteasePlaylist: List<PlaylistsResult>?,
     /** 终态失败(重试耗尽):列表为 null/空时弹窗出"重试"行;有旧列表则静默保留 */
     val youTubePlaylistsFailed: Boolean = false,
+    /** MV 导出下载在途(共享 downloadFileProgress);下载 MV 行三态用 */
+    val mvDownloading: Boolean = false,
     val neteasePlaylistsFailed: Boolean = false,
     val mainLyricsProvider: String,
     val sleepTimer: SleepTimerState,

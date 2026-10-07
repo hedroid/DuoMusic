@@ -2483,15 +2483,36 @@ fun NowPlayingBottomSheet(
                                 }
                         }
                     }
-                    // 网易 MV 专属下载行:mvDetail.brs mp4 单文件直存(免 merge),
-                    // 进度走播放页同一个 DownloadProgress 弹窗
+                    // 网易 MV 专属下载行(mvDetail.brs mp4 单文件直存):三态对齐"下载视频"
+                    // ——在途=下载中(导出管线无取消入口,禁点),已落文件=已下载(点击覆盖重下,
+                    // staged write 原子替换),否则=下载 MV;成功落 song 行,管理页已完成区可见
                     if (isNeteaseMvSong) {
-                        ActionButton(
-                            icon = SimpIcons.Movie,
-                            text = Res.string.download_mv,
-                        ) {
-                            viewModel.onUIEvent(NowPlayingBottomSheetUIEvent.DownloadMv)
-                            hideModalBottomSheet()
+                        val mvFileDownloaded =
+                            uiState.songUIState.downloadedVideoFilePath
+                                ?.let { java.io.File(it).exists() } == true
+                        when {
+                            uiState.mvDownloading ->
+                                ActionButton(
+                                    icon = SimpIcons.Downloading,
+                                    text = Res.string.downloading,
+                                ) { }
+                            mvFileDownloaded ->
+                                ActionButton(
+                                    icon = SimpIcons.Movie,
+                                    iconColor = Color(0xFF00A0CB),
+                                    text = Res.string.downloaded,
+                                ) {
+                                    viewModel.onUIEvent(NowPlayingBottomSheetUIEvent.DownloadMv)
+                                    hideModalBottomSheet()
+                                }
+                            else ->
+                                ActionButton(
+                                    icon = SimpIcons.Movie,
+                                    text = Res.string.download_mv,
+                                ) {
+                                    viewModel.onUIEvent(NowPlayingBottomSheetUIEvent.DownloadMv)
+                                    hideModalBottomSheet()
+                                }
                         }
                     }
                     // 删除下载(2026-10 用户反馈):独立成行——"下载"行对已下载歌是"重新

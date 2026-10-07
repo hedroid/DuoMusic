@@ -2585,24 +2585,73 @@ class SharedViewModel(
             }
             val fileName = sanitizeDownloadFileName("${detail?.name ?: track.title}", track.videoId)
             val path = "${getDownloadFolderPath()}/$fileName"
-            withContext(Dispatchers.IO) {
-                downloadUrlToFile(url, path, "mp4")
-            }
+            val saved =
+                withContext(Dispatchers.IO) {
+                    downloadUrlToFile(url, path, "mp4")
+                }
             // 菜单路径下 Info 面板未开,进度弹窗不可见(实测"点了没反应")——完成/失败补 toast
-            val result = _downloadFileProgress.value
             when {
-                result.isDone -> makeToast(getString(Res.string.mv_saved_to_download))
-                result.isError -> makeToast(result.errorMessage ?: getString(Res.string.error))
+                saved -> {
+                    makeToast(getString(Res.string.mv_saved_to_download))
+                    // 接入下载管理体系(2026-10-07 用户定:三点状态/管理页可见):落 song 行
+                    // (哨兵 id,source=NETEASE,videoType=OMV 让行/UI 判视频),管理页已完成
+                    // 流自动出现;行点击播放走 resolver 本地文件直读(downloadedVideoFilePath)
+                    runCatching {
+                        val filePath = "$path.mp4"
+                        if (java.io.File(filePath).exists()) {
+                            songRepository.insertSong(
+                                com.maxrave.domain.data.entities.SongEntity(
+                                    videoId = track.videoId,
+                                    source = com.maxrave.domain.source.MusicSource.NETEASE.name,
+                                    albumId = null,
+                                    albumName = null,
+                                    artistId = detail.artists.map { it.first.toString() },
+                                    artistName = detail.artists.map { it.second },
+                                    duration = detail.durationMs.toCompactDuration(),
+                                    durationSeconds = (detail.durationMs / 1000).toInt(),
+                                    isAvailable = true,
+                                    isExplicit = false,
+                                    likeStatus = "INDIFFERENT",
+                                    thumbnails = detail.coverUrl,
+                                    title = detail.name,
+                                    videoType = "MUSIC_VIDEO_TYPE_OMV",
+                                    category = null,
+                                    resultType = "mv",
+                                    downloadState = com.maxrave.domain.data.entities.DownloadState.STATE_DOWNLOADED,
+                                    inLibrary = com.maxrave.domain.extension.now(),
+                                ),
+                            ).collect { }
+                            songRepository.updateDownloadedVideoFilePath(track.videoId, filePath)
+                            songRepository.updateDownloadState(
+                                track.videoId,
+                                com.maxrave.domain.data.entities.DownloadState.STATE_DOWNLOADED,
+                            )
+                        }
+                    }
+                }
+                !saved -> {
+                    val err = _downloadFileProgress.value.errorMessage
+                    makeToast(err ?: getString(Res.string.error))
+                }
             }
         }
     }
 
-    /** 共用流式下载体:URL → .part 分块写(校验 Content-Length)→ rename 提交 + 进度 */
+    /** MV 行时长(mm:ss);毫秒直转,毫秒 0(端点不给)回退 track 值 */
+    private fun Long.toCompactDuration(): String {
+        val totalSec = this / 1000
+        if (totalSec <= 0) return ""
+        return "%d:%02d".format(totalSec / 60, totalSec % 60)
+    }
+
+    /** 共用流式下载体:URL → .part 分块写(校验 Content-Length)→ rename 提交 + 进度;
+     *  返回成败——调用方(MV 落库/音频 toast)以文件提交为准,不回读 progress flow
+     *  (IO 协程回 Main 的间隙进度可能被其它写者复位,实测快照不可靠) */
     private suspend fun downloadUrlToFile(
         url: String,
         path: String,
         ext: String,
-    ) {
+    ): Boolean {
         val part = File("$path.$ext.part")
         try {
             // prepareGet+execute 才是真流式:ktor3 的 client.get() 会把整个响应体先
@@ -2652,10 +2701,12 @@ class SharedViewModel(
             commitDownloadFile(part, File("$path.$ext"))
             _downloadFileProgress.value = DownloadProgress.AUDIO_DONE
             Logger.d(tag, "Netease file saved to $path.$ext")
+            return true
         } catch (e: Exception) {
             if (e is CancellationException) throw e
             Logger.e(tag, "netease download failed: ${e.message}")
             _downloadFileProgress.value = DownloadProgress.failed(e.message ?: "download failed")
+            return false
         } finally {
             // 成功路径 part 已被 rename 走,这里只兜异常/取消路径的残留清理
             part.delete()

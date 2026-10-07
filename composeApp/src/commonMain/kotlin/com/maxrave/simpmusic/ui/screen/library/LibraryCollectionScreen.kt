@@ -371,7 +371,9 @@ fun DownloadedManagementBody(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .height(45.dp)
+                            // 高度对齐歌单页搜索条(50dp):placeholder 升 bodyMedium 后 45dp
+                            // 装不下,字显示不全(2026-10-07 用户反馈)
+                            .height(50.dp)
                             .padding(horizontal = 12.dp),
                     inputField = {
                         CompositionLocalProvider(LocalTextStyle provides typo().bodySmall) {
