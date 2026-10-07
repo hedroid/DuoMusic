@@ -46,7 +46,9 @@ class NeteaseHomeViewModel(
         RADAR_PLAYLISTS("雷达歌单"),
         HQ("精品歌单"),
         NEW_SONGS("推荐新歌"),
-        MV("MV"),
+        // 最新 MV(mv/first 30 条;原个性化源每日仅 2-3 条横滑无内容,探针实证换源)
+        MV("最新 MV"),
+        MV_TOPLIST("MV 总榜"),
         CHART("排行榜"),
         NEW_ALBUMS("新碟上架"),
         SECTIONS("分类"),
@@ -221,7 +223,12 @@ class NeteaseHomeViewModel(
             Row.HQ -> neteaseRepository.getHqPlaylistsRow(force)?.let { RowUi.Ready(RowContent.Feed(it)) } ?: RowUi.Failed
             Row.NEW_SONGS -> neteaseRepository.getNewSongsRow(force)?.let { RowUi.Ready(RowContent.Feed(it)) } ?: RowUi.Failed
             Row.MV ->
-                neteaseRepository.getPersonalizedMvs().getOrNull()
+                neteaseRepository.getMvFirst().getOrNull()
+                    ?.takeIf { it.isNotEmpty() }
+                    ?.let { RowUi.Ready(RowContent.MvRow(it)) } ?: RowUi.Failed
+            Row.MV_TOPLIST ->
+                neteaseRepository.getMvToplist().getOrNull()
+                    ?.first
                     ?.takeIf { it.isNotEmpty() }
                     ?.let { RowUi.Ready(RowContent.MvRow(it)) } ?: RowUi.Failed
             Row.CHART ->

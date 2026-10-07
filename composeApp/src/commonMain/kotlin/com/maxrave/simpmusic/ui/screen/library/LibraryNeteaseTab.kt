@@ -53,6 +53,7 @@ import com.maxrave.simpmusic.extension.scrollReportingEffect
 import com.maxrave.simpmusic.ui.component.CenterLoadingBox
 import com.maxrave.simpmusic.ui.component.EndOfPage
 import com.maxrave.simpmusic.ui.component.HomeItemContentPlaylist
+import com.maxrave.simpmusic.ui.navigation.destination.list.MvListDestination
 import com.maxrave.simpmusic.ui.navigation.destination.list.PlaylistDestination
 import com.maxrave.simpmusic.ui.screen.home.NeteaseAlbumRow
 import com.maxrave.simpmusic.ui.screen.home.NeteaseArtistRow
@@ -64,6 +65,8 @@ import simpmusic.composeapp.generated.resources.Res
 import simpmusic.composeapp.generated.resources.confirm
 import simpmusic.composeapp.generated.resources.delete_playlist_message
 import simpmusic.composeapp.generated.resources.delete_playlist_title
+import simpmusic.composeapp.generated.resources.favorite_mvs
+import simpmusic.composeapp.generated.resources.mv_count_short
 import simpmusic.composeapp.generated.resources.followed
 import simpmusic.composeapp.generated.resources.track_count_short
 import simpmusic.composeapp.generated.resources.collected_playlists
@@ -100,6 +103,8 @@ internal fun LibraryNeteaseTab(
     onUnsubscribeAlbum: (albumId: String) -> Unit = {},
     // "创建的歌单"分区固定入口:弹窗在本文件,建单走 VM(成功后静默刷新三分区)
     onCreatePlaylist: (name: String) -> Unit = {},
+    /** 收藏的 MV 概要(count+封面);null=未拉/空,行隐藏 */
+    subscribedMv: Pair<Int, String?>? = null,
     onScrolling: (onTop: Boolean) -> Unit = {},
 ) {
     // 长按目标:待确认取消收藏/删除的歌单/专辑(均为写操作,弹窗确认;删除不可逆,文案更强)
@@ -196,6 +201,16 @@ internal fun LibraryNeteaseTab(
                                 onClick = {
                                     navController.navigate(PlaylistDestination(heartPlaylist.id))
                                 },
+                            )
+                        }
+                    }
+                    // 收藏的 MV(用户 2026-10-07 定案):红心行下,同款满行横卡,点击进 MV 列表页
+                    if (subscribedMv != null) {
+                        item(span = { GridItemSpan(maxLineSpan) }, key = "netease_subscribed_mv_row") {
+                            SubscribedMvRow(
+                                count = subscribedMv.first,
+                                coverUrl = subscribedMv.second,
+                                onClick = { navController.navigate(MvListDestination) },
                             )
                         }
                     }
@@ -356,6 +371,61 @@ private fun NeteasePlaylistTile(
             },
         fillMaxWidth = true,
     )
+}
+
+/** 收藏的 MV 行:HeartPlaylistRow 同款满行横卡(16:9 封面),点击进收藏 MV 列表页 */
+@Composable
+private fun SubscribedMvRow(
+    count: Int,
+    coverUrl: String?,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
+                .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        AsyncImage(
+            model =
+                ImageRequest
+                    .Builder(LocalPlatformContext.current)
+                    .data(coverUrl)
+                    .diskCachePolicy(CachePolicy.ENABLED)
+                    .diskCacheKey(coverUrl)
+                    .crossfade(550)
+                    .build(),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier =
+                Modifier
+                    .size(112.dp)
+                    .aspectRatio(16f / 9f)
+                    .clip(RoundedCornerShape(10.dp)),
+        )
+        Column(
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .padding(start = 12.dp),
+        ) {
+            Text(
+                text = stringResource(Res.string.favorite_mvs),
+                style = typo().titleMedium,
+                color = MaterialTheme.colorScheme.onBackground,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = stringResource(Res.string.mv_count_short, count.toString()),
+                style = typo().bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
+        }
+    }
 }
 
 /**

@@ -473,6 +473,7 @@ fun LibraryScreen(
             }
 
             LibraryChipType.NETEASE_PLAYLIST -> {
+                val subscribedMvSummary by viewModel.subscribedMvSummary.collectAsStateWithLifecycle()
                 LibraryNeteaseTab(
                     navController = navController,
                     contentPadding = innerPadding.copy(top = topAppBarHeight, bottom = lockedBottomPadding),
@@ -487,6 +488,7 @@ fun LibraryScreen(
                     onDeletePlaylist = { viewModel.deleteNeteasePlaylist(it) },
                     onUnsubscribeAlbum = { viewModel.unsubscribeNeteaseAlbum(it) },
                     onCreatePlaylist = { viewModel.createNeteasePlaylistInLibrary(it) },
+                    subscribedMv = subscribedMvSummary,
                     onScrolling = tabScrolling,
                 )
             }

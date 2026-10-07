@@ -25,6 +25,8 @@ import com.maxrave.simpmusic.ui.screen.other.ArtistScreen
 import com.maxrave.simpmusic.ui.screen.other.BrowseScreen
 import com.maxrave.simpmusic.ui.screen.other.MoreAlbumsScreen
 import com.maxrave.simpmusic.ui.screen.other.MoreSongsScreen
+import com.maxrave.simpmusic.ui.navigation.destination.list.MvListDestination
+import com.maxrave.simpmusic.ui.screen.other.MvListScreen
 import com.maxrave.simpmusic.ui.screen.other.SimilarSongsScreen
 import com.maxrave.simpmusic.ui.navigation.destination.list.SimilarSongsDestination
 import com.maxrave.simpmusic.ui.screen.other.PlaylistScreen
@@ -80,6 +82,12 @@ fun NavGraphBuilder.listScreenGraph(
             navController = navController,
             id = data.artistId,
             artistName = data.artistName,
+        )
+    }
+    composable<MvListDestination> {
+        MvListScreen(
+            innerPadding = innerPadding,
+            navController = navController,
         )
     }
     composable<SimilarSongsDestination> { entry ->
