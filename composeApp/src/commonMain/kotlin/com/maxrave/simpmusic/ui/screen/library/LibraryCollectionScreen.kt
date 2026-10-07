@@ -382,9 +382,11 @@ fun DownloadedManagementBody(
                                 expanded = showSearchBar,
                                 onExpandedChange = { showSearchBar = it },
                                 placeholder = {
+                                    // 字体对齐歌单页搜索框(PlaylistScreen 同款 bodyMedium,
+                                    // 用户 2026-10-07 反馈两处不一致)
                                     Text(
                                         stringResource(Res.string.search),
-                                        style = typo().bodySmall,
+                                        style = typo().bodyMedium,
                                     )
                                 },
                                 leadingIcon = { Icon(SimpIcons.Search, contentDescription = null) },

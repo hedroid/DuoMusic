@@ -582,6 +582,7 @@
     <string name="cloud_action_failed_netease">NetEase アカウントを更新できませんでした</string>
     <string name="need_login_toast">ログインすると利用できます</string>
     <string name="favorite_mvs">お気に入りのMV</string>
+    <string name="mv_saved_to_download">MVをDownloadに保存しました</string>
     <string name="mv_count_short">%1$s 本のMV</string>
     <string name="liked_toast">「いいね」しました</string>
     <string name="mv_subscribed">MVをお気に入りに追加しました</string>

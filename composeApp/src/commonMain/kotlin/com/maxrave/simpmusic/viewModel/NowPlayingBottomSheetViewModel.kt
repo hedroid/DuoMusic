@@ -666,8 +666,10 @@ class NowPlayingBottomSheetViewModel(
                 }
 
                 is NowPlayingBottomSheetUIEvent.DownloadMv -> {
-                    // MV mp4 直存(单文件自带音轨免合并);进度走播放页同一个 DownloadProgress 弹窗
+                    // MV mp4 直存(单文件自带音轨免合并);进度弹窗挂在 Info 面板里,菜单直点
+                    // 看不到——点下即 toast 确认受理,完成/失败由 downloadMvFile 再 toast
                     sharedViewModel.downloadMvFile()
+                    makeToast(getString(Res.string.downloading))
                 }
 
                 is NowPlayingBottomSheetUIEvent.StartRadio -> {

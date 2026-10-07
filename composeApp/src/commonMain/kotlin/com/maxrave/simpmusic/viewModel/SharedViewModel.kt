@@ -113,6 +113,7 @@ import org.jetbrains.compose.resources.getString
 import org.koin.core.component.inject
 import org.simpmusic.lastfm.completeLogin
 import simpmusic.composeapp.generated.resources.mv_subscribed
+import simpmusic.composeapp.generated.resources.mv_saved_to_download
 import simpmusic.composeapp.generated.resources.mv_unsubscribed
 import simpmusic.composeapp.generated.resources.watch_mv
 import simpmusic.composeapp.generated.resources.download_mv
@@ -2586,6 +2587,12 @@ class SharedViewModel(
             val path = "${getDownloadFolderPath()}/$fileName"
             withContext(Dispatchers.IO) {
                 downloadUrlToFile(url, path, "mp4")
+            }
+            // 菜单路径下 Info 面板未开,进度弹窗不可见(实测"点了没反应")——完成/失败补 toast
+            val result = _downloadFileProgress.value
+            when {
+                result.isDone -> makeToast(getString(Res.string.mv_saved_to_download))
+                result.isError -> makeToast(result.errorMessage ?: getString(Res.string.error))
             }
         }
     }
