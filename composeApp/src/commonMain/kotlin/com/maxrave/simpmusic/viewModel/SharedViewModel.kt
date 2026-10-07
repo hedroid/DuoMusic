@@ -2585,6 +2585,9 @@ class SharedViewModel(
             }
             val fileName = sanitizeDownloadFileName("${detail?.name ?: track.title}", track.videoId)
             val path = "${getDownloadFolderPath()}/$fileName"
+            // 入途即落行 state=DOWNLOADING:管理页"下载中"区实时可见(getDownloadActivitySongs
+            // 按 state 1/2/3 流式命中),完成后转 3 移入"已完成",失败回 0 两区都不显示
+            persistMvSongRow(track, detail, com.maxrave.domain.data.entities.DownloadState.STATE_DOWNLOADING, null)
             val saved =
                 withContext(Dispatchers.IO) {
                     downloadUrlToFile(url, path, "mp4")
@@ -2593,46 +2596,59 @@ class SharedViewModel(
             when {
                 saved -> {
                     makeToast(getString(Res.string.mv_saved_to_download))
-                    // 接入下载管理体系(2026-10-07 用户定:三点状态/管理页可见):落 song 行
-                    // (哨兵 id,source=NETEASE,videoType=OMV 让行/UI 判视频),管理页已完成
-                    // 流自动出现;行点击播放走 resolver 本地文件直读(downloadedVideoFilePath)
-                    runCatching {
-                        val filePath = "$path.mp4"
-                        if (java.io.File(filePath).exists()) {
-                            songRepository.insertSong(
-                                com.maxrave.domain.data.entities.SongEntity(
-                                    videoId = track.videoId,
-                                    source = com.maxrave.domain.source.MusicSource.NETEASE.name,
-                                    albumId = null,
-                                    albumName = null,
-                                    artistId = detail.artists.map { it.first.toString() },
-                                    artistName = detail.artists.map { it.second },
-                                    duration = detail.durationMs.toCompactDuration(),
-                                    durationSeconds = (detail.durationMs / 1000).toInt(),
-                                    isAvailable = true,
-                                    isExplicit = false,
-                                    likeStatus = "INDIFFERENT",
-                                    thumbnails = detail.coverUrl,
-                                    title = detail.name,
-                                    videoType = "MUSIC_VIDEO_TYPE_OMV",
-                                    category = null,
-                                    resultType = "mv",
-                                    downloadState = com.maxrave.domain.data.entities.DownloadState.STATE_DOWNLOADED,
-                                    inLibrary = com.maxrave.domain.extension.now(),
-                                ),
-                            ).collect { }
-                            songRepository.updateDownloadedVideoFilePath(track.videoId, filePath)
-                            songRepository.updateDownloadState(
-                                track.videoId,
-                                com.maxrave.domain.data.entities.DownloadState.STATE_DOWNLOADED,
-                            )
-                        }
-                    }
+                    // 接入下载管理体系:行点击播放走 resolver 本地文件直读(videoFilePath 列)
+                    persistMvSongRow(track, detail, com.maxrave.domain.data.entities.DownloadState.STATE_DOWNLOADED, "$path.mp4")
                 }
                 !saved -> {
+                    // 失败回 NOT_DOWNLOADED:路径为空,state 归 0 后管理页两区都不再显示
+                    runCatching {
+                        songRepository.updateDownloadState(
+                            track.videoId,
+                            com.maxrave.domain.data.entities.DownloadState.STATE_NOT_DOWNLOADED,
+                        )
+                    }
                     val err = _downloadFileProgress.value.errorMessage
                     makeToast(err ?: getString(Res.string.error))
                 }
+            }
+        }
+    }
+
+    /** MV song 行 upsert(下载管理体系):行在(野行/在途行)时 IGNORE 后仅 UPDATE 状态与路径;
+     *  videoFilePath 非空才写(在途态传 null 不动列) */
+    private suspend fun persistMvSongRow(
+        track: com.maxrave.domain.data.model.browse.album.Track,
+        detail: com.maxrave.netease.model.NeteaseMvDetail,
+        state: Int,
+        videoFilePath: String?,
+    ) {
+        runCatching {
+            songRepository
+                .insertSong(
+                    com.maxrave.domain.data.entities.SongEntity(
+                        videoId = track.videoId,
+                        source = com.maxrave.domain.source.MusicSource.NETEASE.name,
+                        albumId = null,
+                        albumName = null,
+                        artistId = detail.artists.map { it.first.toString() },
+                        artistName = detail.artists.map { it.second },
+                        duration = detail.durationMs.toCompactDuration(),
+                        durationSeconds = (detail.durationMs / 1000).toInt(),
+                        isAvailable = true,
+                        isExplicit = false,
+                        likeStatus = "INDIFFERENT",
+                        thumbnails = detail.coverUrl,
+                        title = detail.name,
+                        videoType = "MUSIC_VIDEO_TYPE_OMV",
+                        category = null,
+                        resultType = "mv",
+                        downloadState = state,
+                        inLibrary = com.maxrave.domain.extension.now(),
+                    ),
+                ).collect { }
+            songRepository.updateDownloadState(track.videoId, state)
+            if (videoFilePath != null && java.io.File(videoFilePath).exists()) {
+                songRepository.updateDownloadedVideoFilePath(track.videoId, videoFilePath)
             }
         }
     }
