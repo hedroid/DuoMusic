@@ -835,31 +835,37 @@ class SharedViewModel(
 
     fun setRemoteSongLiked(liked: Boolean) {
         val song = nowPlayingState.value?.songEntity ?: return
-        // 网易 MV:红心=收藏 MV(mv/sub);无本地镜像行,成功后乐观翻转并同步 Info 卡
+        // 网易 MV:红心=收藏 MV(mv/sub)。**服务端对账模式**:写操作后一律重拉 mvDetail
+        // 的 subed 驱动显示——探针实证取消方向(t=0)回 code=200 但 sublist 不变(端点对 t
+        // 无感的已知怪癖),本地乐观翻转会把失败显示成成功;以服务端回读为准天然免疫。
         if (song.videoId.startsWith(NETEASE_MV_MEDIA_ID_PREFIX)) {
             val mvid = song.videoId.removePrefix(NETEASE_MV_MEDIA_ID_PREFIX).toLongOrNull() ?: return
             viewModelScope.launch {
                 _remoteSongLikeState.value = _remoteSongLikeState.value.copy(pending = true, failed = false)
                 val ok = neteaseRepository.subscribeMv(mvid, liked).getOrDefault(false)
-                if (ok) {
-                    _liked.value = liked
-                    mediaPlayerHandler.like(liked)
-                    makeToast(getString(if (liked) Res.string.mv_subscribed else Res.string.mv_unsubscribed))
+                // 回读校正(写成功/失败都读:失败可能是假失败,读到的才是真相)。
+                // 延迟 800ms:收藏写库是异步的,写完立刻回读撞上主从延迟会拿到旧态
+                // (实测 mv/sub 200 后 88ms 回读 subed 仍是 false,3s 后已变 true)
+                delay(800)
+                val fresh = neteaseRepository.getMvDetail(mvid).getOrNull()
+                val subed = fresh?.subed
+                // toast 以回读结果为准:取消方向服务端有"code=200 但不执行"的怪癖
+                // (t 参数被忽略,sublist 不变),按 ok 提示会把没生效说成成功
+                when {
+                    !ok -> makeToast(getString(Res.string.cloud_action_failed_netease))
+                    subed == null || subed == liked ->
+                        makeToast(getString(if (liked) Res.string.mv_subscribed else Res.string.mv_unsubscribed))
+                    else -> makeToast(getString(Res.string.cloud_action_failed_netease))
+                }
+                if (subed != null) {
+                    _liked.value = subed
+                    mediaPlayerHandler.like(subed)
                     _nowPlayingScreenData.update {
-                        val d = it.neteaseMvData
-                        it.copy(
-                            neteaseMvData =
-                                d?.copy(
-                                    subed = liked,
-                                    subCount = ((d.subCount ?: 0) + if (liked) 1 else -1).coerceAtLeast(0),
-                                ),
-                        )
+                        it.copy(neteaseMvData = fresh ?: it.neteaseMvData)
                     }
-                } else {
-                    makeToast(getString(Res.string.cloud_action_failed_netease))
                 }
                 _remoteSongLikeState.value =
-                    if (ok) RemoteSongLikeState(liked = liked)
+                    if (ok) RemoteSongLikeState(liked = subed ?: liked)
                     else _remoteSongLikeState.value.copy(pending = false, failed = true)
             }
             return
@@ -2554,7 +2560,11 @@ class SharedViewModel(
     /** 网易 MV 下载(菜单"下载 MV"):mvDetail→brs 按设置选档→mp4 直存(单文件自带音轨,
      *  免 YT 式双流合并);进度走同一个 DownloadProgress 弹窗,失败落错误弹窗不裸抛 */
     fun downloadMvFile() {
-        val track = nowPlayingState.value?.track ?: return
+        // track 在队列 rebuild 窗口恒 null,回退 songEntity(九轮铁律);两者取名一致
+        val track =
+            nowPlayingState.value?.track
+                ?: nowPlayingState.value?.songEntity?.toTrack()
+                ?: return
         val mvid = track.videoId.removePrefix(NETEASE_MV_MEDIA_ID_PREFIX).toLongOrNull() ?: return
         viewModelScope.launch {
             _downloadFileProgress.value = DownloadProgress()
