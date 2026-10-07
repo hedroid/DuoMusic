@@ -105,6 +105,7 @@ fun NeteaseHomeScreen(
     viewModel: NeteaseHomeViewModel = koinInject(),
     navController: NavController,
 ) {
+    val sharedViewModel: com.maxrave.simpmusic.viewModel.SharedViewModel = koinInject()
     val state by viewModel.state.collectAsStateWithLifecycle()
     val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
     val accountInfo by viewModel.accountInfo.collectAsStateWithLifecycle()
@@ -191,6 +192,7 @@ fun NeteaseHomeScreen(
                             viewModel = viewModel,
                             navController = navController,
                             newAlbumsArea = state.newAlbumsArea,
+                            onPlayMv = { sharedViewModel.playMv(it) },
                         )
                     }
                 }
@@ -364,6 +366,48 @@ private fun NeteaseCategorySections(
 }
 
 
+
+/** 主页 MV 卡:16:9 横图 + 标题/艺人两行小字(与歌曲卡同视觉档,仅画幅不同) */
+@Composable
+private fun NeteaseMvCard(
+    mv: com.maxrave.domain.data.model.browse.album.Track,
+    onPlay: () -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .width(172.dp)
+                .padding(4.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .clickable(onClick = onPlay),
+    ) {
+        AsyncImage(
+            model = mv.thumbnails?.lastOrNull()?.url,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(16f / 9f)
+                    .clip(RoundedCornerShape(8.dp)),
+        )
+        Text(
+            text = mv.title,
+            style = typo().bodySmall,
+            color = MaterialTheme.colorScheme.onBackground,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+        Text(
+            text = mv.artists?.joinToString { it.name } ?: "",
+            style = typo().bodySmall,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
 
 /** 网格/单行通用紧凑歌曲卡:方图 + 标题/艺人两行小字。cardWidth 默认 96dp(3 行网格用),
  *  FM 单行(主页歌单行样式)传 120dp。NeteaseMixScreen(私人FM)同包复用,勿改回 private。
@@ -552,6 +596,7 @@ private fun NeteaseHomeRowSlot(
     viewModel: NeteaseHomeViewModel,
     navController: NavController,
     newAlbumsArea: String,
+    onPlayMv: (com.maxrave.domain.data.model.browse.album.Track) -> Unit,
 ) {
     when (ui) {
         is NeteaseHomeViewModel.RowUi.Loading -> {
@@ -633,6 +678,23 @@ private fun NeteaseHomeRowSlot(
                             albums = content.list,
                             navController = navController,
                         )
+                    }
+
+                is NeteaseHomeViewModel.RowContent.MvRow ->
+                    Column(Modifier.padding(horizontal = 15.dp)) {
+                        Text(
+                            text = row.title,
+                            style = typo().headlineMedium,
+                            color = MaterialTheme.colorScheme.onBackground,
+                        )
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.padding(top = 8.dp),
+                        ) {
+                            items(content.list, key = { it.videoId }) { mv ->
+                                NeteaseMvCard(mv = mv, onPlay = { onPlayMv(mv) })
+                            }
+                        }
                     }
 
                 is NeteaseHomeViewModel.RowContent.SectionsRow ->

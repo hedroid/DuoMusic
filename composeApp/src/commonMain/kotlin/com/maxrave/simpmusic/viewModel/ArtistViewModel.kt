@@ -63,6 +63,7 @@ class ArtistViewModel(
     private val dataStoreManager: DataStoreManager,
 ) : BaseViewModel() {
     private val mutationBus: LibraryMutationBus by inject()
+    private val neteaseRepository: com.maxrave.data.repository.NeteaseRepositoryImpl by inject()
 
     // It is dynamic and can be changed by the user, so separate it from the ArtistScreenData
     private var _canvasUrl: MutableStateFlow<Pair<String, SongEntity>?> = MutableStateFlow(null)
@@ -96,8 +97,25 @@ class ArtistViewModel(
     private val _artistScreenState: MutableStateFlow<ArtistScreenState> = MutableStateFlow(Loading)
     val artistScreenState: StateFlow<ArtistScreenState> = _artistScreenState
 
+    // 网易艺人 MV 货架(artist/mvs):非空即渲染(仅数字 channelId 拉取);失败静默隐藏
+    private val _artistMvs: MutableStateFlow<List<Track>> = MutableStateFlow(emptyList())
+    val artistMvs: StateFlow<List<Track>> = _artistMvs
+    private var artistMvsJob: Job? = null
+
     fun browseArtist(channelId: String) {
         _artistScreenState.value = Loading
+        // 网易艺人:MV 货架并行拉取(YT 艺人无此端点,清空即隐藏)
+        artistMvsJob?.cancel()
+        _artistMvs.value = emptyList()
+        channelId.toLongOrNull()?.let { numericId ->
+            artistMvsJob =
+                viewModelScope.launch {
+                    neteaseRepository.getArtistMvsPaged(numericId, limit = 10).getOrNull()
+                        ?.first
+                        ?.takeIf { it.isNotEmpty() }
+                        ?.let { mvs -> _artistMvs.value = mvs }
+                }
+        }
         _artistLogo.value = null
         _artistMotion.value = null
         _followed.value = false

@@ -62,6 +62,7 @@ import simpmusic.composeapp.generated.resources.download_no_space
 import simpmusic.composeapp.generated.resources.downloading
 import simpmusic.composeapp.generated.resources.error
 import simpmusic.composeapp.generated.resources.error_occurred
+import simpmusic.composeapp.generated.resources.no_mv_available
 import simpmusic.composeapp.generated.resources.play_next
 import simpmusic.composeapp.generated.resources.removed_download
 import simpmusic.composeapp.generated.resources.removed_from_YouTube_playlist
@@ -77,6 +78,7 @@ class NowPlayingBottomSheetViewModel(
     private val downloadUtils: DownloadHandler by inject()
     private val albumRepository: AlbumRepository by inject()
     private val neteaseRepository: com.maxrave.data.repository.NeteaseRepositoryImpl by inject()
+    private val sharedViewModel: SharedViewModel by inject()
     private val _uiState: MutableStateFlow<NowPlayingBottomSheetUIState> =
         MutableStateFlow(
             NowPlayingBottomSheetUIState(
@@ -648,6 +650,26 @@ class NowPlayingBottomSheetViewModel(
                     )
                 }
 
+                is NowPlayingBottomSheetUIEvent.WatchMv -> {
+                    // 歌曲→MV id→详情→单 MV 队列起播;无 MV/解析失败都给明确反馈
+                    val mvId = neteaseRepository.getNeteaseSongMvId(ev.videoId)
+                    if (mvId == null || mvId <= 0L) {
+                        makeToast(getString(Res.string.no_mv_available))
+                    } else {
+                        val track = neteaseRepository.getMvTrack(mvId)
+                        if (track == null) {
+                            makeToast(getString(Res.string.error))
+                        } else {
+                            sharedViewModel.playMv(track)
+                        }
+                    }
+                }
+
+                is NowPlayingBottomSheetUIEvent.DownloadMv -> {
+                    // MV mp4 直存(单文件自带音轨免合并);进度走播放页同一个 DownloadProgress 弹窗
+                    sharedViewModel.downloadMvFile()
+                }
+
                 is NowPlayingBottomSheetUIEvent.StartRadio -> {
                     songRepository
                         .getRadioFromEndpoint(
@@ -769,6 +791,12 @@ sealed class NowPlayingBottomSheetUIEvent {
         val speed: Float,
         val pitch: Int,
     ) : NowPlayingBottomSheetUIEvent()
+
+    data class WatchMv(
+        val videoId: String,
+    ) : NowPlayingBottomSheetUIEvent()
+
+    data object DownloadMv : NowPlayingBottomSheetUIEvent()
 
     data class StartRadio(
         val videoId: String,

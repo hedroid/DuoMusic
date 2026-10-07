@@ -3,6 +3,7 @@
     <string name="Song_and_artist_name">曲目 • %1$s</string>
     <string name="playlist_and_author">播放列表 • %1$s</string>
     <string name="album_and_artist_name">专辑 • %1$s</string>
+    <string name="subscribed_count">%1$s 人收藏</string>
     <string name="subscribers">%1$s 订阅</string>
     <string name="year_and_category">%1$s • %2$s</string>
     <string name="album_length">%1$s 音轨  %2$s</string>
@@ -944,6 +945,12 @@
     <string name="need_login_toast">登录后才能使用收藏</string>
     <string name="mixed_source_selection">包含不同音源的歌曲，无法添加</string>
     <string name="liked_toast">已喜欢</string>
+    <string name="mv_subscribed">已收藏 MV</string>
+    <string name="mv_unsubscribed">已取消收藏 MV</string>
+    <string name="watch_mv">看 MV</string>
+    <string name="download_mv">下载 MV</string>
+    <string name="no_mv_available">该歌曲暂无 MV</string>
+    <string name="mv">MV</string>
     <string name="unliked_toast">已取消喜欢</string>
     <string name="saved_toast">已收藏</string>
     <string name="unsaved_toast">已取消收藏</string>

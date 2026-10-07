@@ -166,6 +166,7 @@ import simpmusic.composeapp.generated.resources.liked_songs_by
 import simpmusic.composeapp.generated.resources.liked_songs_count
 import simpmusic.composeapp.generated.resources.more
 import simpmusic.composeapp.generated.resources.no_description
+import simpmusic.composeapp.generated.resources.mv
 import simpmusic.composeapp.generated.resources.popular
 import simpmusic.composeapp.generated.resources.related_artists
 import simpmusic.composeapp.generated.resources.share
@@ -932,6 +933,38 @@ private fun ArtistSections(
                         isSelected = selectionState.isSelected(song.videoId),
                         onLongClick = { selectionState.start(it) },
                         onSelectToggle = { selectionState.toggle(it) },
+                    )
+                }
+            }
+        }
+
+        // 网易艺人 MV 货架(/artist/mvs;YT 艺人恒空即隐藏):点击=单 MV 队列起播
+        // (NETEASE_MV_ 哨兵),不走歌曲装载路径
+        val artistMvs by viewModel.artistMvs.collectAsStateWithLifecycle()
+        AnimatedVisibility(artistMvs.isNotEmpty()) {
+            MediaRow(
+                title = stringResource(Res.string.mv),
+                titleColor = Color.White,
+                horizontalPadding = 20.dp,
+            ) {
+                items(artistMvs) { mv ->
+                    HomeItemVideo(
+                        forceDark = true,
+                        onClick = { sharedViewModel.playMv(mv) },
+                        onLongClick = { onTrackMore(mv) },
+                        data =
+                            Content(
+                                album = null,
+                                artists = mv.artists,
+                                description = null,
+                                isExplicit = mv.isExplicit,
+                                playlistId = null,
+                                browseId = null,
+                                thumbnails = mv.thumbnails ?: emptyList(),
+                                title = mv.title,
+                                videoId = mv.videoId,
+                                views = mv.views,
+                            ),
                     )
                 }
             }

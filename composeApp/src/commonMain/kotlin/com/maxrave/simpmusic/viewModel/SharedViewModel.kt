@@ -3,6 +3,7 @@ package com.maxrave.simpmusic.viewModel
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.lifecycle.viewModelScope
 import com.maxrave.common.Config
+import com.maxrave.common.NETEASE_MV_MEDIA_ID_PREFIX
 import com.maxrave.common.Config.ALBUM_CLICK
 import com.maxrave.common.Config.DOWNLOAD_CACHE
 import com.maxrave.common.Config.PLAYLIST_CLICK
@@ -23,6 +24,7 @@ import com.maxrave.domain.data.entities.NeteaseSongInfoEntity
 import com.maxrave.domain.data.entities.SongInfoEntity
 import com.maxrave.domain.data.entities.TranslatedLyricsEntity
 import com.maxrave.domain.data.model.browse.album.Track
+import com.maxrave.netease.model.NeteaseMvDetail
 import com.maxrave.domain.data.model.canvas.CanvasResult
 import com.maxrave.domain.data.model.download.DownloadProgress
 import com.maxrave.domain.data.model.intent.GenericIntent
@@ -110,6 +112,11 @@ import kotlinx.coroutines.withContext
 import org.jetbrains.compose.resources.getString
 import org.koin.core.component.inject
 import org.simpmusic.lastfm.completeLogin
+import simpmusic.composeapp.generated.resources.mv_subscribed
+import simpmusic.composeapp.generated.resources.mv_unsubscribed
+import simpmusic.composeapp.generated.resources.watch_mv
+import simpmusic.composeapp.generated.resources.download_mv
+import simpmusic.composeapp.generated.resources.no_mv_available
 import simpmusic.composeapp.generated.resources.podcast_trial_toast
 import simpmusic.composeapp.generated.resources.Res
 import simpmusic.composeapp.generated.resources.added_to_queue
@@ -554,7 +561,13 @@ class SharedViewModel(
                     }
                     state.mediaItem.let { now ->
                         _canvas.value = null
-                        if (now.mediaId.toLongOrNull() != null) {
+                        if (now.mediaId.startsWith(NETEASE_MV_MEDIA_ID_PREFIX)) {
+                            // 网易 MV:详情(计数/收藏态/评论线程)顶替 songInfo 卡;YT 详情全清
+                            _nowPlayingScreenData.update {
+                                it.copy(songInfoData = null, neteaseSongData = null, neteaseMvData = null)
+                            }
+                            getNeteaseMvData(now.mediaId)
+                        } else if (now.mediaId.toLongOrNull() != null) {
                             // 网易歌:YT songInfo(含 RYD 踩数)/YT 点赞状态对数字 ID 必失败,
                             // 白打两个请求还刷 logcat;songInfoData 必须显式清空,否则
                             // copy(...) 会把上一首的详情卡一直带着走。点赞状态换成云村红心。
@@ -562,10 +575,11 @@ class SharedViewModel(
                                 it.copy(
                                     songInfoData = null,
                                     neteaseSongData = null,
+                                    neteaseMvData = null,
                                 )
                             }
                         } else {
-                            _nowPlayingScreenData.update { it.copy(neteaseSongData = null) }
+                            _nowPlayingScreenData.update { it.copy(neteaseSongData = null, neteaseMvData = null) }
                             getSongInfo(now.mediaId)
                         }
                         getFormat(now.mediaId)
@@ -794,6 +808,8 @@ class SharedViewModel(
      */
     private fun refreshRemoteSongLike(song: SongEntity) {
         _remoteSongLikeState.value = RemoteSongLikeState()
+        // MV 收藏态由 getNeteaseMvData 的 subed 驱动,不走歌曲云端红心(YT 端点对 MV id 白打)
+        if (song.videoId.startsWith(NETEASE_MV_MEDIA_ID_PREFIX)) return
         viewModelScope.launch {
             val cloudLiked = songRepository.getRemoteLikeStatus(song.videoId)
             _remoteSongLikeState.value = RemoteSongLikeState(liked = cloudLiked)
@@ -819,6 +835,35 @@ class SharedViewModel(
 
     fun setRemoteSongLiked(liked: Boolean) {
         val song = nowPlayingState.value?.songEntity ?: return
+        // 网易 MV:红心=收藏 MV(mv/sub);无本地镜像行,成功后乐观翻转并同步 Info 卡
+        if (song.videoId.startsWith(NETEASE_MV_MEDIA_ID_PREFIX)) {
+            val mvid = song.videoId.removePrefix(NETEASE_MV_MEDIA_ID_PREFIX).toLongOrNull() ?: return
+            viewModelScope.launch {
+                _remoteSongLikeState.value = _remoteSongLikeState.value.copy(pending = true, failed = false)
+                val ok = neteaseRepository.subscribeMv(mvid, liked).getOrDefault(false)
+                if (ok) {
+                    _liked.value = liked
+                    mediaPlayerHandler.like(liked)
+                    makeToast(getString(if (liked) Res.string.mv_subscribed else Res.string.mv_unsubscribed))
+                    _nowPlayingScreenData.update {
+                        val d = it.neteaseMvData
+                        it.copy(
+                            neteaseMvData =
+                                d?.copy(
+                                    subed = liked,
+                                    subCount = ((d.subCount ?: 0) + if (liked) 1 else -1).coerceAtLeast(0),
+                                ),
+                        )
+                    }
+                } else {
+                    makeToast(getString(Res.string.cloud_action_failed_netease))
+                }
+                _remoteSongLikeState.value =
+                    if (ok) RemoteSongLikeState(liked = liked)
+                    else _remoteSongLikeState.value.copy(pending = false, failed = true)
+            }
+            return
+        }
         viewModelScope.launch {
             _remoteSongLikeState.value = _remoteSongLikeState.value.copy(pending = true, failed = false)
             val result = songRepository.setRemoteLikeStatus(song.videoId, liked)
@@ -864,6 +909,45 @@ class SharedViewModel(
                     _nowPlayingScreenData.update { it.copy(neteaseSongData = meta) }
                 }
             }
+    }
+
+    /** 网易 MV 详情:Info 卡数据 + 收藏态(红心初态=subed)+ 评论线程;切歌竞态防护同上 */
+    private var neteaseMvJob: Job? = null
+
+    private fun getNeteaseMvData(mediaId: String) {
+        neteaseMvJob?.cancel()
+        neteaseMvJob =
+            viewModelScope.launch {
+                val mvid = mediaId.removePrefix(NETEASE_MV_MEDIA_ID_PREFIX).toLongOrNull() ?: return@launch
+                val detail = neteaseRepository.getMvDetail(mvid).getOrNull() ?: return@launch
+                // 发布前确认还是这首 MV,别把上一支的卡盖到新曲上
+                if (mediaPlayerHandler.nowPlayingState.value.mediaItem?.mediaId == mediaId) {
+                    _nowPlayingScreenData.update { it.copy(neteaseMvData = detail) }
+                    detail.subed?.let { sub ->
+                        _liked.value = sub
+                        mediaPlayerHandler.like(sub)
+                    }
+                }
+            }
+    }
+
+    /** 网易 MV 播放入口(菜单"看 MV"/歌手页/主页 MV 货架共用):单一 MV 队列,
+     *  playlistId=NETEASE_MV_<mvid> 哨兵(loadMore 见前缀即止);PLAYLIST_CLICK 整队装载。
+     *  不走 loadMediaItemFromTrack——它先 insertSong,MV 不落 song 表。 */
+    fun playMv(track: Track) {
+        viewModelScope.launch {
+            mediaPlayerHandler.setQueueData(
+                QueueData.Data(
+                    listTracks = arrayListOf(track),
+                    firstPlayedTrack = track,
+                    playlistId = track.videoId,
+                    playlistName = track.title,
+                    playlistType = PlaylistType.PLAYLIST,
+                    continuation = null,
+                ),
+            )
+            mediaPlayerHandler.loadMediaItem(track, PLAYLIST_CLICK, 0)
+        }
     }
 
     private fun getCanvas(
@@ -2464,6 +2548,44 @@ class SharedViewModel(
             return
         }
         val ext = if (stream.mimeType?.contains("flac", ignoreCase = true) == true) "flac" else "mp3"
+        downloadUrlToFile(stream.url, path, ext)
+    }
+
+    /** 网易 MV 下载(菜单"下载 MV"):mvDetail→brs 按设置选档→mp4 直存(单文件自带音轨,
+     *  免 YT 式双流合并);进度走同一个 DownloadProgress 弹窗,失败落错误弹窗不裸抛 */
+    fun downloadMvFile() {
+        val track = nowPlayingState.value?.track ?: return
+        val mvid = track.videoId.removePrefix(NETEASE_MV_MEDIA_ID_PREFIX).toLongOrNull() ?: return
+        viewModelScope.launch {
+            _downloadFileProgress.value = DownloadProgress()
+            val detail = neteaseRepository.getMvDetail(mvid).getOrNull()
+            val brs = detail?.brs
+            if (brs.isNullOrEmpty()) {
+                _downloadFileProgress.value = DownloadProgress.failed("mv stream unavailable")
+                return@launch
+            }
+            val wanted = dataStoreManager.videoQuality.first().removeSuffix("p").toIntOrNull() ?: 720
+            val candidates = brs.keys.filter { it in 240..1080 }.sorted()
+            val pick = candidates.lastOrNull { it <= wanted } ?: candidates.firstOrNull()
+            val url = pick?.let { brs[it] }
+            if (url == null) {
+                _downloadFileProgress.value = DownloadProgress.failed("mv stream unavailable")
+                return@launch
+            }
+            val fileName = sanitizeDownloadFileName("${detail?.name ?: track.title}", track.videoId)
+            val path = "${getDownloadFolderPath()}/$fileName"
+            withContext(Dispatchers.IO) {
+                downloadUrlToFile(url, path, "mp4")
+            }
+        }
+    }
+
+    /** 共用流式下载体:URL → .part 分块写(校验 Content-Length)→ rename 提交 + 进度 */
+    private suspend fun downloadUrlToFile(
+        url: String,
+        path: String,
+        ext: String,
+    ) {
         val part = File("$path.$ext.part")
         try {
             // prepareGet+execute 才是真流式:ktor3 的 client.get() 会把整个响应体先
@@ -2477,7 +2599,7 @@ class SharedViewModel(
                     socketTimeoutMillis = 60_000L
                 }
             }.use { client ->
-                client.prepareGet(stream.url).execute { response ->
+                client.prepareGet(url).execute { response ->
                     // ktor 默认不按状态码判失败;audioUrl 有 10 分钟有效期,过期/区域拒绝
                     // 返回的 4xx/5xx 正文是 HTML/JSON,不拦会存成 .mp3 还报下载完成
                     if (!response.status.isSuccess()) {
@@ -2746,6 +2868,8 @@ data class NowPlayingScreenData(
     val songInfoData: SongInfoEntity? = null,
     /** 网易歌详情卡数据(艺人/专辑/热评),与 songInfoData 按源互斥 */
     val neteaseSongData: NeteaseSongInfoEntity? = null,
+    /** 网易 MV 详情(计数/收藏态/评论线程),当前曲是 MV 时非 null,与上两者互斥 */
+    val neteaseMvData: NeteaseMvDetail? = null,
     val bitmap: ImageBitmap? = null,
 ) {
     data class CanvasData(

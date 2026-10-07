@@ -194,6 +194,7 @@ import com.maxrave.simpmusic.ui.icon.SyncDisabled
 import com.maxrave.simpmusic.ui.icon.Update
 import com.maxrave.simpmusic.ui.navigation.destination.list.AlbumDestination
 import com.maxrave.simpmusic.ui.navigation.destination.list.ArtistDestination
+import com.maxrave.common.NETEASE_MV_MEDIA_ID_PREFIX
 import com.maxrave.simpmusic.ui.navigation.destination.list.SimilarSongsDestination
 import com.maxrave.simpmusic.ui.screen.player.deriveOrderIndex
 import com.maxrave.simpmusic.ui.utils.formatCompactCount
@@ -275,7 +276,11 @@ import simpmusic.composeapp.generated.resources.download_this_song_file_to_your_
 import simpmusic.composeapp.generated.resources.downloaded
 import simpmusic.composeapp.generated.resources.delete_video_message
 import simpmusic.composeapp.generated.resources.delete_video_title
+import simpmusic.composeapp.generated.resources.download_mv
+import simpmusic.composeapp.generated.resources.mv
+import simpmusic.composeapp.generated.resources.subscribed_count
 import simpmusic.composeapp.generated.resources.download_video
+import simpmusic.composeapp.generated.resources.watch_mv
 import simpmusic.composeapp.generated.resources.overwrite_download_message
 import simpmusic.composeapp.generated.resources.overwrite_download_title
 import simpmusic.composeapp.generated.resources.downloading
@@ -683,7 +688,9 @@ fun InfoPlayerBottomSheet(
                 )
                 // 网易歌:来源链接是 music.163.com(YT 链接对数字 ID 无效);播放量/赞踩换
                 // 红心总数+评论数(热评内容从播放页详情卡进入评论列表看)。
-                val isNeteaseSong = songEntity?.videoId?.toLongOrNull() != null
+                // 网易 MV 同走本分支:互动数据换 MV 详情(播放/赞/收藏),链接指 MV 页
+                val isNeteaseMv = songEntity?.videoId?.startsWith(NETEASE_MV_MEDIA_ID_PREFIX) == true
+                val isNeteaseSong = songEntity?.videoId?.toLongOrNull() != null || isNeteaseMv
                 // 标签(itag)是 YouTube 流格式编号,网易取流无此概念(占位 0),隐藏
                 if (!isNeteaseSong) {
                     Text(
@@ -890,7 +897,86 @@ fun InfoPlayerBottomSheet(
                 )
 
                 val neteaseMeta = screenDataState.neteaseSongData
-                if (isNeteaseSong && neteaseMeta != null) {
+                val mvMeta = screenDataState.neteaseMvData
+                if (isNeteaseMv && mvMeta != null) {
+                    // MV 信息卡:播放/赞/收藏/评论 + 简介(数据全来自 mv/detail)
+                    mvMeta.playCount?.let { playCount ->
+                        Text(
+                            text = stringResource(Res.string.plays),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
+                            textAlign = TextAlign.Center,
+                            style = typo().labelMedium,
+                            color = rememberSurfaceDarkColors().content,
+                        )
+                        Text(
+                            text = formatCompactCount(playCount),
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp),
+                            style = typo().bodyMedium,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                    mvMeta.likeCount?.let { likeCount ->
+                        Text(
+                            text = stringResource(Res.string.like),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
+                            textAlign = TextAlign.Center,
+                            style = typo().labelMedium,
+                            color = rememberSurfaceDarkColors().content,
+                        )
+                        Text(
+                            text = formatCompactCount(likeCount),
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp),
+                            style = typo().bodyMedium,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                    mvMeta.subCount?.let { subCount ->
+                        Text(
+                            text = stringResource(Res.string.mv),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
+                            textAlign = TextAlign.Center,
+                            style = typo().labelMedium,
+                            color = rememberSurfaceDarkColors().content,
+                        )
+                        Text(
+                            text = stringResource(Res.string.subscribed_count, formatCompactCount(subCount)),
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp),
+                            style = typo().bodyMedium,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                    if ((mvMeta.commentCount ?: 0) > 0) {
+                        Text(
+                            text = stringResource(Res.string.comments),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
+                            textAlign = TextAlign.Center,
+                            style = typo().labelMedium,
+                            color = rememberSurfaceDarkColors().content,
+                        )
+                        Text(
+                            text = stringResource(Res.string.comments_count, formatCompactCount(mvMeta.commentCount ?: 0L)),
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp),
+                            style = typo().bodyMedium,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                    val mvDesc = mvMeta.description?.takeIf { it.isNotBlank() } ?: mvMeta.briefDesc?.takeIf { it.isNotBlank() }
+                    if (mvDesc != null) {
+                        Text(
+                            text = stringResource(Res.string.description),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
+                            textAlign = TextAlign.Center,
+                            style = typo().labelMedium,
+                            color = rememberSurfaceDarkColors().content,
+                        )
+                        Text(
+                            text = mvDesc,
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp),
+                            style = typo().bodyMedium,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                } else if (isNeteaseSong && neteaseMeta != null) {
                     // 播客节目点赞数拿不到(端点对 mainSong 恒 0)——不展示,别挂一个"点赞 0"
                     if (!isPodcastQueue) neteaseMeta.likeCount?.let { likeCount ->
                         Text(
@@ -1033,7 +1119,9 @@ fun InfoPlayerBottomSheet(
                     )
                 }
                 val sourceUrl =
-                    if (isNeteaseSong) {
+                    if (isNeteaseMv) {
+                        "https://music.163.com/mv?id=${songEntity?.videoId?.removePrefix(NETEASE_MV_MEDIA_ID_PREFIX)}"
+                    } else if (isNeteaseSong) {
                         "https://music.163.com/song?id=${songEntity?.videoId}"
                     } else {
                         "https://music.youtube.com/watch?v=${songEntity?.videoId}"
@@ -2319,7 +2407,10 @@ fun NowPlayingBottomSheet(
                     val isRealVideoSong =
                         uiState.songUIState.videoType.isNotBlank() &&
                             uiState.songUIState.videoType != "MUSIC_VIDEO_TYPE_ATV"
-                    if (!isPodcastEpisode && !isRealVideoSong) ActionButton(
+                    // 网易 MV(媒体 id=NETEASE_MV_ 哨兵):非歌曲实体——下载/电台/加歌单/
+                    // 歌词供应商等歌曲语义的行全部不适用,专属行见"下载 MV"
+                    val isNeteaseMvSong = uiState.songUIState.videoId.startsWith(NETEASE_MV_MEDIA_ID_PREFIX)
+                    if (!isPodcastEpisode && !isRealVideoSong && !isNeteaseMvSong) ActionButton(
                         icon =
                             when (uiState.songUIState.downloadState) {
                                 DownloadState.STATE_NOT_DOWNLOADED -> SimpIcons.DownloadForOfflineOutlined
@@ -2361,7 +2452,8 @@ fun NowPlayingBottomSheet(
                     // 在途=下载中(点击只撤视频条目),文件在=已下载(点击"重新下载?"覆盖),
                     // 否则=下载视频;视频态独立于音频态,Room 路径列+内存条目流双源
                     if (uiState.songUIState.videoId.toLongOrNull() == null &&
-                        uiState.songUIState.videoType != "MUSIC_VIDEO_TYPE_ATV"
+                        uiState.songUIState.videoType != "MUSIC_VIDEO_TYPE_ATV" &&
+                        !isNeteaseMvSong
                     ) {
                         when {
                             videoDownloading ->
@@ -2391,6 +2483,17 @@ fun NowPlayingBottomSheet(
                                 }
                         }
                     }
+                    // 网易 MV 专属下载行:mvDetail.brs mp4 单文件直存(免 merge),
+                    // 进度走播放页同一个 DownloadProgress 弹窗
+                    if (isNeteaseMvSong) {
+                        ActionButton(
+                            icon = SimpIcons.Movie,
+                            text = Res.string.download_mv,
+                        ) {
+                            viewModel.onUIEvent(NowPlayingBottomSheetUIEvent.DownloadMv)
+                            hideModalBottomSheet()
+                        }
+                    }
                     // 删除下载(2026-10 用户反馈):独立成行——"下载"行对已下载歌是"重新
                     // 下载?"覆盖语义,真删除放这里(图标用 playlist_remove,不用垃圾桶)。
                     // 下载中/准备中也显示(用户 2026-10-01:下载中的歌也要能从三点里删,
@@ -2400,7 +2503,7 @@ fun NowPlayingBottomSheet(
                     // 下载,删除走下载管理页);列表歌曲菜单保留。
                     // 位置在"下载视频"按钮之下(2026-10-03 用户定);视频歌=删除视频
                     // (音频不下载,在途取消在视频行,这里只管已落文件)
-                    if (!isPodcastEpisode && song != null) {
+                    if (!isPodcastEpisode && song != null && !isNeteaseMvSong) {
                         if (isRealVideoSong) {
                             if (uiState.songUIState.downloadedVideoFilePath != null) {
                                 ActionButton(
@@ -2433,7 +2536,7 @@ fun NowPlayingBottomSheet(
                         }
                     }
                     // 播客节目不进歌单(剧集不是歌)——隐藏(2026-09-29 用户定)
-                    if (!isPodcastQueue) ActionButton(
+                    if (!isPodcastQueue && !isNeteaseMvSong) ActionButton(
                         icon = SimpIcons.PlaylistAdd,
                         text = Res.string.add_to_a_playlist,
                         enable = cloudLikedForGate != null,
@@ -2501,7 +2604,7 @@ fun NowPlayingBottomSheet(
                             navController.navigate(AlbumDestination(browseId = id))
                         }
                     }
-                    if (!isPodcastQueue) ActionButton(
+                    if (!isPodcastQueue && !isNeteaseMvSong) ActionButton(
                         icon = SimpIcons.Sensors,
                         text = Res.string.start_radio,
                     ) {
@@ -2530,13 +2633,28 @@ fun NowPlayingBottomSheet(
                             hideModalBottomSheet()
                         }
                     }
+                    // 网易歌独有:看 MV(歌曲→mv 字段解析,详情拉取后单 MV 队列起播)
+                    if (uiState.songUIState.videoId.toLongOrNull() != null && !isPodcastQueue) {
+                        ActionButton(
+                            icon = SimpIcons.Movie,
+                            text = Res.string.watch_mv,
+                        ) {
+                            viewModel.onUIEvent(
+                                NowPlayingBottomSheetUIEvent.WatchMv(
+                                    videoId = uiState.songUIState.videoId,
+                                ),
+                            )
+                            hideModalBottomSheet()
+                        }
+                    }
                     // 网易歌歌词恒走 NETEASE 官方专线,供应商选择对其无效 → 入口隐藏;
                     // 仅 YT 歌可选(设置页入口已隐藏,这里是唯一选择处)
                     Crossfade(
                         targetState =
                             changeMainLyricsProviderEnable &&
                                 uiState.songUIState.videoId.isNotEmpty() &&
-                                uiState.songUIState.videoId.toLongOrNull() == null,
+                                uiState.songUIState.videoId.toLongOrNull() == null &&
+                                !isNeteaseMvSong,
                     ) {
                         if (it) {
                             ActionButton(
@@ -4542,6 +4660,7 @@ fun NeteaseCommentsSheet(
                     parentCommentId = parentId,
                     limit = 20,
                     time = time,
+                    threadId = threadId?.takeIf { it.isNotEmpty() },
                 )
             if (page == null) {
                 floorFailed = true

@@ -3,6 +3,7 @@
     <string name="Song_and_artist_name">Song • %1$s</string>
     <string name="playlist_and_author">Playlist • %1$s</string>
     <string name="album_and_artist_name">Album • %1$s</string>
+    <string name="subscribed_count">%1$s favorites</string>
     <string name="subscribers">%1$s subscribers</string>
     <string name="year_and_category">%1$s • %2$s</string>
     <string name="album_length">%1$s tracks  %2$s</string>
@@ -1005,6 +1006,12 @@
     <string name="need_login_toast">Sign in to use favorites</string>
     <string name="mixed_source_selection">Mixes music sources — cannot add</string>
     <string name="liked_toast">Liked</string>
+    <string name="mv_subscribed">MV saved to favorites</string>
+    <string name="mv_unsubscribed">Removed MV from favorites</string>
+    <string name="watch_mv">Watch MV</string>
+    <string name="download_mv">Download MV</string>
+    <string name="no_mv_available">This song has no MV</string>
+    <string name="mv">MV</string>
     <string name="unliked_toast">Removed from likes</string>
     <string name="saved_toast">Saved</string>
     <string name="unsaved_toast">Removed from library</string>

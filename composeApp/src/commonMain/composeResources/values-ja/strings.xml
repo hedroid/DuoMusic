@@ -3,6 +3,7 @@
     <string name="Song_and_artist_name">曲 • %1$s</string>
     <string name="playlist_and_author">再生リスト • %1$s</string>
     <string name="album_and_artist_name">アルバム • %1$s</string>
+    <string name="subscribed_count">%1$s 件のお気に入り</string>
     <string name="subscribers">%1$s人の登録者</string>
     <string name="year_and_category">%1$s • %2$s</string>
     <string name="album_length">%1$s曲 %2$s</string>
@@ -581,6 +582,12 @@
     <string name="cloud_action_failed_netease">NetEase アカウントを更新できませんでした</string>
     <string name="need_login_toast">ログインすると利用できます</string>
     <string name="liked_toast">「いいね」しました</string>
+    <string name="mv_subscribed">MVをお気に入りに追加しました</string>
+    <string name="mv_unsubscribed">MVのお気に入りを解除しました</string>
+    <string name="watch_mv">MVを見る</string>
+    <string name="download_mv">MVをダウンロード</string>
+    <string name="no_mv_available">この曲にはMVがありません</string>
+    <string name="mv">MV</string>
     <string name="unliked_toast">「いいね」を解除しました</string>
     <string name="saved_toast">保存しました</string>
     <string name="unsaved_toast">保存から外しました</string>

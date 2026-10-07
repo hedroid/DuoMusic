@@ -46,6 +46,7 @@ class NeteaseHomeViewModel(
         RADAR_PLAYLISTS("雷达歌单"),
         HQ("精品歌单"),
         NEW_SONGS("推荐新歌"),
+        MV("MV"),
         CHART("排行榜"),
         NEW_ALBUMS("新碟上架"),
         SECTIONS("分类"),
@@ -62,6 +63,9 @@ class NeteaseHomeViewModel(
         data class ArtistsRow(val list: List<ArtistsResult>) : RowContent
 
         data class AlbumsRow(val list: List<AlbumsResult>) : RowContent
+
+        /** 个性化 MV(personalized/mv;Track=NETEASE_MV_ 哨兵,点击单 MV 队列起播) */
+        data class MvRow(val list: List<com.maxrave.domain.data.model.browse.album.Track>) : RowContent
 
         data class SectionsRow(val mood: Mood) : RowContent
     }
@@ -216,6 +220,10 @@ class NeteaseHomeViewModel(
             Row.RADAR_PLAYLISTS -> neteaseRepository.getRadarPlaylistsRow(force)?.let { RowUi.Ready(RowContent.Feed(it)) } ?: RowUi.Failed
             Row.HQ -> neteaseRepository.getHqPlaylistsRow(force)?.let { RowUi.Ready(RowContent.Feed(it)) } ?: RowUi.Failed
             Row.NEW_SONGS -> neteaseRepository.getNewSongsRow(force)?.let { RowUi.Ready(RowContent.Feed(it)) } ?: RowUi.Failed
+            Row.MV ->
+                neteaseRepository.getPersonalizedMvs().getOrNull()
+                    ?.takeIf { it.isNotEmpty() }
+                    ?.let { RowUi.Ready(RowContent.MvRow(it)) } ?: RowUi.Failed
             Row.CHART ->
                 neteaseRepository.getHomeChart().getOrNull()
                     ?.let { RowUi.Ready(RowContent.ChartRow(it)) } ?: RowUi.Failed

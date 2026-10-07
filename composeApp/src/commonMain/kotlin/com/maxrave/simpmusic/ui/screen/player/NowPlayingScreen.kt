@@ -97,6 +97,7 @@ import com.maxrave.simpmusic.ui.icon.SimpIcons
 import com.maxrave.simpmusic.ui.navigation.destination.home.ListenTogetherDestination
 import com.maxrave.simpmusic.ui.navigation.destination.list.ArtistDestination
 import com.maxrave.simpmusic.ui.navigation.destination.player.FullscreenDestination
+import com.maxrave.common.NETEASE_MV_MEDIA_ID_PREFIX
 import com.maxrave.simpmusic.ui.screen.player.content.ArtworkPagerSnapAnimation
 import com.maxrave.simpmusic.ui.screen.player.content.NowPlayingContentActions
 import com.maxrave.simpmusic.ui.screen.player.content.NowPlayingContentAppleMusic
@@ -326,6 +327,8 @@ fun NowPlayingScreenContent(
     // 拦住不再回发——songEntity 与 track 同指当前曲,回退取它(否则 isNeteaseSong/红心门控
     // 在冷启恢复队列等场景全部误判成 YT)。
     val nowPlayingVideoId: String? = nowPlayingState?.track?.videoId ?: nowPlayingState?.songEntity?.videoId
+    // 当前曲是网易 MV(队列/媒体 id 带 NETEASE_MV_ 哨兵):强制渲染视频 + 评论走 R_MV_5_ 线程
+    val isNeteaseMv = nowPlayingVideoId?.startsWith(NETEASE_MV_MEDIA_ID_PREFIX) == true
     // currentOrderIndex() is a plain getter over the player, NOT Compose state, so it is read
     // inside this remember block — whose keys (the queue, and the track now playing) are exactly
     // the two things that can move the player's position. nowPlayingState is published FROM the
@@ -676,13 +679,14 @@ fun NowPlayingScreenContent(
             controllerState = controllerState,
             timelineFlow = sharedViewModel.timeline,
             castState = castState,
-            shouldShowVideo = shouldShowVideo,
-            isNeteaseSong = nowPlayingVideoId?.toLongOrNull() != null,
+            // MV:看 MV 语义即视频常显,不受"视频代替音频"设置门控
+            shouldShowVideo = shouldShowVideo || isNeteaseMv,
+            isNeteaseSong = nowPlayingVideoId?.toLongOrNull() != null || isNeteaseMv,
             isPodcastSong = mediaPlayerHandler.queueData.value?.data?.isNeteasePodcastQueue == true,
             remoteLikeState = remoteLikeState,
-            // 红心=云端态;未登录源置灰(点击提示登录)
+            // 红心=云端态;未登录源置灰(点击提示登录);MV 红心=收藏,吃网易登录态
             likeEnabled =
-                if (nowPlayingVideoId?.toLongOrNull() != null) {
+                if (nowPlayingVideoId?.toLongOrNull() != null || isNeteaseMv) {
                     neteaseLoggedIn
                 } else {
                     isUserLoggedIn
@@ -959,8 +963,14 @@ fun NowPlayingScreenContent(
                 mediaPlayerHandler.nowPlayingState.value.songEntity?.videoId
                     ?: nowPlayingVideoId
                     ?: "",
-            totalCount = screenDataState.neteaseSongData?.commentCount ?: 0,
-            threadId = podcastProgramThreadId.value,
+            // MV:详情响应直接带 R_MV_5_<mvid>,零反查
+            totalCount = screenDataState.neteaseSongData?.commentCount ?: screenDataState.neteaseMvData?.commentCount?.toInt() ?: 0,
+            threadId =
+                if (isNeteaseMv) {
+                    screenDataState.neteaseMvData?.commentThreadId ?: ""
+                } else {
+                    podcastProgramThreadId.value
+                },
             isPodcast = mediaPlayerHandler.queueData.value?.data?.isNeteasePodcastQueue == true,
         )
     }
