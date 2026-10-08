@@ -1,42 +1,78 @@
 package com.maxrave.simpmusic.ui.screen.other
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
-import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.MarqueeAnimationMode
+import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SearchBar
+import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -46,113 +82,301 @@ import coil3.compose.LocalPlatformContext
 import coil3.request.CachePolicy
 import coil3.request.ImageRequest
 import coil3.request.crossfade
+import com.kmpalette.rememberPaletteState
+import com.maxrave.domain.data.model.browse.album.Track
+import com.maxrave.domain.utils.toSongEntity
+import com.maxrave.simpmusic.expect.ui.layerBackdrop
+import com.maxrave.simpmusic.expect.ui.rememberBackdrop
+import com.maxrave.simpmusic.expect.ui.toImageBitmap
+import com.maxrave.simpmusic.extension.artworkScrimBrush
 import com.maxrave.simpmusic.extension.barBlurStyle
+import com.maxrave.simpmusic.extension.getScreenSizeInfo
+import com.maxrave.simpmusic.extension.toImmersiveBackground
+import com.maxrave.simpmusic.ui.component.ActionButton
 import com.maxrave.simpmusic.ui.component.CenterLoadingBox
+import com.maxrave.simpmusic.ui.component.EndOfModalBottomSheet
 import com.maxrave.simpmusic.ui.component.EndOfPage
-import com.maxrave.simpmusic.ui.component.RippleIconButton
+import com.maxrave.simpmusic.ui.component.LiquidGlassIconButton
+import com.maxrave.simpmusic.ui.component.NowPlayingBottomSheet
+import com.maxrave.simpmusic.ui.component.SearchBarEnter
+import com.maxrave.simpmusic.ui.component.SearchBarExit
+import com.maxrave.simpmusic.ui.component.liquidGlass
 import com.maxrave.simpmusic.ui.component.rememberHolderPainter
+import com.maxrave.simpmusic.ui.component.rememberSurfaceDarkColors
 import com.maxrave.simpmusic.ui.icon.ArrowBackIosNew
+import com.maxrave.simpmusic.ui.icon.Close
+import com.maxrave.simpmusic.ui.icon.DownloadForOffline
+import com.maxrave.simpmusic.ui.icon.MoreVert
+import com.maxrave.simpmusic.ui.icon.Pause
+import com.maxrave.simpmusic.ui.icon.PlayArrow
+import com.maxrave.simpmusic.ui.icon.QueueMusic
+import com.maxrave.simpmusic.ui.icon.Search
+import com.maxrave.simpmusic.ui.icon.Shuffle
 import com.maxrave.simpmusic.ui.icon.SimpIcons
-import com.maxrave.simpmusic.ui.theme.LibraryGridDefaults
 import com.maxrave.simpmusic.ui.theme.typo
 import com.maxrave.simpmusic.viewModel.MvListUIState
 import com.maxrave.simpmusic.viewModel.MvListViewModel
 import com.maxrave.simpmusic.viewModel.SharedViewModel
+import com.maxrave.simpmusic.viewModel.UIEvent
 import dev.chrisbanes.haze.HazeInput
 import dev.chrisbanes.haze.blur.hazeBlur
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import simpmusic.composeapp.generated.resources.Res
+import simpmusic.composeapp.generated.resources.add_to_queue
+import simpmusic.composeapp.generated.resources.download
+import simpmusic.composeapp.generated.resources.downloading
 import simpmusic.composeapp.generated.resources.favorite_mvs
+import simpmusic.composeapp.generated.resources.mv_count_short
 import simpmusic.composeapp.generated.resources.no_favorite_mvs
 import simpmusic.composeapp.generated.resources.retry
+import simpmusic.composeapp.generated.resources.search
 
 /**
- * 收藏的 MV 页(2026-10-08 用户定:UI 对齐收藏歌单网格):16:9 tile 网格
- * (LibraryGridDefaults 口径,封面+标题+艺人两行文字与歌单 tile 同构),点击单 MV 队列起播。
+ * 收藏的 MV 页(2026-10-08 二稿,用户定案:对齐歌单详情页 PlaylistScreen 同构)——
+ * 沉浸式半屏头图(首条 MV 封面+调色板底色)+液态玻璃顶栏(返回+搜索+更多)、
+ * [随机][播放][下载]按钮行、16:9 行卡带三点菜单(NowPlayingBottomSheet,MV 语义行已内建)、
+ * 顶栏搜索=本地过滤已加载条目。分页/页脚重试沿用一稿口径。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MvListScreen(
-    innerPadding: PaddingValues,
+    @Suppress("UNUSED_PARAMETER") innerPadding: PaddingValues,
     navController: NavController,
     viewModel: MvListViewModel = koinViewModel(),
     sharedViewModel: SharedViewModel = koinInject(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val hazeState = rememberHazeState()
-    val gridState = rememberLazyGridState()
+    val listState = rememberLazyListState()
+    // 正在播放判定双源(track 在队列 rebuild 窗口恒 null,songEntity 兜底——九轮铁律)
     val playingTrack by remember {
         sharedViewModel.nowPlayingState.map { it?.songEntity?.videoId ?: it?.track?.videoId }
     }.collectAsState(null)
+    val isPlaying by sharedViewModel.controllerState.map { it.isPlaying }.collectAsState(initial = false)
+    val queueData by sharedViewModel.getQueueDataState().collectAsStateWithLifecycle()
+    val playingThisList = queueData?.data?.playlistId == MvListViewModel.MV_SUBLIST_QUEUE_ID
 
-    // 近底触发下一页:网格按"剩余条目"计,24 条≈手机 3 列时的 8 行,与改版前列页同跑道;
-    // 翻页失败后被 loadMoreFailed 挡住,改由页脚"重试"驱动
+    var showSearchBar by rememberSaveable { mutableStateOf(false) }
+    var searchBarHeightPx by remember { mutableStateOf(0) }
+    var query by rememberSaveable { mutableStateOf("") }
+    var menuTarget by remember { mutableStateOf<Track?>(null) }
+    var showListMenu by remember { mutableStateOf(false) }
+
+    // stringResource 不能在 onClick 协程/回调里取——组合期先解析好(项目惯例)
+    val emptyText = stringResource(Res.string.no_favorite_mvs)
+    val downloadingText = stringResource(Res.string.downloading)
+
+    val mvs = (uiState as? MvListUIState.Success)?.mvs.orEmpty()
+    // 本地过滤(歌单页同款):直接计算,不走 remember+derivedStateOf——mvs 是普通局部
+    // val,lambda 捕获的是首帧值,翻页新批次会被旧闭包吞掉
+    val filteredMvs =
+        if (query.isEmpty() || !showSearchBar) {
+            mvs
+        } else {
+            mvs.filter {
+                it.title.contains(query, ignoreCase = true) ||
+                    it.artists?.joinToString(", ")?.contains(query, ignoreCase = true) == true
+            }
+        }
+
+    // 近底触发下一页(剩 8 行内);翻页失败后被 loadMoreFailed 挡住,改由页脚"重试"驱动
     val shouldLoadMore by remember {
         derivedStateOf {
             val state = uiState as? MvListUIState.Success ?: return@derivedStateOf false
             state.hasMore &&
                 !state.loadingMore &&
                 !state.loadMoreFailed &&
-                gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index
-                    ?.let { it >= gridState.layoutInfo.totalItemsCount - 24 } == true
+                listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index
+                    ?.let { it >= listState.layoutInfo.totalItemsCount - 8 } == true
         }
     }
     LaunchedEffect(shouldLoadMore) {
         if (shouldLoadMore) viewModel.loadMore()
     }
 
+    val firstItemVisible by remember {
+        derivedStateOf { listState.firstVisibleItemIndex == 0 }
+    }
+    var shouldHideTopBar by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(firstItemVisible) { shouldHideTopBar = !firstItemVisible }
+
+    val paletteState = rememberPaletteState()
+    val headerCover = mvs.firstOrNull()?.thumbnails?.lastOrNull()?.url
+    val mutedPaletteBg = paletteState.palette.toImmersiveBackground()
+    var bitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+    // 防滚动回收重放:同封面只生成一次调色板(歌单页同款护栏)
+    var paletteGeneratedFor by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(bitmap) {
+        val bm = bitmap
+        if (bm != null && headerCover != null && paletteGeneratedFor != headerCover) {
+            paletteState.generate(bm)
+            paletteGeneratedFor = headerCover
+        }
+    }
+
     Box(Modifier.fillMaxSize()) {
         Crossfade(targetState = uiState) { state ->
             when (state) {
                 is MvListUIState.Success -> {
-                    // 空集=居中空态文案(入口常驻后 0 条是可达状态,不再让网格只剩页尾)
-                    if (state.mvs.isEmpty()) {
-                        Box(
-                            Modifier
-                                .fillMaxSize()
-                                .padding(16.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                text = stringResource(Res.string.no_favorite_mvs),
-                                style = typo().bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    } else {
-                    LazyVerticalGrid(
-                        columns = GridCells.Adaptive(minSize = LibraryGridDefaults.minTileSize),
-                        horizontalArrangement = LibraryGridDefaults.horizontalArrangement,
-                        verticalArrangement = LibraryGridDefaults.verticalArrangement,
-                        contentPadding =
-                            PaddingValues(
-                                start = LibraryGridDefaults.horizontalPadding,
-                                top = innerPadding.calculateTopPadding() + 64.dp + 4.dp,
-                                end = LibraryGridDefaults.horizontalPadding,
-                                // 底部让位已在 contentPadding,页尾 EndOfPage 不再叠底栏垫
-                                bottom = innerPadding.calculateBottomPadding() + 8.dp,
-                            ),
-                        state = gridState,
+                    LazyColumn(
                         modifier =
                             Modifier
+                                // fillMaxSize 而非 fillMaxWidth:深色底画在 LazyColumn 自身,
+                                // 搜索过滤后内容变短时底色随内容缩水会漏浅色窗口底
+                                // (歌单页模式 A 白屏同因,31da652e)
                                 .fillMaxSize()
+                                .background(mutedPaletteBg)
                                 .hazeSource(state = hazeState),
+                        state = listState,
                     ) {
-                        items(state.mvs, key = { it.videoId }) { mv ->
-                            MvTile(
-                                title = mv.title,
-                                artist = mv.artists?.joinToString { it.name } ?: "",
-                                coverUrl = mv.thumbnails?.lastOrNull()?.url,
-                                isPlaying = mv.videoId == playingTrack,
-                                onClick = { sharedViewModel.playMv(mv) },
-                            )
+                        if (!showSearchBar) {
+                            item(contentType = "header") {
+                                ImmersiveMvHeader(
+                                    coverUrl = headerCover,
+                                    count = mvs.size,
+                                    paletteBg = mutedPaletteBg,
+                                    onBack = navController::navigateUp,
+                                    onSearch = { showSearchBar = !showSearchBar },
+                                    onMore = { showListMenu = true },
+                                    onBitmap = { bitmap = it },
+                                )
+                            }
+                            item(contentType = "actions") {
+                                // [随机][播放/暂停][下载] 与歌单详情页按钮行同构(居中 48dp 档)
+                                val isThisPlaying = isPlaying && playingThisList
+                                Row(
+                                    modifier =
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 8.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Box(
+                                        modifier =
+                                            Modifier
+                                                .size(48.dp)
+                                                .clip(CircleShape)
+                                                .background(Color.White.copy(alpha = 0.12f))
+                                                .clickable { viewModel.playAll(shuffle = true) },
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Icon(
+                                            imageVector = SimpIcons.Shuffle,
+                                            contentDescription = null,
+                                            tint = Color.White,
+                                            modifier = Modifier.size(22.dp),
+                                        )
+                                    }
+                                    Box(
+                                        modifier =
+                                            Modifier
+                                                .height(48.dp)
+                                                .widthIn(min = 110.dp)
+                                                .clip(CircleShape)
+                                                .background(Color.White)
+                                                .clickable {
+                                                    if (isThisPlaying) {
+                                                        sharedViewModel.onUIEvent(UIEvent.PlayPause)
+                                                    } else {
+                                                        viewModel.playAll()
+                                                    }
+                                                }.padding(horizontal = 20.dp),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                imageVector = if (isThisPlaying) SimpIcons.Pause else SimpIcons.PlayArrow,
+                                                contentDescription = null,
+                                                tint = Color.Black,
+                                                modifier = Modifier.size(22.dp),
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(
+                                                text = if (isThisPlaying) "Pause" else "Play",
+                                                color = Color.Black,
+                                                style = typo().labelLarge,
+                                            )
+                                        }
+                                    }
+                                    // 下载全部=逐个入队 MV 视频下载;进度弹窗只在 Info 面板上下文
+                                    // 可见,这里的反馈=toast+下载管理页"下载中"区落行
+                                    Box(
+                                        modifier =
+                                            Modifier
+                                                .size(48.dp)
+                                                .clip(CircleShape)
+                                                .background(Color.White.copy(alpha = 0.12f))
+                                                .clickable {
+                                                    if (mvs.isEmpty()) {
+                                                        viewModel.makeToast(emptyText)
+                                                    } else {
+                                                        viewModel.makeToast(downloadingText)
+                                                        mvs.forEach { sharedViewModel.downloadMvFile(it.videoId) }
+                                                    }
+                                                },
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Icon(
+                                            imageVector = SimpIcons.DownloadForOffline,
+                                            contentDescription = null,
+                                            tint = Color.White,
+                                            modifier = Modifier.size(22.dp),
+                                        )
+                                    }
+                                }
+                                if (mvs.isEmpty()) {
+                                    Box(
+                                        modifier =
+                                            Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 48.dp),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Text(
+                                            text = emptyText,
+                                            style = typo().bodyMedium,
+                                            color = Color.White.copy(alpha = 0.7f),
+                                        )
+                                    }
+                                }
+                            }
+                        } else {
+                            item {
+                                val density = LocalDensity.current
+                                Spacer(
+                                    Modifier.height(
+                                        with(density) { searchBarHeightPx.toDp() },
+                                    ),
+                                )
+                            }
                         }
-                        item(span = { GridItemSpan(maxLineSpan) }, contentType = "footer") {
+                        itemsIndexed(filteredMvs, key = { _, mv -> mv.videoId }) { index, mv ->
+                            Column(modifier = Modifier.animateItem()) {
+                                MvPlaylistRow(
+                                    title = mv.title,
+                                    artist = mv.artists?.joinToString { it.name } ?: "",
+                                    coverUrl = mv.thumbnails?.lastOrNull()?.url,
+                                    isPlaying = mv.videoId == playingTrack && isPlaying,
+                                    onClick = { sharedViewModel.playMv(mv) },
+                                    onMore = { menuTarget = mv },
+                                )
+                                if (index < filteredMvs.size - 1) {
+                                    HorizontalDivider(
+                                        modifier = Modifier.padding(start = 128.dp, end = 16.dp),
+                                        thickness = 0.5.dp,
+                                        color = Color.White.copy(alpha = 0.12f),
+                                    )
+                                }
+                            }
+                        }
+                        item(contentType = "footer") {
                             when {
                                 state.loadingMore -> Box(
                                     Modifier
@@ -160,7 +384,7 @@ fun MvListScreen(
                                         .padding(vertical = 12.dp),
                                     contentAlignment = Alignment.Center,
                                 ) {
-                                    CircularProgressIndicator(strokeWidth = 2.5.dp)
+                                    CircularProgressIndicator(strokeWidth = 2.5.dp, color = Color.White)
                                 }
 
                                 state.loadMoreFailed -> TextButton(
@@ -170,44 +394,123 @@ fun MvListScreen(
                                     Text(
                                         text = stringResource(Res.string.retry),
                                         style = typo().labelMedium,
+                                        color = Color.White,
                                     )
                                 }
 
-                                else -> EndOfPage(includeBottomBarPadding = false)
+                                else -> EndOfPage()
                             }
                         }
                     }
-                    }
-                    TopAppBar(
-                        modifier =
-                            Modifier.hazeBlur(HazeInput.Sources(hazeState), barBlurStyle(MaterialTheme.colorScheme.surface, 0.3f)),
-                        title = {
-                            Text(
-                                text = stringResource(Res.string.favorite_mvs),
-                                style = typo().titleMedium,
-                                maxLines = 1,
-                            )
-                        },
-                        navigationIcon = {
-                            Box(Modifier.padding(horizontal = 5.dp)) {
-                                RippleIconButton(
-                                    SimpIcons.ArrowBackIosNew,
-                                    Modifier.size(32.dp),
-                                    true,
+
+                    // 搜索条覆盖层(歌单页同款:不透明 palette 底兜底防 haze 白带)
+                    AnimatedVisibility(
+                        visible = showSearchBar,
+                        enter = SearchBarEnter,
+                        exit = SearchBarExit,
+                    ) {
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .onGloballyPositioned { searchBarHeightPx = it.size.height }
+                                .background(mutedPaletteBg)
+                                .hazeBlur(HazeInput.Sources(hazeState), barBlurStyle(mutedPaletteBg, 0.55f)),
+                        ) {
+                            Row(
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                IconButton(onClick = navController::navigateUp) {
+                                    Icon(SimpIcons.ArrowBackIosNew, null, tint = Color.White)
+                                }
+                                SearchBar(
+                                    modifier =
+                                        Modifier
+                                            .height(50.dp)
+                                            .padding(horizontal = 12.dp)
+                                            .weight(1f),
+                                    colors =
+                                        SearchBarDefaults.colors().copy(
+                                            containerColor = Color.Transparent,
+                                        ),
+                                    inputField = {
+                                        CompositionLocalProvider(LocalTextStyle provides typo().bodySmall) {
+                                            SearchBarDefaults.InputField(
+                                                query = query,
+                                                onQueryChange = { query = it },
+                                                onSearch = { showSearchBar = false },
+                                                expanded = showSearchBar,
+                                                onExpandedChange = { showSearchBar = it },
+                                                placeholder = {
+                                                    Text(
+                                                        stringResource(Res.string.search),
+                                                        style = typo().bodyMedium,
+                                                    )
+                                                },
+                                            )
+                                        }
+                                    },
+                                    expanded = false,
+                                    onExpandedChange = {},
+                                    windowInsets = WindowInsets(0, 0, 0, 0),
                                 ) {
-                                    navController.navigateUp()
+                                }
+                                IconButton(
+                                    onClick = { showSearchBar = !showSearchBar },
+                                ) {
+                                    Icon(SimpIcons.Close, null, tint = Color.White)
                                 }
                             }
-                        },
-                        colors =
-                            TopAppBarDefaults.topAppBarColors(
-                                Color.Transparent,
-                                Color.Unspecified,
-                                Color.Unspecified,
-                                Color.Unspecified,
-                                Color.Unspecified,
-                            ),
-                    )
+                        }
+                    }
+
+                    // 滚动后收起的顶栏(标题 marquee + 返回 + 搜索)
+                    AnimatedVisibility(
+                        visible = shouldHideTopBar && !showSearchBar,
+                        enter = fadeIn() + slideInVertically(),
+                        exit = fadeOut() + slideOutVertically(),
+                    ) {
+                        TopAppBar(
+                            title = {
+                                Text(
+                                    text = stringResource(Res.string.favorite_mvs),
+                                    style = typo().titleMedium,
+                                    maxLines = 1,
+                                    modifier =
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .wrapContentHeight(align = Alignment.CenterVertically)
+                                            .basicMarquee(
+                                                iterations = Int.MAX_VALUE,
+                                                animationMode = MarqueeAnimationMode.Immediately,
+                                            ).focusable(),
+                                )
+                            },
+                            navigationIcon = {
+                                Box(Modifier.padding(horizontal = 5.dp)) {
+                                    IconButton(onClick = navController::navigateUp) {
+                                        Icon(SimpIcons.ArrowBackIosNew, null, tint = Color.White)
+                                    }
+                                }
+                            },
+                            actions = {
+                                IconButton(
+                                    onClick = { showSearchBar = !showSearchBar },
+                                ) {
+                                    Icon(SimpIcons.Search, null, tint = Color.White)
+                                }
+                            },
+                            colors =
+                                TopAppBarDefaults.topAppBarColors(
+                                    containerColor = Color.Transparent,
+                                ),
+                            modifier =
+                                Modifier.hazeBlur(HazeInput.Sources(hazeState), barBlurStyle(mutedPaletteBg, 0.55f)),
+                        )
+                    }
                 }
 
                 MvListUIState.Loading -> CenterLoadingBox(Modifier.fillMaxSize())
@@ -216,6 +519,7 @@ fun MvListScreen(
                     Box(
                         Modifier
                             .fillMaxSize()
+                            .background(mutedPaletteBg)
                             .padding(16.dp),
                         contentAlignment = Alignment.Center,
                     ) {
@@ -223,7 +527,7 @@ fun MvListScreen(
                             Text(
                                 text = state.message,
                                 style = typo().bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = Color.White.copy(alpha = 0.7f),
                             )
                             Button(onClick = viewModel::refresh) {
                                 Text(stringResource(Res.string.retry))
@@ -233,79 +537,265 @@ fun MvListScreen(
             }
         }
     }
+
+    // 行三点菜单:与歌单行同款——Track→SongEntity,歌曲语义行(下载音频/电台/相似等)
+    // 由 NowPlayingBottomSheet 按 MV 前缀内建隐藏
+    menuTarget?.let { mv ->
+        NowPlayingBottomSheet(
+            onDismiss = {
+                menuTarget = null
+            },
+            navController = navController,
+            song = mv.toSongEntity(),
+        )
+    }
+
+    // 顶栏三点:添加到队列(不打断播放)/下载全部(与按钮行同款入队)
+    if (showListMenu) {
+        MvListMenuSheet(
+            onDismiss = { showListMenu = false },
+            onAddToQueue = {
+                val loaded = viewModel.loadedMvs()
+                if (loaded.isEmpty()) {
+                    viewModel.makeToast(emptyText)
+                } else {
+                    sharedViewModel.addListToQueue(loaded.toCollection(arrayListOf()))
+                }
+            },
+            onDownloadAll = {
+                val loaded = viewModel.loadedMvs()
+                if (loaded.isEmpty()) {
+                    viewModel.makeToast(emptyText)
+                } else {
+                    viewModel.makeToast(downloadingText)
+                    loaded.forEach { sharedViewModel.downloadMvFile(it.videoId) }
+                }
+            },
+        )
+    }
 }
 
-/**
- * MV tile:收藏歌单 tile(HomeItemContentPlaylist fillMaxWidth 档)同构——封面铺满网格槽
- * (MV 缩略图天然 16:9,不裁成方卡)+ 标题两行省略 + 艺人单行 marquee(与歌单副标题同参数)。
- */
-@OptIn(ExperimentalFoundationApi::class)
+/** 沉浸式半屏头图(PlaylistScreen 竖屏分支同构):封面+底部渐隐+标题/计数+液态玻璃顶栏 */
 @Composable
-private fun MvTile(
+private fun ImmersiveMvHeader(
+    coverUrl: String?,
+    count: Int,
+    paletteBg: Color,
+    onBack: () -> Unit,
+    onSearch: () -> Unit,
+    onMore: () -> Unit,
+    onBitmap: (ImageBitmap?) -> Unit,
+) {
+    val screenInfo = getScreenSizeInfo()
+    val artworkBackdrop = rememberBackdrop(Color.Black)
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height((screenInfo.hDP / 2).dp),
+    ) {
+        Box(modifier = Modifier.fillMaxSize().layerBackdrop(artworkBackdrop)) {
+            AsyncImage(
+                model =
+                    ImageRequest
+                        .Builder(LocalPlatformContext.current)
+                        .data(coverUrl)
+                        .diskCachePolicy(CachePolicy.ENABLED)
+                        .memoryCachePolicy(CachePolicy.ENABLED)
+                        .diskCacheKey(coverUrl)
+                        .crossfade(false)
+                        .build(),
+                placeholder = rememberHolderPainter(isVideo = true),
+                error = rememberHolderPainter(isVideo = true),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                onSuccess = { onBitmap(it.result.image.toImageBitmap()) },
+                modifier = Modifier.fillMaxSize(),
+            )
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height((screenInfo.hDP * 0.35f).dp)
+                        .align(Alignment.BottomCenter)
+                        .background(artworkScrimBrush(paletteBg)),
+            )
+            Column(
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp)
+                        .padding(bottom = 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    text = stringResource(Res.string.favorite_mvs),
+                    style = typo().titleLarge,
+                    color = Color.White,
+                    maxLines = 2,
+                    textAlign = TextAlign.Center,
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = stringResource(Res.string.mv_count_short, count.toString()),
+                    style = typo().titleSmall,
+                    color = Color(0xC4FFFFFF),
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
+        // 顶栏:返回(左)+液态玻璃药丸[搜索][更多](右)——歌单页同款(收藏心对 MV 合集
+        // 无语义,药丸里不放心)
+        Row(
+            modifier =
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 4.dp)
+                    .windowInsetsPadding(WindowInsets.statusBars),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            LiquidGlassIconButton(
+                backdrop = artworkBackdrop,
+                imageVector = SimpIcons.ArrowBackIosNew,
+                modifier = Modifier.size(48.dp),
+            ) {
+                onBack()
+            }
+            Spacer(Modifier.weight(1f))
+            Row(
+                modifier =
+                    Modifier
+                        .height(48.dp)
+                        .liquidGlass(artworkBackdrop, RoundedCornerShape(24.dp)),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = onSearch) {
+                    Icon(SimpIcons.Search, null, tint = Color.White)
+                }
+                IconButton(onClick = onMore) {
+                    Icon(SimpIcons.MoreVert, contentDescription = "More", tint = Color.White)
+                }
+            }
+        }
+    }
+}
+
+/** MV 行(歌单行同构):16:9 封面+标题/艺人两行+三点;播放中标题转主题色 */
+@Composable
+private fun MvPlaylistRow(
     title: String,
     artist: String,
     coverUrl: String?,
     isPlaying: Boolean,
     onClick: () -> Unit,
+    onMore: () -> Unit,
 ) {
-    Column(
+    Row(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
-                .clickable(onClick = onClick),
+                .clickable(onClick = onClick)
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         AsyncImage(
-            model =
-                ImageRequest
-                    .Builder(LocalPlatformContext.current)
-                    .data(coverUrl)
-                    .diskCachePolicy(CachePolicy.ENABLED)
-                    .diskCacheKey(coverUrl)
-                    .crossfade(550)
-                    .build(),
+            model = coverUrl,
             contentDescription = null,
             contentScale = ContentScale.Crop,
             placeholder = rememberHolderPainter(isVideo = true),
             error = rememberHolderPainter(isVideo = true),
             modifier =
                 Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(16f / 9f)
-                    .clip(RoundedCornerShape(10.dp)),
+                    .size(width = 104.dp, height = 58.dp)
+                    .clip(RoundedCornerShape(8.dp)),
         )
-        Text(
-            text = title,
-            style = typo().titleSmall,
-            color =
-                if (isPlaying) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.onSurface
-                },
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
+        Column(
             modifier =
                 Modifier
-                    .fillMaxWidth()
-                    .padding(start = 10.dp, top = 8.dp),
-        )
-        Text(
-            text = artist,
-            style = typo().bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            minLines = 1,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(start = 10.dp)
-                    .basicMarquee(
-                        initialDelayMillis = 2000,
-                        repeatDelayMillis = 2000,
-                        velocity = 25.dp,
-                    ),
-        )
+                    .weight(1f)
+                    .padding(start = 12.dp),
+        ) {
+            Text(
+                text = title,
+                style = typo().titleSmall,
+                color =
+                    if (isPlaying) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        Color.White
+                    },
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = artist,
+                style = typo().bodySmall,
+                color = Color.White.copy(alpha = 0.7f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        IconButton(onClick = onMore) {
+            Icon(SimpIcons.MoreVert, contentDescription = "More", tint = Color.White)
+        }
+    }
+}
+
+/** 顶栏三点菜单(PlaylistBottomSheet 同壳):添加到队列 / 下载全部 */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MvListMenuSheet(
+    onDismiss: () -> Unit,
+    onAddToQueue: () -> Unit,
+    onDownloadAll: () -> Unit,
+) {
+    val coroutineScope = rememberCoroutineScope()
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = Color.Transparent,
+        contentColor = Color.Transparent,
+        dragHandle = null,
+        scrimColor = Color.Black.copy(alpha = 0.5f),
+    ) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp),
+            colors = CardDefaults.cardColors().copy(containerColor = rememberSurfaceDarkColors().container),
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Spacer(modifier = Modifier.height(5.dp))
+                Card(
+                    modifier = Modifier.width(60.dp).height(4.dp),
+                    colors = CardDefaults.cardColors().copy(containerColor = rememberSurfaceDarkColors().handle),
+                    shape = RoundedCornerShape(50),
+                ) {}
+                Spacer(modifier = Modifier.height(5.dp))
+                ActionButton(
+                    icon = SimpIcons.QueueMusic,
+                    text = Res.string.add_to_queue,
+                ) {
+                    coroutineScope.launch {
+                        sheetState.hide()
+                        onDismiss()
+                    }
+                    onAddToQueue()
+                }
+                ActionButton(
+                    icon = SimpIcons.DownloadForOffline,
+                    text = Res.string.download,
+                ) {
+                    coroutineScope.launch {
+                        sheetState.hide()
+                        onDismiss()
+                    }
+                    onDownloadAll()
+                }
+                EndOfModalBottomSheet()
+            }
+        }
     }
 }
