@@ -680,7 +680,8 @@ fun NowPlayingScreenContent(
             timelineFlow = sharedViewModel.timeline,
             castState = castState,
             // MV:看 MV 语义即视频常显,不受"视频代替音频"设置门控
-            shouldShowVideo = shouldShowVideo || isNeteaseMv,
+            shouldShowVideo = shouldShowVideo || isNeteaseMv ||
+                com.maxrave.domain.data.player.ExplicitVideoPlayback.includes(nowPlayingVideoId),
             isNeteaseSong = nowPlayingVideoId?.toLongOrNull() != null || isNeteaseMv,
             isPodcastSong = mediaPlayerHandler.queueData.value?.data?.isNeteasePodcastQueue == true,
             remoteLikeState = remoteLikeState,
@@ -960,11 +961,12 @@ fun NowPlayingScreenContent(
         NeteaseCommentsSheet(
             onDismiss = { showNeteaseComments = false },
             songId =
-                mediaPlayerHandler.nowPlayingState.value.songEntity?.videoId
-                    ?: nowPlayingVideoId
-                    ?: "",
+                if (isNeteaseMv) nowPlayingVideoId.orEmpty()
+                else mediaPlayerHandler.nowPlayingState.value.songEntity?.videoId ?: nowPlayingVideoId.orEmpty(),
             // MV:详情响应直接带 R_MV_5_<mvid>,零反查
-            totalCount = screenDataState.neteaseSongData?.commentCount ?: screenDataState.neteaseMvData?.commentCount?.toInt() ?: 0,
+            totalCount =
+                if (isNeteaseMv) screenDataState.neteaseMvData?.commentCount?.toInt() ?: 0
+                else screenDataState.neteaseSongData?.commentCount ?: 0,
             threadId =
                 if (isNeteaseMv) {
                     screenDataState.neteaseMvData?.commentThreadId ?: ""

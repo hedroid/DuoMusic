@@ -276,7 +276,9 @@ fun DownloadedManagementBody(
     var showSearchBar by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
     // 暂停全部只对 DownloadManager 在途(下载中/排队)有效;转存中(EXPORTING)不走队列停不了
-    val hasPausable = managementRows.any { listOf(it.audioStatus.sortRank(), it.videoStatus?.sortRank() ?: 9).any { r -> r == 0 || r == 2 } }
+    val hasPausable = managementRows.any { row ->
+        !row.directMvActive && listOf(row.audioStatus.sortRank(), row.videoStatus?.sortRank() ?: 9).any { r -> r == 0 || r == 2 }
+    }
     val hasPaused = managementRows.any { it.audioStatus == DownloadEntryStatus.PAUSED || it.videoStatus == DownloadEntryStatus.PAUSED }
     val hasFailed = managementRows.any { it.audioStatus == DownloadEntryStatus.FAILED || it.videoStatus == DownloadEntryStatus.FAILED }
 

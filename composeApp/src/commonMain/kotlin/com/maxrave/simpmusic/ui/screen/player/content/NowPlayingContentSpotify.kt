@@ -188,6 +188,7 @@ import simpmusic.composeapp.generated.resources.lyrics_provider_simpmusic
 import simpmusic.composeapp.generated.resources.lyrics_provider_youtube
 import simpmusic.composeapp.generated.resources.now_playing_upper
 import simpmusic.composeapp.generated.resources.offline_mode
+import simpmusic.composeapp.generated.resources.netease_lyrics
 import simpmusic.composeapp.generated.resources.playing_on_device
 import simpmusic.composeapp.generated.resources.published_at
 import simpmusic.composeapp.generated.resources.rate_lyrics
@@ -1324,6 +1325,10 @@ fun NowPlayingContentSpotify(
                                                         stringResource(Res.string.spotify_lyrics_provider)
                                                     }
 
+                                                    LyricsProvider.NETEASE -> {
+                                                        stringResource(Res.string.netease_lyrics)
+                                                    }
+
                                                     LyricsProvider.OFFLINE -> {
                                                         stringResource(Res.string.offline_mode)
                                                     }
@@ -1443,7 +1448,7 @@ fun NowPlayingContentSpotify(
                         }
                         Spacer(modifier = Modifier.height(10.dp))
                         // 说明卡同艺人卡:播客节目端点字段全空/零值,展示只会剩空壳——不展示
-                        AnimatedVisibility(visible = (state.screenData.songInfoData != null || neteaseMeta != null) && !state.isPodcastSong) {
+                        AnimatedVisibility(visible = (state.screenData.songInfoData != null || neteaseMeta != null || state.screenData.neteaseMvData != null) && !state.isPodcastSong) {
                             ElevatedCard(
                                 onClick = {},
                                 shape = RoundedCornerShape(8.dp),
@@ -1458,7 +1463,9 @@ fun NowPlayingContentSpotify(
                                         .fillMaxWidth(),
                                 ) {
                                     Spacer(modifier = Modifier.height(5.dp))
-                                    if (neteaseMeta != null) {
+                                    if (state.screenData.neteaseMvData != null) {
+                                        NeteaseMvDescription(state.screenData.neteaseMvData!!, neteaseMeta?.artistBriefDesc)
+                                    } else if (neteaseMeta != null) {
                                         // 网易版说明卡三层:发行信息(日期·曲目数·唱片公司) →
                                         // 数据行(红心总数;评论入口已上移到底部行中间,评论数在评论弹窗标题) → 简介(艺人优先,专辑兜底)
                                         val releaseInfo =

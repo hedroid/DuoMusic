@@ -2,14 +2,15 @@ package com.maxrave.simpmusic.viewModel
 
 import androidx.lifecycle.viewModelScope
 import com.maxrave.common.Config
+import com.maxrave.common.NETEASE_MV_MEDIA_ID_PREFIX
 import com.maxrave.common.songRadioPlaylistId
 import com.maxrave.domain.data.entities.DownloadState
-import com.maxrave.domain.data.model.download.DownloadProgress
 import com.maxrave.domain.data.entities.LocalPlaylistEntity
 import com.maxrave.domain.data.entities.SongEntity
 import com.maxrave.domain.data.model.searchResult.playlists.PlaylistsResult
 import com.maxrave.domain.data.model.searchResult.songs.Album
 import com.maxrave.domain.data.model.searchResult.songs.Artist
+import com.maxrave.domain.data.model.browse.album.Track
 import com.maxrave.domain.data.model.streams.YouTubeWatchEndpoint
 import com.maxrave.domain.manager.DataStoreManager
 import com.maxrave.domain.manager.DataStoreManager.Values.BETTER_LYRICS
@@ -37,6 +38,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import com.maxrave.simpmusic.viewModel.base.demoteDownloadedContainers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.SharingStarted
@@ -98,6 +100,7 @@ class NowPlayingBottomSheetViewModel(
     val uiState: StateFlow<NowPlayingBottomSheetUIState> get() = _uiState.asStateFlow()
 
     private var getSongAsFlow: Job? = null
+    private var mvLookupJob: Job? = null
 
     // 云端歌单加载链(单飞):VM init 与弹窗打开的 resetPlaylists 曾各自起一套重试链
     // (各 3 次退避),首次打开弹窗最多 6 次全量 YT 拉取且旧回包可能覆盖新回包
@@ -107,9 +110,11 @@ class NowPlayingBottomSheetViewModel(
 
     init {
         viewModelScope.launch {
-            // MV 导出下载在途态:共享 SharedViewModel 的进度流(菜单行三态)
-            sharedViewModel.downloadFileProgress.collectLatest { progress ->
-                _uiState.update { it.copy(mvDownloading = progress != DownloadProgress.INIT && !progress.isDone) }
+            // 只观察当前 MV 的任务;其它歌曲/视频导出的共享进度不能把本行染成下载中。
+            sharedViewModel.mvDownloadProgress.collectLatest { progress ->
+                _uiState.update { state ->
+                    state.copy(mvDownloading = progress.containsKey(state.songUIState.videoId))
+                }
             }
         }
         viewModelScope.launch {
@@ -289,8 +294,39 @@ class NowPlayingBottomSheetViewModel(
     }
 
     fun setSongEntity(songEntity: SongEntity?) {
-        val songOrNowPlaying = songEntity ?: (mediaPlayerHandler.nowPlayingState.value.songEntity ?: return)
+        mvLookupJob?.cancel()
+        _uiState.update { it.copy(mvCandidates = null, mvSearchLoading = false, mvPlaybackStarted = false) }
+        val nowPlaying = mediaPlayerHandler.nowPlayingState.value
+        val currentMvId = nowPlaying.mediaItem?.mediaId?.takeIf { it.startsWith(NETEASE_MV_MEDIA_ID_PREFIX) }
+        val songOrNowPlaying = songEntity ?: (nowPlaying.songEntity?.let { current ->
+            if (currentMvId != null) current.copy(videoId = currentMvId) else current
+        } ?: return)
         loadNeteasePlaylists(songOrNowPlaying.videoId.toLongOrNull() != null)
+        if (songOrNowPlaying.videoId.startsWith(NETEASE_MV_MEDIA_ID_PREFIX)) {
+            // MV 不属于歌曲库:菜单使用队列实体，已有下载行只读观察，绝不插入 song 表。
+            getSongAsFlow?.cancel()
+            _uiState.update {
+                it.copy(
+                    songUIState = songOrNowPlaying.toSheetSongState(),
+                    mvDownloading = sharedViewModel.mvDownloadProgress.value.containsKey(songOrNowPlaying.videoId),
+                )
+            }
+            refreshCloudLiked(songOrNowPlaying.videoId)
+            getSongAsFlow = viewModelScope.launch {
+                songRepository.getSongAsFlow(songOrNowPlaying.videoId).collectLatest { downloaded ->
+                    if (downloaded != null) {
+                        _uiState.update { state ->
+                            state.copy(
+                                songUIState = state.songUIState.copy(
+                                    downloadedVideoFilePath = downloaded.downloadedVideoFilePath,
+                                ),
+                            )
+                        }
+                    }
+                }
+            }
+            return
+        }
         viewModelScope.launch {
             _uiState.update { state ->
                 state.copy(
@@ -318,6 +354,7 @@ class NowPlayingBottomSheetViewModel(
      */
     private val _cloudLiked = MutableStateFlow<Boolean?>(null)
     val cloudLiked: StateFlow<Boolean?> = _cloudLiked
+    private var cloudLikeJob: Job? = null
 
     /**
      * "下载视频"行的下载中态:DownloadManager 视频条目在途实时流 × 当前歌曲。
@@ -700,7 +737,9 @@ class NowPlayingBottomSheetViewModel(
                 is NowPlayingBottomSheetUIEvent.Share -> {
                     // 网易数字 ID 拼进 YT 链接是无效地址;按 ID 形状分源拼分享链接
                     val url =
-                        if (songUIState.videoId.toLongOrNull() != null) {
+                        if (songUIState.videoId.startsWith(NETEASE_MV_MEDIA_ID_PREFIX)) {
+                            "https://music.163.com/mv?id=${songUIState.videoId.removePrefix(NETEASE_MV_MEDIA_ID_PREFIX)}"
+                        } else if (songUIState.videoId.toLongOrNull() != null) {
                             "https://music.163.com/song?id=${songUIState.videoId}"
                         } else {
                             "https://music.youtube.com/watch?v=${songUIState.videoId}"
@@ -726,10 +765,46 @@ class NowPlayingBottomSheetViewModel(
                     }
                 }
 
+                is NowPlayingBottomSheetUIEvent.WatchYouTubeMv -> {
+                    mvLookupJob?.cancel()
+                    _uiState.update { it.copy(mvCandidates = null, mvSearchLoading = true, mvPlaybackStarted = false) }
+                    mvLookupJob = viewModelScope.launch {
+                        val candidates = try {
+                            songRepository.findMusicVideos(ev.videoId, ev.title, ev.artist)
+                        } catch (error: CancellationException) {
+                            throw error
+                        } catch (error: Exception) {
+                            _uiState.update { it.copy(mvSearchLoading = false) }
+                            makeToast(getString(Res.string.error))
+                            return@launch
+                        }
+                        when (candidates.size) {
+                            0 -> {
+                                _uiState.update { it.copy(mvSearchLoading = false) }
+                                makeToast(getString(Res.string.no_mv_available))
+                            }
+                            1 -> {
+                                sharedViewModel.playYouTubeMv(candidates.first())
+                                _uiState.update { it.copy(mvSearchLoading = false, mvPlaybackStarted = true) }
+                            }
+                            else -> _uiState.update { it.copy(mvCandidates = candidates, mvSearchLoading = false) }
+                        }
+                    }
+                }
+
+                is NowPlayingBottomSheetUIEvent.PlayYouTubeMv -> {
+                    sharedViewModel.playYouTubeMv(ev.track)
+                    _uiState.update { it.copy(mvCandidates = null, mvPlaybackStarted = true) }
+                }
+
+                is NowPlayingBottomSheetUIEvent.DismissMvCandidates -> {
+                    _uiState.update { it.copy(mvCandidates = null) }
+                }
+
                 is NowPlayingBottomSheetUIEvent.DownloadMv -> {
                     // MV mp4 直存(单文件自带音轨免合并);进度弹窗挂在 Info 面板里,菜单直点
                     // 看不到——点下即 toast 确认受理,完成/失败由 downloadMvFile 再 toast
-                    sharedViewModel.downloadMvFile()
+                    sharedViewModel.downloadMvFile(songUIState.videoId)
                     makeToast(getString(Res.string.downloading))
                 }
 
@@ -782,6 +857,9 @@ data class NowPlayingBottomSheetUIState(
     val youTubePlaylistsFailed: Boolean = false,
     /** MV 导出下载在途(共享 downloadFileProgress);下载 MV 行三态用 */
     val mvDownloading: Boolean = false,
+    val mvCandidates: List<Track>? = null,
+    val mvSearchLoading: Boolean = false,
+    val mvPlaybackStarted: Boolean = false,
     val neteasePlaylistsFailed: Boolean = false,
     val mainLyricsProvider: String,
     val sleepTimer: SleepTimerState,
@@ -860,6 +938,16 @@ sealed class NowPlayingBottomSheetUIEvent {
     data class WatchMv(
         val videoId: String,
     ) : NowPlayingBottomSheetUIEvent()
+
+    data class WatchYouTubeMv(
+        val videoId: String,
+        val title: String,
+        val artist: String?,
+    ) : NowPlayingBottomSheetUIEvent()
+
+    data class PlayYouTubeMv(val track: Track) : NowPlayingBottomSheetUIEvent()
+
+    data object DismissMvCandidates : NowPlayingBottomSheetUIEvent()
 
     data object DownloadMv : NowPlayingBottomSheetUIEvent()
 

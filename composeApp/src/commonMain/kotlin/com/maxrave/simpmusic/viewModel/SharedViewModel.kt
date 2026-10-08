@@ -371,6 +371,13 @@ class SharedViewModel(
 
     init {
         viewModelScope.launch {
+            nowPlayingState.collectLatest { state ->
+                com.maxrave.domain.data.player.ExplicitVideoPlayback.onCurrentMediaChanged(
+                    state?.mediaItem?.mediaId,
+                )
+            }
+        }
+        viewModelScope.launch {
             log("SharedViewModel init")
             if (dataStoreManager.appVersion.first() != VersionManager.getVersionName()) {
                 dataStoreManager.resetOpenAppTime()
@@ -972,11 +979,38 @@ class SharedViewModel(
                 val detail = neteaseRepository.getMvDetail(mvid).getOrNull() ?: return@launch
                 // 发布前确认还是这首 MV,别把上一支的卡盖到新曲上
                 if (mediaPlayerHandler.nowPlayingState.value.mediaItem?.mediaId == mediaId) {
-                    _nowPlayingScreenData.update { it.copy(neteaseMvData = detail) }
+                    val firstArtist = detail.artists.firstOrNull()
+                    _nowPlayingScreenData.update {
+                        it.copy(
+                            neteaseMvData = detail,
+                            neteaseSongData = firstArtist?.let { (id, name) ->
+                                NeteaseSongInfoEntity(artistId = id.toString(), artistName = name)
+                            },
+                        )
+                    }
                     detail.subed?.let { sub ->
                         _liked.value = sub
                         mediaPlayerHandler.like(sub)
                     }
+                }
+                // mv/detail 的评论数可能滞后；列表 v2 返回该线程总数，回写信息卡。
+                launch {
+                    val count = neteaseRepository.getSongCommentsPage(
+                        songId = mediaId,
+                        sortType = 3,
+                        cursor = "0",
+                        pageSize = 1,
+                        threadId = detail.commentThreadId ?: "R_MV_5_$mvid",
+                    )?.totalCount
+                    if (count != null && mediaPlayerHandler.nowPlayingState.value.mediaItem?.mediaId == mediaId) {
+                        _nowPlayingScreenData.update { state ->
+                            state.copy(neteaseMvData = state.neteaseMvData?.copy(commentCount = count.toLong()))
+                        }
+                    }
+                }
+                val artistInfo = neteaseRepository.getMvArtistInfo(detail)
+                if (mediaPlayerHandler.nowPlayingState.value.mediaItem?.mediaId == mediaId) {
+                    _nowPlayingScreenData.update { it.copy(neteaseSongData = artistInfo) }
                 }
             }
     }
@@ -998,6 +1032,11 @@ class SharedViewModel(
             )
             mediaPlayerHandler.loadMediaItem(track, PLAYLIST_CLICK, 0)
         }
+    }
+
+    fun playYouTubeMv(track: Track) {
+        com.maxrave.domain.data.player.ExplicitVideoPlayback.select(track.videoId)
+        playMv(track)
     }
 
     private fun getCanvas(
@@ -1901,6 +1940,18 @@ class SharedViewModel(
                 getNeteaseLyrics(videoId, song, (artist ?: ""), duration)
                 return@launch
             }
+            if (videoId.startsWith(NETEASE_MV_MEDIA_ID_PREFIX)) {
+                val mvId = videoId.removePrefix(NETEASE_MV_MEDIA_ID_PREFIX).toLongOrNull()
+                val detail = mvId?.let { id ->
+                    nowPlayingScreenData.value.neteaseMvData?.takeIf { it.id == id }
+                        ?: neteaseRepository.getMvDetail(id).getOrNull()
+                }
+                val linkedSongId = detail?.let { neteaseRepository.getMvLinkedSongId(it) }
+                if (linkedSongId != null) {
+                    getNeteaseLyrics(videoId, song, (artist ?: ""), duration, linkedSongId)
+                    return@launch
+                }
+            }
             val lyricsProvider = dataStoreManager.lyricsProvider.first()
             when (lyricsProvider) {
                 DataStoreManager.SIMPMUSIC -> {
@@ -1961,9 +2012,10 @@ class SharedViewModel(
         song: SongEntity,
         artist: String,
         duration: Int,
+        sourceSongId: String = videoId,
     ) {
         viewModelScope.launch {
-            neteaseRepository.getNeteaseLyricsData(videoId)
+            neteaseRepository.getNeteaseLyricsData(sourceSongId)
                 .fold(
                     onSuccess = { (lyrics, officialTranslation, officialRomanization) ->
                         updateLyrics(
@@ -2510,6 +2562,18 @@ class SharedViewModel(
 
     private var _downloadFileProgress = MutableStateFlow<DownloadProgress>(DownloadProgress.INIT)
     val downloadFileProgress: StateFlow<DownloadProgress> get() = _downloadFileProgress
+    /** MV 直写文件不经过 Media3 DownloadManager；下载管理页从这里读取在途 ID 和进度。 */
+    private val _mvDownloadProgress = MutableStateFlow<Map<String, Float?>>(emptyMap())
+    val mvDownloadProgress: StateFlow<Map<String, Float?>> get() = _mvDownloadProgress
+
+    /** 在途 MV 直写协程表(id→Job):下载管理页删除/取消要能真正停掉写文件的协程,
+     *  否则删后协程照跑、完成时把路径+完成态写回 Room,文件"复活"(2026-10 CR P1) */
+    private val mvDownloadJobs = java.util.concurrent.ConcurrentHashMap<String, Job>()
+
+    /** 取消在途 MV 直写下载:协程收到取消后自清已提交文件与 Room 在途态,不再回写完成 */
+    fun cancelMvDownload(videoId: String) {
+        mvDownloadJobs.remove(videoId)?.cancel()
+    }
 
     fun downloadFile(bitmap: ImageBitmap) {
         viewModelScope.launch {
@@ -2733,10 +2797,10 @@ class SharedViewModel(
                         inLibrary = com.maxrave.domain.extension.now(),
                     ),
                 ).collect { }
-            songRepository.updateDownloadState(track.videoId, state)
             if (videoFilePath != null && java.io.File(videoFilePath).exists()) {
                 songRepository.updateDownloadedVideoFilePath(track.videoId, videoFilePath)
             }
+            songRepository.updateDownloadState(track.videoId, state)
         }
     }
 
@@ -2754,6 +2818,7 @@ class SharedViewModel(
         url: String,
         path: String,
         ext: String,
+        onProgress: ((Float) -> Unit)? = null,
     ): Boolean {
         val part = File("$path.$ext.part")
         try {
@@ -2786,6 +2851,7 @@ class SharedViewModel(
                             output.write(buffer, 0, n)
                             read += n
                             if (total > 0) {
+                                onProgress?.invoke((read.toFloat() / total).coerceIn(0f, 1f))
                                 val elapsedS = (System.currentTimeMillis() - startedAt).coerceAtLeast(1) / 1000f
                                 _downloadFileProgress.value =
                                     DownloadProgress(

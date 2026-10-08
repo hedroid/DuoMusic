@@ -124,6 +124,7 @@ import simpmusic.composeapp.generated.resources.lyrics_provider_lrc
 import simpmusic.composeapp.generated.resources.lyrics_provider_simpmusic
 import simpmusic.composeapp.generated.resources.lyrics_provider_youtube
 import simpmusic.composeapp.generated.resources.offline_mode
+import simpmusic.composeapp.generated.resources.netease_lyrics
 import simpmusic.composeapp.generated.resources.published_at
 import simpmusic.composeapp.generated.resources.rate_lyrics
 import simpmusic.composeapp.generated.resources.rich_synced
@@ -689,6 +690,10 @@ internal fun ExpressiveBelowTheFold(
                                         stringResource(Res.string.spotify_lyrics_provider)
                                     }
 
+                                    LyricsProvider.NETEASE -> {
+                                        stringResource(Res.string.netease_lyrics)
+                                    }
+
                                     LyricsProvider.OFFLINE -> {
                                         stringResource(Res.string.offline_mode)
                                     }
@@ -799,7 +804,7 @@ internal fun ExpressiveBelowTheFold(
         Spacer(modifier = Modifier.height(10.dp))
         // Description card
         // 说明卡同艺人卡:播客节目端点字段全空/零值,展示只会剩空壳——不展示
-        AnimatedVisibility(visible = (state.screenData.songInfoData != null || neteaseMeta != null) && !state.isPodcastSong) {
+        AnimatedVisibility(visible = (state.screenData.songInfoData != null || neteaseMeta != null || state.screenData.neteaseMvData != null) && !state.isPodcastSong) {
             Surface(
                 shape = ExpressiveCardShape,
                 color = colorScheme.surfaceContainer,
@@ -810,7 +815,9 @@ internal fun ExpressiveBelowTheFold(
                         .fillMaxWidth(),
                 ) {
                     Spacer(modifier = Modifier.height(5.dp))
-                    if (neteaseMeta != null) {
+                    if (state.screenData.neteaseMvData != null) {
+                        NeteaseMvDescription(state.screenData.neteaseMvData!!, neteaseMeta?.artistBriefDesc)
+                    } else if (neteaseMeta != null) {
                         val releaseInfo =
                             listOfNotNull(
                                 neteaseMeta.albumPublishDate?.let { stringResource(Res.string.published_at, it) },

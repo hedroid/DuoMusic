@@ -253,16 +253,16 @@ import simpmusic.composeapp.generated.resources.can_not_be_empty
 import simpmusic.composeapp.generated.resources.cancel
 import simpmusic.composeapp.generated.resources.crop_cover
 import simpmusic.composeapp.generated.resources.codec
-import simpmusic.composeapp.generated.resources.comments
 import simpmusic.composeapp.generated.resources.comments_title
 import simpmusic.composeapp.generated.resources.collapse_replies
 import simpmusic.composeapp.generated.resources.end_of_list
-import simpmusic.composeapp.generated.resources.comments_count
 import simpmusic.composeapp.generated.resources.copied_to_clipboard
 import simpmusic.composeapp.generated.resources.n_replies
 import simpmusic.composeapp.generated.resources.no_comments
 import simpmusic.composeapp.generated.resources.post_comment_hint
 import simpmusic.composeapp.generated.resources.post_comment_success
+import simpmusic.composeapp.generated.resources.comment_waiting_to_sync
+import simpmusic.composeapp.generated.resources.published_at
 import simpmusic.composeapp.generated.resources.publish
 import simpmusic.composeapp.generated.resources.reply_hint
 import simpmusic.composeapp.generated.resources.retry
@@ -389,6 +389,7 @@ fun InfoPlayerBottomSheet(
 
     val screenDataState by sharedViewModel.nowPlayingScreenData.collectAsStateWithLifecycle()
     val songEntity by sharedViewModel.nowPlayingState.map { it?.songEntity }.collectAsState(null)
+    val currentMediaId by sharedViewModel.nowPlayingState.map { it?.mediaItem?.mediaId }.collectAsState(null)
     val format by sharedViewModel.format.collectAsState(null)
     val extractSource by sharedViewModel.extractSource.collectAsState()
     val downloadProgress by sharedViewModel.downloadFileProgress.collectAsStateWithLifecycle()
@@ -691,7 +692,7 @@ fun InfoPlayerBottomSheet(
                 // 网易歌:来源链接是 music.163.com(YT 链接对数字 ID 无效);播放量/赞踩换
                 // 红心总数+评论数(热评内容从播放页详情卡进入评论列表看)。
                 // 网易 MV 同走本分支:互动数据换 MV 详情(播放/赞/收藏),链接指 MV 页
-                val isNeteaseMv = songEntity?.videoId?.startsWith(NETEASE_MV_MEDIA_ID_PREFIX) == true
+                val isNeteaseMv = currentMediaId?.startsWith(NETEASE_MV_MEDIA_ID_PREFIX) == true
                 val isNeteaseSong = songEntity?.videoId?.toLongOrNull() != null || isNeteaseMv
                 // 标签(itag)是 YouTube 流格式编号,网易取流无此概念(占位 0),隐藏
                 if (!isNeteaseSong) {
@@ -901,7 +902,31 @@ fun InfoPlayerBottomSheet(
                 val neteaseMeta = screenDataState.neteaseSongData
                 val mvMeta = screenDataState.neteaseMvData
                 if (isNeteaseMv && mvMeta != null) {
-                    // MV 信息卡:播放/赞/收藏/评论 + 简介(数据全来自 mv/detail)
+                    // MV 信息卡与歌曲共用字段布局；MV 没有专辑/踩数，只展示其真实字段。
+                    mvMeta.artists.takeIf { it.isNotEmpty() }?.let { artists ->
+                        Text(
+                            text = stringResource(Res.string.artists),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
+                            textAlign = TextAlign.Center,
+                            style = typo().labelMedium,
+                            color = rememberSurfaceDarkColors().content,
+                        )
+                        Text(
+                            text = artists.joinToString("、") { it.second },
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp),
+                            style = typo().bodyMedium,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                    mvMeta.publishTimeStr?.takeIf { it.isNotBlank() }?.let { published ->
+                        Text(
+                            text = stringResource(Res.string.published_at, published),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
+                            textAlign = TextAlign.Center,
+                            style = typo().labelMedium,
+                            color = rememberSurfaceDarkColors().content,
+                        )
+                    }
                     mvMeta.playCount?.let { playCount ->
                         Text(
                             text = stringResource(Res.string.plays),
@@ -947,21 +972,6 @@ fun InfoPlayerBottomSheet(
                             textAlign = TextAlign.Center,
                         )
                     }
-                    if ((mvMeta.commentCount ?: 0) > 0) {
-                        Text(
-                            text = stringResource(Res.string.comments),
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
-                            textAlign = TextAlign.Center,
-                            style = typo().labelMedium,
-                            color = rememberSurfaceDarkColors().content,
-                        )
-                        Text(
-                            text = stringResource(Res.string.comments_count, formatCompactCount(mvMeta.commentCount ?: 0L)),
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp),
-                            style = typo().bodyMedium,
-                            textAlign = TextAlign.Center,
-                        )
-                    }
                     val mvDesc = mvMeta.description?.takeIf { it.isNotBlank() } ?: mvMeta.briefDesc?.takeIf { it.isNotBlank() }
                     if (mvDesc != null) {
                         Text(
@@ -990,28 +1000,6 @@ fun InfoPlayerBottomSheet(
                         )
                         Text(
                             text = formatCompactCount(likeCount),
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .wrapContentHeight(align = Alignment.CenterVertically)
-                                    .padding(horizontal = 10.dp),
-                            style = typo().bodyMedium,
-                            textAlign = TextAlign.Center,
-                        )
-                    }
-                    if (neteaseMeta.commentCount > 0) {
-                        Text(
-                            text = stringResource(Res.string.comments),
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 10.dp),
-                            textAlign = TextAlign.Center,
-                            style = typo().labelMedium,
-                            color = rememberSurfaceDarkColors().content,
-                        )
-                        Text(
-                            text = stringResource(Res.string.comments_count, formatCompactCount(neteaseMeta.commentCount)),
                             modifier =
                                 Modifier
                                     .fillMaxWidth()
@@ -1122,7 +1110,7 @@ fun InfoPlayerBottomSheet(
                 }
                 val sourceUrl =
                     if (isNeteaseMv) {
-                        "https://music.163.com/mv?id=${songEntity?.videoId?.removePrefix(NETEASE_MV_MEDIA_ID_PREFIX)}"
+                        "https://music.163.com/mv?id=${currentMediaId?.removePrefix(NETEASE_MV_MEDIA_ID_PREFIX)}"
                     } else if (isNeteaseSong) {
                         "https://music.163.com/song?id=${songEntity?.videoId}"
                     } else {
@@ -1854,6 +1842,8 @@ fun NowPlayingBottomSheet(
             .queueData.value?.data?.isNeteasePodcastQueue == true
     // 点赞/添加到歌单按源登录置灰:cloudLiked 为 null = 未登录(或云端态未知)
     val cloudLikedForGate by viewModel.cloudLiked.collectAsStateWithLifecycle()
+    val neteaseLoggedIn by koinInject<com.maxrave.simpmusic.viewModel.SharedViewModel>()
+        .neteaseLoggedIn.collectAsStateWithLifecycle()
     // "下载视频"行的下载中态(DownloadManager 视频条目在途实时流)
     val videoDownloading by viewModel.videoDownloading.collectAsStateWithLifecycle()
     val coroutineScope = rememberCoroutineScope()
@@ -1893,6 +1883,42 @@ fun NowPlayingBottomSheet(
 
     LaunchedEffect(key1 = song) {
         viewModel.setSongEntity(song)
+    }
+
+    LaunchedEffect(uiState.mvPlaybackStarted) {
+        if (uiState.mvPlaybackStarted) hideModalBottomSheet()
+    }
+
+    uiState.mvCandidates?.let { candidates ->
+        AlertDialog(
+            containerColor = rememberSurfaceDarkColors().container,
+            onDismissRequest = { viewModel.onUIEvent(NowPlayingBottomSheetUIEvent.DismissMvCandidates) },
+            title = { Text(stringResource(Res.string.watch_mv), style = typo().labelSmall) },
+            text = {
+                Column(Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState())) {
+                    candidates.forEach { candidate ->
+                        TextButton(
+                            onClick = { viewModel.onUIEvent(NowPlayingBottomSheetUIEvent.PlayYouTubeMv(candidate)) },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Column(Modifier.fillMaxWidth()) {
+                                Text(candidate.title, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                Text(
+                                    listOfNotNull(candidate.artists?.firstOrNull()?.name, candidate.duration)
+                                        .filter { it.isNotBlank() }.joinToString(" · "),
+                                    style = typo().bodyMedium,
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.onUIEvent(NowPlayingBottomSheetUIEvent.DismissMvCandidates) }) {
+                    Text(stringResource(Res.string.cancel))
+                }
+            },
+        )
     }
 
     if (changePlaybackSpeedPitch) {
@@ -2072,15 +2098,20 @@ fun NowPlayingBottomSheet(
     }
 
     if (showRedownloadVideoDialog) {
-        // 视频重新下载确认(文案与音频覆盖弹窗同源;确认走 DownloadVideo——
-        // 事件内先删旧视频文件+条目再入队)
+        // 视频重新下载确认;网易 MV 与 YTM 视频各自走原有下载管线。
         AlertDialog(
             containerColor = rememberSurfaceDarkColors().container,
             onDismissRequest = { showRedownloadVideoDialog = false },
             confirmButton = {
                 TextButton(onClick = {
                     showRedownloadVideoDialog = false
-                    viewModel.onUIEvent(NowPlayingBottomSheetUIEvent.DownloadVideo)
+                    viewModel.onUIEvent(
+                        if (uiState.songUIState.videoId.startsWith(NETEASE_MV_MEDIA_ID_PREFIX)) {
+                            NowPlayingBottomSheetUIEvent.DownloadMv
+                        } else {
+                            NowPlayingBottomSheetUIEvent.DownloadVideo
+                        },
+                    )
                 }) {
                     Text(text = stringResource(Res.string.overwrite_download_title), style = typo().labelSmall)
                 }
@@ -2390,13 +2421,15 @@ fun NowPlayingBottomSheet(
                     }
                     // 播客节目红心走 /song/like 报 524"歌单不支持添加播客声音"(歌曲/声音链路
                     // 分离,声音喜欢端点多形状穷举全 400)——隐藏防假失败(2026-09-29)
+                    val isNeteaseMvSong = uiState.songUIState.videoId.startsWith(NETEASE_MV_MEDIA_ID_PREFIX)
                     if (!isPodcastQueue) CheckBoxActionButton(
                         // 云端态优先(登录时拉取,~几百 ms 到):本地 Room 的 liked 可能过期
                         // (YT 红心歌单里本地未赞、云端已赞,读作"状态不对");云端未到/未登录
                         // 退回本地值。checkbox 以 defaultChecked 为 key,云端晚到会重置显示
                         defaultChecked = cloudLikedForGate ?: uiState.songUIState.liked,
                         isHeartIcon = true,
-                        enable = cloudLikedForGate != null,
+                        enable = cloudLikedForGate != null && (!isNeteaseMvSong || neteaseLoggedIn),
+                        optimistic = !isNeteaseMvSong,
                         onChangeListener = { liked ->
                             viewModel.onUIEvent(NowPlayingBottomSheetUIEvent.ToggleLike)
                             onLikeChanged?.invoke(liked)
@@ -2414,7 +2447,6 @@ fun NowPlayingBottomSheet(
                             uiState.songUIState.videoType != "MUSIC_VIDEO_TYPE_ATV"
                     // 网易 MV(媒体 id=NETEASE_MV_ 哨兵):非歌曲实体——下载/电台/加歌单/
                     // 歌词供应商等歌曲语义的行全部不适用,专属行见"下载 MV"
-                    val isNeteaseMvSong = uiState.songUIState.videoId.startsWith(NETEASE_MV_MEDIA_ID_PREFIX)
                     if (!isPodcastEpisode && !isRealVideoSong && !isNeteaseMvSong) ActionButton(
                         icon =
                             when (uiState.songUIState.downloadState) {
@@ -2453,7 +2485,7 @@ fun NowPlayingBottomSheet(
                     // Music/SimpMusic[/主艺人/专辑](与音频同树,回落 Movies)。ATV=纯音频
                     // 曲目(player 响应无视频 format),下了也只能 merge 出"只有声音的
                     // mp4"——不显示入口(2026-10-01 用户反馈)。
-                    // 三态与音频下载行同构(2026-10-03 用户问"状态会随已下载更新吗"):
+                    // 真正的视频曲目按钮与网易 MV 共用歌曲下载的图标/文案三态:
                     // 在途=下载中(点击只撤视频条目),文件在=已下载(点击"重新下载?"覆盖),
                     // 否则=下载视频;视频态独立于音频态,Room 路径列+内存条目流双源
                     if (uiState.songUIState.videoId.toLongOrNull() == null &&
@@ -2469,9 +2501,10 @@ fun NowPlayingBottomSheet(
                                     showCancelVideoDownloadDialog = true
                                 }
 
-                            uiState.songUIState.downloadedVideoFilePath != null ->
+                            uiState.songUIState.downloadedVideoFilePath
+                                ?.let { java.io.File(it).exists() } == true ->
                                 ActionButton(
-                                    icon = SimpIcons.Movie,
+                                    icon = if (isRealVideoSong) SimpIcons.DownloadForOffline else SimpIcons.Movie,
                                     // 同音频"已下载"行:共享 symbol 是中性色,完成态明说颜色
                                     iconColor = Color(0xFF00A0CB),
                                     text = Res.string.downloaded,
@@ -2481,16 +2514,14 @@ fun NowPlayingBottomSheet(
 
                             else ->
                                 ActionButton(
-                                    icon = SimpIcons.Movie,
-                                    text = Res.string.download_video,
+                                    icon = if (isRealVideoSong) SimpIcons.DownloadForOfflineOutlined else SimpIcons.Movie,
+                                    text = if (isRealVideoSong) Res.string.download else Res.string.download_video,
                                 ) {
                                     viewModel.onUIEvent(NowPlayingBottomSheetUIEvent.DownloadVideo)
                                 }
                         }
                     }
-                    // 网易 MV 专属下载行(mvDetail.brs mp4 单文件直存):三态对齐"下载视频"
-                    // ——在途=下载中(导出管线无取消入口,禁点),已落文件=已下载(点击覆盖重下,
-                    // staged write 原子替换),否则=下载 MV;成功落 song 行,管理页已完成区可见
+                    // 网易 MV 走独立 mp4 下载管线,但按钮图标与歌曲下载的三态一致。
                     if (isNeteaseMvSong) {
                         val mvFileDownloaded =
                             uiState.songUIState.downloadedVideoFilePath
@@ -2503,17 +2534,16 @@ fun NowPlayingBottomSheet(
                                 ) { }
                             mvFileDownloaded ->
                                 ActionButton(
-                                    icon = SimpIcons.Movie,
+                                    icon = SimpIcons.DownloadForOffline,
                                     iconColor = Color(0xFF00A0CB),
                                     text = Res.string.downloaded,
                                 ) {
-                                    viewModel.onUIEvent(NowPlayingBottomSheetUIEvent.DownloadMv)
-                                    hideModalBottomSheet()
+                                    showRedownloadVideoDialog = true
                                 }
                             else ->
                                 ActionButton(
-                                    icon = SimpIcons.Movie,
-                                    text = Res.string.download_mv,
+                                    icon = SimpIcons.DownloadForOfflineOutlined,
+                                    text = Res.string.download,
                                 ) {
                                     viewModel.onUIEvent(NowPlayingBottomSheetUIEvent.DownloadMv)
                                     hideModalBottomSheet()
@@ -2602,7 +2632,7 @@ fun NowPlayingBottomSheet(
                             artist = true
                         }
                     }
-                    if (!isPodcastQueue) ActionButton(
+                    if (!isPodcastQueue && !isNeteaseMvSong) ActionButton(
                         icon = SimpIcons.Album,
                         // Three states, not two. A track can carry an album ID with no title: the
                         // row it was parsed from links an album but never spells its name out.
@@ -2657,6 +2687,25 @@ fun NowPlayingBottomSheet(
                                 ),
                             )
                             hideModalBottomSheet()
+                        }
+                    }
+                    if (uiState.songUIState.videoId.isNotBlank() &&
+                        uiState.songUIState.videoId.toLongOrNull() == null &&
+                        !isNeteaseMvSong && !isRealVideoSong && !isPodcastQueue
+                    ) {
+                        ActionButton(
+                            icon = SimpIcons.Movie,
+                            text = if (uiState.mvSearchLoading) Res.string.processing else Res.string.watch_mv,
+                        ) {
+                            if (!uiState.mvSearchLoading) {
+                                viewModel.onUIEvent(
+                                    NowPlayingBottomSheetUIEvent.WatchYouTubeMv(
+                                        videoId = uiState.songUIState.videoId,
+                                        title = uiState.songUIState.title,
+                                        artist = uiState.songUIState.listArtists.firstOrNull()?.name,
+                                    ),
+                                )
+                            }
                         }
                     }
                     // 网易歌独有:看 MV(歌曲→mv 字段解析,详情拉取后单 MV 队列起播)
@@ -2811,6 +2860,7 @@ fun CheckBoxActionButton(
     defaultChecked: Boolean,
     isHeartIcon: Boolean,
     enable: Boolean = true,
+    optimistic: Boolean = true,
     onChangeListener: (checked: Boolean) -> Unit,
 ) {
     // key 上 defaultChecked:菜单存活期间云端点赞态晚到(本地过期值先显示)时重置为真值;
@@ -2821,8 +2871,9 @@ fun CheckBoxActionButton(
             Modifier
                 .wrapContentSize(align = Alignment.Center)
                 .clickable(enabled = enable) {
-                    stateChecked = !stateChecked
-                    onChangeListener(stateChecked)
+                    val next = !stateChecked
+                    if (optimistic) stateChecked = next
+                    onChangeListener(next)
                 },
     ) {
         Row(
@@ -4578,12 +4629,27 @@ fun NeteaseCommentsSheet(
      *  null 且 isPodcast=true 表示反查在途——首载等它落地,否则会拿 R_SO_4 歌曲线程加载错评论 */
     isPodcast: Boolean = false,
     neteaseRepository: com.maxrave.data.repository.NeteaseRepositoryImpl = koinInject(),
+    dataStoreManager: DataStoreManager = koinInject(),
 ) {
     val coroutineScope = rememberCoroutineScope()
+    val isMv = songId.startsWith(NETEASE_MV_MEDIA_ID_PREFIX)
+    val commentThreadId =
+        if (isMv) {
+            threadId?.takeIf { it.startsWith("R_MV_5_") }
+                ?: "R_MV_5_${songId.removePrefix(NETEASE_MV_MEDIA_ID_PREFIX)}"
+        } else {
+            threadId?.takeIf { it.isNotEmpty() }
+        }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val dark = rememberSurfaceDarkColors()
     var sort by remember { mutableStateOf(NeteaseCommentSort.RECOMMEND) }
     var comments by remember { mutableStateOf<List<com.maxrave.domain.data.entities.NeteaseSongInfoEntity.HotComment>>(emptyList()) }
+    var pendingLocalComments by remember(songId, commentThreadId) {
+        mutableStateOf<List<com.maxrave.domain.data.entities.NeteaseSongInfoEntity.HotComment>>(emptyList())
+    }
+    var fetchedTotalCount by remember(songId, commentThreadId) { mutableStateOf<Int?>(null) }
+    var localCountFloor by remember(songId, commentThreadId) { mutableStateOf<Int?>(null) }
+    val displayTotalCount = maxOf(fetchedTotalCount ?: totalCount, localCountFloor ?: 0)
     // 首载/切档=loading,追加=loadingMore(重入守卫读两者);失败置 failed 出重试行——
     // 旧版失败直接 hasMore=false 假装到底,网络抖一下评论列表就"没了"
     var loading by remember { mutableStateOf(false) }
@@ -4615,12 +4681,18 @@ fun NeteaseCommentsSheet(
                     cursor = target.firstCursor,
                     pageNo = 1,
                     // ""=反查未命中的哨兵,按无 threadId 处理回退歌曲线程
-                    threadId = threadId?.takeIf { it.isNotEmpty() },
+                    threadId = commentThreadId,
                 )
             if (page == null) {
                 failed = true
             } else {
                 comments = page.items
+                fetchedTotalCount = page.totalCount
+                // 回显去重:有 id 的按 id 匹配;id 缺失(xeapi 偶不回 id)的 ghost 一并摘除
+                // ——顶层回显永远匹配不上它,留在 pending 里会以残影形式永久置顶
+                pendingLocalComments = pendingLocalComments.filterNot { pending ->
+                    pending.commentId == null || page.items.any { it.commentId == pending.commentId }
+                }
                 hasMore = page.hasMore
                 cursor = page.nextCursor
             }
@@ -4641,12 +4713,13 @@ fun NeteaseCommentsSheet(
                     sortType = sort.wire,
                     cursor = next,
                     pageNo = pageNo,
-                    threadId = threadId,
+                    threadId = commentThreadId,
                 )
             if (page == null) {
                 failed = true
                 pageNo -= 1
             } else {
+                fetchedTotalCount = page.totalCount ?: fetchedTotalCount
                 // 同一条评论跨页/跨档可能重复,按评论 id 去重
                 val oldSize = comments.size
                 val deduped = (comments + page.items).distinctBy { it.commentId }
@@ -4687,7 +4760,7 @@ fun NeteaseCommentsSheet(
                     parentCommentId = parentId,
                     limit = 20,
                     time = time,
-                    threadId = threadId?.takeIf { it.isNotEmpty() },
+                    threadId = commentThreadId,
                 )
             if (page == null) {
                 floorFailed = true
@@ -4711,7 +4784,7 @@ fun NeteaseCommentsSheet(
         if (id in likePending) return
         // 节目线程(A_DJ_1)的 like 写通道未验证支持——禁用防"显示成功实则失败"。
         // (runBlocking 取串:本函数非 Composable,stringResource 不可用)
-        if (isPodcast || threadId != null) {
+        if (isPodcast || (!isMv && threadId != null)) {
             showToast(
                 message = runBlocking { getString(Res.string.podcast_comment_like_unsupported) },
                 duration = ToastDuration.Short,
@@ -4735,7 +4808,7 @@ fun NeteaseCommentsSheet(
         if (isFloor) floorComments = patch(floorComments) else comments = patch(comments)
         likePending = likePending + id
         coroutineScope.launch {
-            neteaseRepository.setCommentLiked(songId, id, like = !oldLiked).onFailure { e ->
+            neteaseRepository.setCommentLiked(songId, id, like = !oldLiked, threadId = commentThreadId).onFailure { e ->
                 fun revert(list: List<com.maxrave.domain.data.entities.NeteaseSongInfoEntity.HotComment>): List<com.maxrave.domain.data.entities.NeteaseSongInfoEntity.HotComment> =
                     list.map {
                         if (it.commentId == id) {
@@ -4755,7 +4828,7 @@ fun NeteaseCommentsSheet(
         }
     }
 
-    LaunchedEffect(songId, threadId) {
+    LaunchedEffect(songId, commentThreadId) {
         // 播客 threadId 是面板打开后才反查的:在途(null)不首发,落地(含 "" 未命中)再载
         if (isPodcast && threadId == null) return@LaunchedEffect
         loadFirst(sort)
@@ -4768,6 +4841,7 @@ fun NeteaseCommentsSheet(
     var postText by remember { mutableStateOf("") }
     var posting by remember { mutableStateOf(false) }
     val postSuccessText = stringResource(Res.string.post_comment_success)
+    val waitingToSyncText = stringResource(Res.string.comment_waiting_to_sync)
 
     fun submitPost() {
         val text = postText.trim()
@@ -4776,23 +4850,70 @@ fun NeteaseCommentsSheet(
         posting = true
         coroutineScope.launch {
             neteaseRepository
-                .postSongComment(songId, text, replyTo = target?.commentId)
-                .onSuccess {
+                .postSongComment(songId, text, replyTo = target?.commentId, threadId = commentThreadId)
+                .onSuccess { newCommentId ->
                     posting = false
                     showPostDialog = false
                     postText = ""
                     replyTarget = null
-                    showToast(message = postSuccessText, duration = ToastDuration.Short, gravity = ToastGravity.Bottom)
-                    // 新评论在"最新"档最前,发布后切到最新并重载首屏让它立即可见
-                    if (sort != NeteaseCommentSort.LATEST) {
-                        sort = NeteaseCommentSort.LATEST
+                    val accountName = runCatching { dataStoreManager.neteaseAccountName.first() }.getOrNull()
+                    val accountAvatar = runCatching { dataStoreManager.neteaseAccountThumbUrl.first() }.getOrNull()
+                    if (target == null) {
+                        // 顶层评论:pending 置顶展示,重载首屏后按 id 去重摘除(loadFirst 里)
+                        pendingLocalComments =
+                            listOf(
+                                com.maxrave.domain.data.entities.NeteaseSongInfoEntity.HotComment(
+                                    nickname = accountName?.takeIf { it.isNotBlank() },
+                                    avatarUrl = accountAvatar?.takeIf { it.isNotBlank() },
+                                    content = text,
+                                    commentId = newCommentId,
+                                    timeStr = waitingToSyncText,
+                                ),
+                            ) + pendingLocalComments
+                        localCountFloor = maxOf(displayTotalCount, localCountFloor ?: 0) + 1
+                        showToast(message = postSuccessText, duration = ToastDuration.Short, gravity = ToastGravity.Bottom)
+                        // 新评论在"最新"档最前,发布后切到最新并重载首屏让它立即可见
+                        if (sort != NeteaseCommentSort.LATEST) {
+                            sort = NeteaseCommentSort.LATEST
+                        }
+                        collapseFloor()
+                        loadFirst(NeteaseCommentSort.LATEST)
+                    } else {
+                        // 回复属楼中楼,绝不进顶层 pending——顶层重拉永远等不到它的回显,
+                        // 按摘除条件会永久钉在列表顶。乐观落位:目标所在楼层正展开时插入
+                        // 该楼层(楼层新→旧排,前插)+楼层所属父评论 replyCount+1 让
+                        // "N 条回复"入口即时出现;顶层列表内容未变,不切档不重载
+                        // (重载只会覆盖乐观计数,回复本身也不会出现在顶层页)
+                        val optimisticReply =
+                            com.maxrave.domain.data.entities.NeteaseSongInfoEntity.HotComment(
+                                nickname = accountName?.takeIf { it.isNotBlank() },
+                                avatarUrl = accountAvatar?.takeIf { it.isNotBlank() },
+                                content = text,
+                                commentId = newCommentId,
+                                timeStr = waitingToSyncText,
+                                beRepliedNickname = target.nickname,
+                                beRepliedContent = target.content,
+                            )
+                        if (expandedCommentId != null &&
+                            (
+                                target.commentId == expandedCommentId ||
+                                    floorComments.any { it.commentId == target.commentId }
+                            )
+                        ) {
+                            floorComments = listOf(optimisticReply) + floorComments
+                        }
+                        val parentId =
+                            if (comments.any { it.commentId == target.commentId }) {
+                                target.commentId
+                            } else {
+                                expandedCommentId ?: target.commentId
+                            }
+                        comments =
+                            comments.map {
+                                if (it.commentId == parentId) it.copy(replyCount = it.replyCount + 1) else it
+                            }
+                        showToast(message = postSuccessText, duration = ToastDuration.Short, gravity = ToastGravity.Bottom)
                     }
-                    collapseFloor()
-                    comments = emptyList()
-                    hasMore = true
-                    failed = false
-                    cursor = null
-                    loadFirst(NeteaseCommentSort.LATEST)
                 }
                 .onFailure { e ->
                     posting = false
@@ -4846,7 +4967,7 @@ fun NeteaseCommentsSheet(
                         } else {
                             stringResource(
                                 Res.string.comments_title,
-                                formatCompactCount(totalCount),
+                                formatCompactCount(displayTotalCount),
                             )
                         },
                     style = typo().titleMedium,
@@ -4916,7 +5037,7 @@ fun NeteaseCommentsSheet(
                     modifier = Modifier.weight(1f).nestedScroll(listGestureSink),
                     contentPadding = PaddingValues(vertical = 6.dp),
                 ) {
-                    items(comments) { comment ->
+                    items(pendingLocalComments + comments) { comment ->
                         Column(Modifier.fillMaxWidth()) {
                             Row(
                                 modifier =
@@ -4939,9 +5060,11 @@ fun NeteaseCommentsSheet(
                                         .weight(1f)
                                         .clip(RoundedCornerShape(8.dp))
                                         .clickable {
-                                            replyTarget = comment
-                                            postText = ""
-                                            showPostDialog = true
+                                            if (comment.commentId != null) {
+                                                replyTarget = comment
+                                                postText = ""
+                                                showPostDialog = true
+                                            }
                                         },
                                 ) {
                                     Text(
@@ -5146,7 +5269,7 @@ fun NeteaseCommentsSheet(
                                     }
                                 loading && comments.isEmpty() ->
                                     CircularProgressIndicator(modifier = Modifier.size(28.dp))
-                                comments.isEmpty() ->
+                                comments.isEmpty() && pendingLocalComments.isEmpty() ->
                                     Text(
                                         text = stringResource(Res.string.no_comments),
                                         style = typo().labelMedium,
@@ -5174,7 +5297,7 @@ fun NeteaseCommentsSheet(
                     }
                 }
                 // 节目评论发布写通道未验证——输入栏整行隐藏(2026-09-29)
-                if (threadId == null && !isPodcast) Row(
+                if (!isPodcast && (threadId == null || isMv)) Row(
                     modifier =
                         Modifier
                             .fillMaxWidth()

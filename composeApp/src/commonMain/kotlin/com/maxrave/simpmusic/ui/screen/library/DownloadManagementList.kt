@@ -227,7 +227,12 @@ fun DownloadManagementItem(
                         ).focusable(),
             )
             Text(
-                text = entryStatusText(primaryStatus ?: DownloadEntryStatus.FILE_MISSING, primaryLive, primaryBytes),
+                text = entryStatusText(
+                    primaryStatus ?: DownloadEntryStatus.FILE_MISSING,
+                    primaryLive,
+                    primaryBytes,
+                    if (row.directMvActive) row.directMvProgress else null,
+                ),
                 style = typo().bodySmall,
                 color = if (primaryRank == 4) failedColor else subtitleColor,
                 maxLines = 1,
@@ -249,7 +254,9 @@ fun DownloadManagementItem(
             Spacer(modifier = Modifier.width(4.dp))
             // 主操作:在途→暂停;暂停→继续;失败→重试;丢失→重下;完成→删除(playlist_remove)
             when (primaryRank) {
-                0, 2 -> RippleIconButton(imageVector = SimpIcons.Pause, fillMaxSize = false, tint = contentColor) { onPause() }
+                0, 2 -> if (!row.directMvActive) {
+                    RippleIconButton(imageVector = SimpIcons.Pause, fillMaxSize = false, tint = contentColor) { onPause() }
+                }
                 3 -> RippleIconButton(imageVector = SimpIcons.PlayArrow, fillMaxSize = false, tint = contentColor) { onResume() }
                 4 -> RippleIconButton(imageVector = SimpIcons.Update, fillMaxSize = false, tint = contentColor) { onRetry() }
                 5 -> RippleIconButton(imageVector = SimpIcons.DownloadForOffline, fillMaxSize = false, tint = contentColor) { onRedownload() }
@@ -267,6 +274,7 @@ private fun progressOf(
     row: DownloadManagementRow,
     viewMode: DownloadViewMode,
 ): Float? {
+    if (row.directMvActive) return row.directMvProgress
     val pick: (com.maxrave.domain.mediaservice.handler.DownloadHandler.Download?, DownloadEntryStatus?) -> Float? = { live, status ->
         if (status == DownloadEntryStatus.DOWNLOADING && live != null && live.percentDownloaded >= 0) live.percentDownloaded / 100f else null
     }
@@ -279,11 +287,13 @@ private fun entryStatusText(
     status: DownloadEntryStatus,
     live: com.maxrave.domain.mediaservice.handler.DownloadHandler.Download?,
     fileBytes: Long?,
+    directMvProgress: Float? = null,
 ): String =
     when (status) {
         DownloadEntryStatus.QUEUED -> stringResource(Res.string.download_status_queued)
         DownloadEntryStatus.DOWNLOADING ->
             when {
+                directMvProgress != null -> "${(directMvProgress * 100).toInt()}%"
                 live != null && live.percentDownloaded >= 0 -> "${live.percentDownloaded}%"
                 live != null && live.bytesDownloaded > 0 -> stringResource(Res.string.downloading) + " · " + formatDownloadBytes(live.bytesDownloaded)
                 else -> stringResource(Res.string.downloading)

@@ -27,6 +27,10 @@ data class DownloadManagementRow(
     val videoLive: DownloadHandler.Download?,
     val audioFileBytes: Long?,
     val videoFileBytes: Long?,
+    /** MV 直写 MP4 在途；不支持 Media3 的暂停/继续动作。 */
+    val directMvActive: Boolean = false,
+    /** 0..1；null 表示 Content-Length 尚未知。 */
+    val directMvProgress: Float? = null,
 )
 
 /** 列表排序:在途最上(下载中>转存中>排队>暂停>失败),丢失次之,完成沉底;同档按时间倒序 */

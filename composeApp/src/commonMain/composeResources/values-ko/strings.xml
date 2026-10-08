@@ -157,7 +157,8 @@
     <string name="no_comments">아직 댓글이 없습니다</string>
     <string name="post_comment_hint">댓글을 입력하세요...</string>
     <string name="reply_hint">@%1$s에게 답글:</string>
-    <string name="post_comment_success">댓글이 게시되었습니다</string>
+    <string name="post_comment_success">댓글을 제출했습니다</string>
+    <string name="comment_waiting_to_sync">서버 동기화 대기 중</string>
     <string name="publish">게시</string>
     <string name="end_of_list">마지막 댓글입니다</string>
     <string name="comments">댓글</string>

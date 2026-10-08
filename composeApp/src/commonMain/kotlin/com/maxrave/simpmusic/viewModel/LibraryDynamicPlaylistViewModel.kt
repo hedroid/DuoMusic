@@ -2,9 +2,11 @@ package com.maxrave.simpmusic.viewModel
 
 import androidx.lifecycle.viewModelScope
 import com.maxrave.common.Config
+import com.maxrave.common.NETEASE_MV_MEDIA_ID_PREFIX
 import com.maxrave.common.Config.REMOVED_SONG_DATE_TIME
 import com.maxrave.domain.data.entities.ArtistEntity
 import com.maxrave.domain.data.entities.SongEntity
+import com.maxrave.domain.data.entities.DownloadState
 import com.maxrave.domain.extension.now
 import com.maxrave.domain.mediaservice.handler.PlaylistType
 import com.maxrave.domain.mediaservice.handler.QueueData
@@ -45,6 +47,7 @@ class LibraryDynamicPlaylistViewModel(
     private val analyticsRepository: AnalyticsRepository,
 ) : BaseViewModel() {
     private val downloadUtils: com.maxrave.domain.mediaservice.handler.DownloadHandler by inject()
+    private val sharedViewModel: SharedViewModel by inject()
     private val playlistRepository: com.maxrave.domain.repository.PlaylistRepository by inject()
     private val albumRepository: com.maxrave.domain.repository.AlbumRepository by inject()
     private val localPlaylistRepository: com.maxrave.domain.repository.LocalPlaylistRepository by inject()
@@ -108,24 +111,44 @@ class LibraryDynamicPlaylistViewModel(
             kotlinx.coroutines.flow.combine(
                 songRepository.getDownloadActivitySongs(),
                 downloadUtils.downloads,
-            ) { songs, live ->
+                sharedViewModel.mvDownloadProgress,
+            ) { songs, live, directMv ->
                 songs.mapNotNull { song ->
                     val pair = live[song.videoId]
-                    val audioStatus = resolveDownloadEntryStatus(pair?.first, song.downloadedFilePath, song.downloadState)
+                    val isMv = song.videoId.startsWith(NETEASE_MV_MEDIA_ID_PREFIX)
+                    val directActive = isMv && directMv.containsKey(song.videoId)
                     val videoStatus =
-                        if (pair?.second != null || song.downloadedVideoFilePath != null) {
+                        if (directActive) {
+                            DownloadEntryStatus.DOWNLOADING
+                        } else if (isMv) {
+                            // 直写任务退出后没有 Media3 队列可恢复；只认真实文件为完成。
+                            if (song.downloadedVideoFilePath?.let { File(it).exists() } == true) {
+                                DownloadEntryStatus.DONE
+                            } else if (song.downloadState == DownloadState.STATE_DOWNLOADING) {
+                                // 进程在传输中退出时，残留 Room 在途态应允许重试。
+                                DownloadEntryStatus.FAILED
+                            } else {
+                                DownloadEntryStatus.FILE_MISSING
+                            }
+                        } else if (pair?.second != null || song.downloadedVideoFilePath != null) {
                             resolveDownloadEntryStatus(pair?.second, song.downloadedVideoFilePath, song.downloadState)
                         } else {
                             null
                         }
+                    val audioStatus =
+                        if (isMv) videoStatus ?: DownloadEntryStatus.FILE_MISSING
+                        else resolveDownloadEntryStatus(pair?.first, song.downloadedFilePath, song.downloadState)
+                    val videoBytes = song.downloadedVideoFilePath?.let { File(it).takeIf(File::exists)?.length() }
                     DownloadManagementRow(
                         song = song,
                         audioStatus = audioStatus,
                         audioLive = pair?.first,
                         videoStatus = videoStatus,
                         videoLive = pair?.second,
-                        audioFileBytes = song.downloadedFilePath?.let { java.io.File(it).takeIf(File::exists)?.length() },
-                        videoFileBytes = song.downloadedVideoFilePath?.let { java.io.File(it).takeIf(File::exists)?.length() },
+                        audioFileBytes = if (isMv) videoBytes else song.downloadedFilePath?.let { File(it).takeIf(File::exists)?.length() },
+                        videoFileBytes = videoBytes,
+                        directMvActive = directActive,
+                        directMvProgress = directMv[song.videoId],
                     )
                 }.sortedWith(
                     compareBy<DownloadManagementRow> {
@@ -147,6 +170,10 @@ class LibraryDynamicPlaylistViewModel(
     fun resumeDownload(videoId: String) = downloadUtils.resumeDownload(videoId)
 
     fun retryDownload(videoId: String) {
+        if (videoId.startsWith(NETEASE_MV_MEDIA_ID_PREFIX)) {
+            sharedViewModel.downloadMvFile(videoId)
+            return
+        }
         viewModelScope.launch { downloadUtils.retryDownload(videoId) }
     }
 
@@ -168,6 +195,10 @@ class LibraryDynamicPlaylistViewModel(
 
     /** 视频视角重下(2026-10 CR P1-2):只删视频重新下视频,音频不动 */
     fun redownloadVideo(videoId: String) {
+        if (videoId.startsWith(NETEASE_MV_MEDIA_ID_PREFIX)) {
+            sharedViewModel.downloadMvFile(videoId)
+            return
+        }
         viewModelScope.launch {
             val song = songRepository.getSongById(videoId).firstOrNull() ?: return@launch
             downloadUtils.removeVideoDownload(videoId)
@@ -175,8 +206,11 @@ class LibraryDynamicPlaylistViewModel(
         }
     }
 
-    /** 删除:文件式=删文件+Room;旧缓存条目引擎内分流走原 removeDownload */
+    /** 删除:文件式=删文件+Room;旧缓存条目引擎内分流走原 removeDownload。
+     *  MV 直写在途必须先停协程——removeDownload 只清 Room/文件,管不到写文件的
+     *  协程,完成回写会把删掉的行原样复活(批量删除逐个走这里,同享此防线) */
     fun deleteDownload(videoId: String) {
+        if (videoId.startsWith(NETEASE_MV_MEDIA_ID_PREFIX)) sharedViewModel.cancelMvDownload(videoId)
         viewModelScope.launch {
             demoteDownloadedContainers(
                 videoId = videoId,
@@ -193,6 +227,9 @@ class LibraryDynamicPlaylistViewModel(
     fun resumeAllDownloads() = downloadUtils.resumeAllPausedDownloads()
 
     fun retryFailedDownloads() {
+        downloadManagementRows.value.filter { row ->
+            row.song.videoId.startsWith(NETEASE_MV_MEDIA_ID_PREFIX) && row.videoStatus == DownloadEntryStatus.FAILED
+        }.forEach { sharedViewModel.downloadMvFile(it.song.videoId) }
         viewModelScope.launch { downloadUtils.retryAllFailedDownloads() }
     }
 
