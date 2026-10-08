@@ -245,7 +245,8 @@ class SharedViewModel(
     val remoteSongLikeState: StateFlow<RemoteSongLikeState> = _remoteSongLikeState
 
     /**
-     * 点赞变更事件(videoId+liked+可选 Track):迷你条/播放页红心写成功(或 MV 对账确认)后发,
+     * 点赞变更事件(videoId+liked+可选 Track):迷你条/播放页红心写成功(或 MV 对账
+     * **确认成请求方向**——写失败/回读停在原状态不发,那不是变化)后发,
      * 开着的收藏列表页(红心歌单/MV 收藏)据此原地增删行(2026-10-08 用户定案补齐业内实时档)。
      * 错过事件无妨——云端为准,下次进入/刷新自然对账;通知栏点赞走 core 另一路不发此事件。
      */
@@ -913,14 +914,21 @@ class SharedViewModel(
                             it.copy(neteaseMvData = fresh ?: it.neteaseMvData)
                         }
                     }
-                    // MV 收藏态以回读为准落定,带 detail 派生的完整 Track 通知开着的收藏页
-                    _likeChangeEvent.tryEmit(
-                        LikeChangeEvent(
-                            videoId = targetId,
-                            liked = subed,
-                            track = fresh?.let { neteaseRepository.mvTrackFromDetail(it) },
-                        ),
-                    )
+                    // 收藏变化事件只在"回读确认成请求方向"(subed==liked)时发——写失败/
+                    // 回读停在原状态不是变化,发出去会让收藏页误增删行误动计数(未收藏
+                    // MV 收藏失败回读 false→误减总数;未加载页已收藏 MV 取消失败回读
+                    // true→误插首行虚增总数和 consumed)。回读旧态仍照常校正播放器红心
+                    // (上面分支),两件事口径不同。与 toast/likeWriteResults 的成功判定
+                    // (ok && subed==liked)对齐。
+                    if (subed == liked) {
+                        _likeChangeEvent.tryEmit(
+                            LikeChangeEvent(
+                                videoId = targetId,
+                                liked = subed,
+                                track = fresh?.let { neteaseRepository.mvTrackFromDetail(it) },
+                            ),
+                        )
+                    }
                 }
                 // UI 状态与 toast 同口径:取消方向 subed=null 时保持点前状态(仅对在播目标,
                 // 复核切歌;非在播目标写 remoteSongLikeState 会盖掉在播曲的快照)。
