@@ -252,6 +252,14 @@ class SharedViewModel(
     private val _likeChangeEvent = MutableSharedFlow<LikeChangeEvent>(extraBufferCapacity = 8)
     val likeChangeEvent: kotlinx.coroutines.flow.SharedFlow<LikeChangeEvent> = _likeChangeEvent
 
+    /**
+     * 单次红心/MV 收藏写的落定事件(任意目标,含非在播):列表页对账移行(MV 收藏页/
+     * 红心歌单)、sheet 复选框非乐观确认的消费源。与 remoteSongLikeState 分工——后者是
+     * "在播曲的云端快照"(只随在播曲走),这里才是"这一笔写成了没"的事实通道,别混用。
+     */
+    private val _likeWriteResults = MutableSharedFlow<LikeWriteResult>(extraBufferCapacity = 16)
+    val likeWriteResults: kotlinx.coroutines.flow.SharedFlow<LikeWriteResult> = _likeWriteResults
+
     var isServiceRunning: Boolean = false
 
     private val downloadUtils: DownloadHandler by inject<DownloadHandler>()
@@ -825,12 +833,12 @@ class SharedViewModel(
      * 缓存值显示,操作会走云端并给出失败提示。
      */
     private fun refreshRemoteSongLike(song: SongEntity) {
-        _remoteSongLikeState.value = RemoteSongLikeState()
+        _remoteSongLikeState.value = RemoteSongLikeState(videoId = song.videoId)
         // MV 收藏态由 getNeteaseMvData 的 subed 驱动,不走歌曲云端红心(YT 端点对 MV id 白打)
         if (song.videoId.startsWith(NETEASE_MV_MEDIA_ID_PREFIX)) return
         viewModelScope.launch {
             val cloudLiked = songRepository.getRemoteLikeStatus(song.videoId)
-            _remoteSongLikeState.value = RemoteSongLikeState(liked = cloudLiked)
+            _remoteSongLikeState.value = RemoteSongLikeState(liked = cloudLiked, videoId = song.videoId)
             if (cloudLiked != null) {
                 _liked.value = cloudLiked
                 mediaPlayerHandler.like(cloudLiked)
@@ -853,20 +861,28 @@ class SharedViewModel(
 
     /**
      * 云端红心写入口。videoId=null(默认)=作用于正在播放的曲目(播放页红心);
-     * 传 videoId=作用于指定曲目——列表行菜单(收藏 MV 列表等)打开的 sheet 里,
+     * 传 videoId=作用于指定曲目——列表行菜单(收藏 MV 列表/歌单页等)打开的 sheet 里,
      * 目标行未必在播,不传会错打到 nowPlayingState 的当前曲。
+     *
+     * 目标≠在播曲时只动目标自己的账(本地镜像行+likeChangeEvent+likeWriteResults),
+     * 绝不碰全局在播态(_liked/controllerState 红心/Info 卡/remoteSongLikeState)——
+     * 那些是"在播曲的快照",被别曲的写污染会让播放器红心/通知图标错翻、ToggleLike
+     * 按错方向翻转(2026-10-09 CR)。
      */
     fun setRemoteSongLiked(
         liked: Boolean,
         videoId: String? = null,
     ) {
         val targetId = videoId ?: nowPlayingState.value?.songEntity?.videoId ?: return
+        val isPlayingTarget = playingMediaId() == targetId
         // 网易 MV:红心=收藏/取消收藏 MV。**服务端对账模式**:写操作后一律重拉 mvDetail
         // 的 subed 驱动显示,避免写入延迟或服务端拒绝时本地状态误报成功。
         if (targetId.startsWith(NETEASE_MV_MEDIA_ID_PREFIX)) {
             val mvid = targetId.removePrefix(NETEASE_MV_MEDIA_ID_PREFIX).toLongOrNull() ?: return
+            if (isPlayingTarget) {
+                _remoteSongLikeState.value = _remoteSongLikeState.value.copy(pending = true, failed = false, videoId = targetId)
+            }
             viewModelScope.launch {
-                _remoteSongLikeState.value = _remoteSongLikeState.value.copy(pending = true, failed = false)
                 val ok = neteaseRepository.subscribeMv(mvid, liked).getOrDefault(false)
                 // 回读校正(写成功/失败都读:失败可能是假失败,读到的才是真相)。
                 // 延迟 800ms:收藏写库是异步的,写完立刻回读撞上主从延迟会拿到旧态
@@ -888,10 +904,14 @@ class SharedViewModel(
                     else -> makeToast(getString(Res.string.cloud_action_failed_netease))
                 }
                 if (subed != null) {
-                    _liked.value = subed
-                    mediaPlayerHandler.like(subed)
-                    _nowPlayingScreenData.update {
-                        it.copy(neteaseMvData = fresh ?: it.neteaseMvData)
+                    // 在播判定回读后复核:写等待窗口里可能已切歌
+                    val stillPlayingTarget = playingMediaId() == targetId
+                    if (stillPlayingTarget) {
+                        _liked.value = subed
+                        mediaPlayerHandler.like(subed)
+                        _nowPlayingScreenData.update {
+                            it.copy(neteaseMvData = fresh ?: it.neteaseMvData)
+                        }
                     }
                     // MV 收藏态以回读为准落定,带 detail 派生的完整 Track 通知开着的收藏页
                     _likeChangeEvent.tryEmit(
@@ -902,18 +922,25 @@ class SharedViewModel(
                         ),
                     )
                 }
-                // UI 状态与 toast 同口径:取消方向 subed=null 时保持点前状态。
-                _remoteSongLikeState.value =
-                    if (ok && (subed != null || liked)) {
-                        RemoteSongLikeState(liked = subed ?: liked)
-                    } else {
-                        _remoteSongLikeState.value.copy(pending = false, failed = true)
-                    }
+                // UI 状态与 toast 同口径:取消方向 subed=null 时保持点前状态(仅对在播目标,
+                // 复核切歌;非在播目标写 remoteSongLikeState 会盖掉在播曲的快照)。
+                if (playingMediaId() == targetId) {
+                    _remoteSongLikeState.value =
+                        if (ok && (subed != null || liked)) {
+                            RemoteSongLikeState(liked = subed ?: liked, videoId = targetId)
+                        } else {
+                            _remoteSongLikeState.value.copy(pending = false, failed = true)
+                        }
+                }
+                // 任意目标都发落定事件:列表页对账移行/sheet 复选框确认靠它
+                _likeWriteResults.tryEmit(LikeWriteResult(targetId, liked, ok && subed == liked))
             }
             return
         }
         viewModelScope.launch {
-            _remoteSongLikeState.value = _remoteSongLikeState.value.copy(pending = true, failed = false)
+            if (isPlayingTarget) {
+                _remoteSongLikeState.value = _remoteSongLikeState.value.copy(pending = true, failed = false, videoId = targetId)
+            }
             val result = songRepository.setRemoteLikeStatus(targetId, liked)
             val ok = result.getOrDefault(false)
             if (!ok) {
@@ -930,8 +957,10 @@ class SharedViewModel(
             } else {
                 makeToast(getString(if (liked) Res.string.liked_toast else Res.string.unliked_toast))
                 songRepository.setLikedLocal(targetId, if (liked) 1 else 0)
-                _liked.value = liked
-                mediaPlayerHandler.like(liked)
+                if (playingMediaId() == targetId) {
+                    _liked.value = liked
+                    mediaPlayerHandler.like(liked)
+                }
                 // 迷你条/播放页红心写成功:带在播 Track(目标=在播曲时)通知开着的收藏页。
                 // track 在队列 rebuild 窗口恒 null,回退 songEntity(九轮铁律)——
                 // 恢复队列起播的场景 track 长时间为 null,不兜底收藏方向永远插不了行
@@ -942,14 +971,22 @@ class SharedViewModel(
                     ?.takeIf { it.videoId == targetId }
                     .let { _likeChangeEvent.tryEmit(LikeChangeEvent(targetId, liked, it)) }
             }
-            _remoteSongLikeState.value =
-                if (ok) {
-                    RemoteSongLikeState(liked = liked)
-                } else {
-                    _remoteSongLikeState.value.copy(pending = false, failed = true)
-                }
+            if (isPlayingTarget) {
+                _remoteSongLikeState.value =
+                    if (ok) {
+                        RemoteSongLikeState(liked = liked, videoId = targetId)
+                    } else {
+                        _remoteSongLikeState.value.copy(pending = false, failed = true)
+                    }
+            }
+            _likeWriteResults.tryEmit(LikeWriteResult(targetId, liked, ok))
         }
     }
+
+    /** 当前在播曲目 id:mediaItem 为准(切歌窗口权威),songEntity 兜底(rebuild 窗口) */
+    private fun playingMediaId(): String? =
+        mediaPlayerHandler.nowPlayingState.value.mediaItem?.mediaId
+            ?: nowPlayingState.value?.songEntity?.videoId
 
     private fun getNeteaseSongInfo(song: SongEntity) {
         neteaseSongInfoJob?.cancel()
@@ -1412,9 +1449,14 @@ class SharedViewModel(
                 }
 
                 UIEvent.ToggleLike -> {
-                    // 红心直连云端:当前态优先读云端快照,未知时回落本地镜像
+                    // 红心直连云端:当前态优先读云端快照——只认属于在播曲的快照(列表菜单
+                    // 对别曲的写不再进这里),未知/不属于时回落本地镜像
                     Logger.w(tag, "ToggleLike")
-                    val current = _remoteSongLikeState.value.liked ?: _liked.value
+                    val snapshot = _remoteSongLikeState.value
+                    val current =
+                        snapshot.liked
+                            .takeIf { snapshot.videoId == playingMediaId() }
+                            ?: _liked.value
                     setRemoteSongLiked(!current)
                 }
 
@@ -3069,11 +3111,22 @@ sealed class UIEvent {
     data object ToggleLike : UIEvent()
 }
 
-/** Independent source-account state. `liked == null` means signed out or not yet known. */
+/** Independent source-account state. `liked == null` means signed out or not yet known.
+ *  videoId=该快照所属曲目(=在播曲):ToggleLike 只认属于在播曲的快照,列表菜单对
+ *  别曲的写不进这里,防止翻转方向被污染。 */
 data class RemoteSongLikeState(
     val liked: Boolean? = null,
     val pending: Boolean = false,
     val failed: Boolean = false,
+    val videoId: String? = null,
+)
+
+/** 见 SharedViewModel.likeWriteResults:一次云端写(红心/MV 收藏)的最终落定结果 */
+data class LikeWriteResult(
+    val videoId: String,
+    val liked: Boolean,
+    /** 服务端已确认成请求方向(红心=写成功;MV=subed 回读一致) */
+    val success: Boolean,
 )
 
 /** 见 SharedViewModel.likeChangeEvent:收藏列表页原地增删行的数据载荷 */

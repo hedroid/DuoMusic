@@ -170,17 +170,18 @@ fun MvListScreen(
     var menuTarget by remember { mutableStateOf<Track?>(null) }
     var showListMenu by remember { mutableStateOf(false) }
     // 列表内取消收藏(行菜单红心)→服务端对账确认后原地移行:MV 写路径不乐观翻转
-    // (对账铁律),onLikeChanged 只登记目标,remoteSongLikeState 落定(pending 结束)再动行;
-    // 失败(failed)保留行,toast 由写路径自报
+    // (对账铁律),onLikeChanged 只登记目标,likeWriteResults(带目标 id+成败)落定再动行;
+    // 失败保留行,toast 由写路径自报
     var pendingUnlikeId by remember { mutableStateOf<String?>(null) }
-    val remoteLikeState by sharedViewModel.remoteSongLikeState.collectAsStateWithLifecycle()
-    LaunchedEffect(remoteLikeState) {
-        val pending = pendingUnlikeId ?: return@LaunchedEffect
-        if (!remoteLikeState.pending) {
-            if (!remoteLikeState.failed && remoteLikeState.liked == false) {
-                viewModel.removeMv(pending)
+    LaunchedEffect(Unit) {
+        sharedViewModel.likeWriteResults.collect { result ->
+            val pending = pendingUnlikeId ?: return@collect
+            if (result.videoId == pending) {
+                if (result.success && !result.liked) {
+                    viewModel.removeMv(pending)
+                }
+                pendingUnlikeId = null
             }
-            pendingUnlikeId = null
         }
     }
 
@@ -215,7 +216,10 @@ fun MvListScreen(
             }
         }
 
-    // 近底触发下一页(剩 8 行内);翻页失败后被 loadMoreFailed 挡住,改由页脚"重试"驱动
+    // 近底触发下一页(剩 8 行内);翻页失败后被 loadMoreFailed 挡住,改由页脚"重试"驱动。
+    // uiState 是 collectAsStateWithLifecycle 的 by 委托(State 读取),derivedStateOf 里
+    // 每次计算都会重读它——依赖被正确跟踪,与 MoreSongsScreen(线上验证过分页)同款
+    // 写法;不是捕获首帧值的普通局部 val(那种才是 lambda 闭包陷阱)
     val shouldLoadMore by remember {
         derivedStateOf {
             val state = uiState as? MvListUIState.Success ?: return@derivedStateOf false
@@ -269,7 +273,9 @@ fun MvListScreen(
                             item(contentType = "header") {
                                 ImmersiveMvHeader(
                                     coverUrl = headerCover,
-                                    count = mvs.size,
+                                    // 计数=服务端收藏总数(mv/sublist count),翻完页前
+                                    // 大于已加载条数;未知(0)回落已加载数
+                                    count = state.totalCount.takeIf { it > 0 } ?: mvs.size,
                                     paletteBg = mutedPaletteBg,
                                     onBack = navController::navigateUp,
                                     onSearch = { showSearchBar = !showSearchBar },
@@ -583,11 +589,14 @@ fun MvListScreen(
         MvListMenuSheet(
             onDismiss = { showListMenu = false },
             onAddToQueue = {
-                val loaded = viewModel.loadedMvs()
-                if (loaded.isEmpty()) {
-                    viewModel.makeToast(emptyText)
-                } else {
-                    sharedViewModel.addListToQueue(loaded.toCollection(arrayListOf()))
+                // 与"播放全部"同口径:先把剩余页拉全再入队(显式全量动作不缩水),
+                // 拉取期间页脚有 loadingMore spinner
+                viewModel.withAllMvs { loaded ->
+                    if (loaded.isEmpty()) {
+                        viewModel.makeToast(emptyText)
+                    } else {
+                        sharedViewModel.addListToQueue(loaded.toCollection(arrayListOf()))
+                    }
                 }
             },
             onDownloadAll = {

@@ -517,34 +517,29 @@ class NowPlayingBottomSheetViewModel(
                         // 不传会错打到 nowPlayingState 的当前曲
                         val target = !(_cloudLiked.value ?: songUIState.liked)
                         sharedViewModel.setRemoteSongLiked(target, songUIState.videoId)
-                        // 复选框不乐观翻转(对账铁律):pending 落定后按服务端确认结果回写
+                        // 复选框不乐观翻转(对账铁律):按本笔写的落定事件(带目标 id,不会
+                        // 被别曲写的结果串台)确认后回写
                         launch {
-                            sharedViewModel.remoteSongLikeState.first { !it.pending }
-                            val settled = sharedViewModel.remoteSongLikeState.value
-                            if (!settled.failed && settled.liked != null) {
+                            val settled =
+                                sharedViewModel.likeWriteResults.first { it.videoId == songUIState.videoId }
+                            if (settled.success) {
                                 _cloudLiked.value = settled.liked
                             }
                         }
                         return@launch
                     }
-                    // 点赞=云端账号红心;成功后镜像本地缓存行(库页"喜欢的歌曲"读它)
+                    // 点赞=云端账号红心,统一走 SharedViewModel 单一写路径(2026-10-09):
+                    // 成功镜像本地缓存行(库页"喜欢的歌曲"读它)+目标在播时同步播放器红心/
+                    // 通知图标+发列表页对账事件;失败 toast 按源分流(405 频控专属文案在内)。
+                    // 此前这里直连仓库,给在播曲点赞时播放器红心不翻、也不发对账事件。
                     val target = !(_cloudLiked.value ?: songUIState.liked)
-                    val result = songRepository.setRemoteLikeStatus(songUIState.videoId, target)
-                    val ok = result.getOrDefault(false)
-                    if (ok) {
-                        _cloudLiked.value = target
-                        songRepository.setLikedLocal(songUIState.videoId, if (target) 1 else 0)
-                    } else {
-                        makeToast(
-                            getString(
-                                when {
-                                    result.exceptionOrNull() is com.maxrave.netease.NeteaseRateLimitException ->
-                                        Res.string.netease_rate_limited
-                                    songUIState.videoId.toLongOrNull() != null -> Res.string.cloud_action_failed_netease
-                                    else -> Res.string.cloud_action_failed_youtube
-                                },
-                            ),
-                        )
+                    sharedViewModel.setRemoteSongLiked(target, songUIState.videoId)
+                    launch {
+                        val settled =
+                            sharedViewModel.likeWriteResults.first { it.videoId == songUIState.videoId }
+                        if (settled.success) {
+                            _cloudLiked.value = settled.liked
+                        }
                     }
                 }
 

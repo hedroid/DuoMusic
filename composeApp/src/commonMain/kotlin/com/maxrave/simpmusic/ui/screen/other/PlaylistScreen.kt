@@ -279,6 +279,24 @@ fun PlaylistScreen(
     // 组合期预判会被 Loading 态抢先钉死成 false
     val heartCheckScope = rememberCoroutineScope()
 
+    // 页内行菜单取消红心:登记目标等写落定(对账确认)再移行,失败保留行(见 onLikeChanged)
+    var pendingUnlikeId by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) {
+        sharedViewModel.likeWriteResults.collect { result ->
+            val pending = pendingUnlikeId ?: return@collect
+            if (result.videoId == pending) {
+                if (result.success && !result.liked) {
+                    heartCheckScope.launch {
+                        if (viewModel.isNeteaseLikedPlaylist()) {
+                            viewModel.removeTrackLocally(pending)
+                        }
+                    }
+                }
+                pendingUnlikeId = null
+            }
+        }
+    }
+
     // 别处(迷你条/播放页)红心 → 开着的红心歌单页原地增删行(Spotify 式实时档);
     // 仅红心歌单消费,普通歌单取消红心≠移出歌单
     LaunchedEffect(Unit) {
@@ -1350,16 +1368,13 @@ fun PlaylistScreen(
                         },
                         navController = navController,
                         song = track,
-                        // 红心歌单内取消红心:原地移行(乐观,与复选框本行的乐观翻转同口径;
-                        // 云端写失败时 toast 自报,行下次进入对账回归)
+                        // 红心歌单内取消红心:对账确认后移行(2026-10-09 CR 改)——不再
+                        // 点击即删:云端写失败/被拒时行直接消失,页面与云端不一致且无自愈
+                        // (下次进入才对账回归)。onLikeChanged 只登记目标,likeWriteResults
+                        // 落定(带目标 id+成败)再动行;失败保留行,toast 由写路径自报。
+                        // 与 MV 收藏页 pendingUnlikeId 同款模式。
                         onLikeChanged = { liked ->
-                            if (!liked) {
-                                heartCheckScope.launch {
-                                    if (viewModel.isNeteaseLikedPlaylist()) {
-                                        viewModel.removeTrackLocally(track.videoId)
-                                    }
-                                }
-                            }
+                            if (!liked) pendingUnlikeId = track.videoId
                         },
                     )
                 }

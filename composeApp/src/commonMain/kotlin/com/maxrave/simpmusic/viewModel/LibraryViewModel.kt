@@ -3,6 +3,7 @@ package com.maxrave.simpmusic.viewModel
 import androidx.lifecycle.viewModelScope
 import com.maxrave.common.Config
 import com.maxrave.common.LibraryChipType
+import com.maxrave.common.NETEASE_MV_MEDIA_ID_PREFIX
 import com.maxrave.data.repository.NeteaseRepositoryImpl
 import com.maxrave.domain.data.entities.AlbumEntity
 import com.maxrave.domain.data.entities.LocalPlaylistEntity
@@ -90,6 +91,9 @@ class LibraryViewModel(
 ) : BaseViewModel() {
     private val downloadUtils: DownloadHandler by inject<DownloadHandler>()
     private val mutationBus: LibraryMutationBus by inject()
+
+    // MV 收藏事件回写用(见 init):SharedViewModel 是 Koin single,无循环依赖
+    private val sharedViewModel: SharedViewModel by inject()
 
     private val _currentScreen: MutableStateFlow<LibraryChipType> = MutableStateFlow(LibraryChipType.YOUR_LIBRARY)
     val currentScreen: StateFlow<LibraryChipType> get() = _currentScreen.asStateFlow()
@@ -254,6 +258,16 @@ class LibraryViewModel(
         // 库页本地回写:子页(艺人/歌单/播放页)写操作成功后原地更新分区,不触发网络刷新
         viewModelScope.launch {
             mutationBus.mutations.collect { applyMutation(it) }
+        }
+        // MV 收藏变化回写(2026-10-09 CR):事件从写路径发(播放页红心/收藏 MV 页菜单,
+        // 含本 VM 存活期间在别的页面发生的),返回库页时"收藏的 MV"行的数量+封面已是
+        // 新值,不做返回刷新。概要还是 null(该 tab 从未拉过)不动——行未物化,首拉自取。
+        viewModelScope.launch {
+            sharedViewModel.likeChangeEvent.collect { ev ->
+                if (ev.videoId.startsWith(NETEASE_MV_MEDIA_ID_PREFIX) && _subscribedMvSummary.value != null) {
+                    _subscribedMvSummary.value = neteaseRepository.getMvSublistSummary() ?: (0 to null)
+                }
+            }
         }
         viewModelScope.launch {
             val currentScreenJob =
