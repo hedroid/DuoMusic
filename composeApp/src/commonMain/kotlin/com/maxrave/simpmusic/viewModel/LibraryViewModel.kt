@@ -195,7 +195,8 @@ class LibraryViewModel(
     val subscribedArtists: StateFlow<LocalResource<List<ArtistsResult>>> get() = _subscribedArtists.asStateFlow()
 
     /** 收藏的专辑(/mine/rn/resource/list,repo 自带 10min 行缓存) */
-    /** 收藏的 MV 概要(mv/sublist):count+首条封面,库页红心行下横卡用;null=未拉/失败 */
+    /** 收藏的 MV 概要(mv/sublist):count+首条封面,库页红心行下横卡用;null=尚未拉取。
+     *  拉取后恒非 null(空集/失败都是 (0,null))——入口常驻,别再按 count 藏行(2026-10-08 用户反馈)。 */
     private val _subscribedMvSummary = MutableStateFlow<Pair<Int, String?>?>(null)
     val subscribedMvSummary: StateFlow<Pair<Int, String?>?> get() = _subscribedMvSummary.asStateFlow()
 
@@ -527,9 +528,10 @@ class LibraryViewModel(
                         },
                     )
                 }
-                // 收藏的 MV 概要:独立降级(失败 null=行隐藏,不拖三分区)
+                // 收藏的 MV 概要:入口常驻(2026-10-08 用户反馈 count=0 藏行不可发现)——
+                // 空集/失败都回 (0,null),空态由列表页自己表达
                 launch {
-                    _subscribedMvSummary.value = neteaseRepository.getMvSublistSummary()?.takeIf { it.first > 0 }
+                    _subscribedMvSummary.value = neteaseRepository.getMvSublistSummary() ?: (0 to null)
                 }
             }
             _neteaseRefreshing.value = false

@@ -68,6 +68,7 @@ import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import simpmusic.composeapp.generated.resources.Res
 import simpmusic.composeapp.generated.resources.favorite_mvs
+import simpmusic.composeapp.generated.resources.no_favorite_mvs
 import simpmusic.composeapp.generated.resources.retry
 
 /**
@@ -109,6 +110,21 @@ fun MvListScreen(
         Crossfade(targetState = uiState) { state ->
             when (state) {
                 is MvListUIState.Success -> {
+                    // 空集=居中空态文案(入口常驻后 0 条是可达状态,不再让网格只剩页尾)
+                    if (state.mvs.isEmpty()) {
+                        Box(
+                            Modifier
+                                .fillMaxSize()
+                                .padding(16.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = stringResource(Res.string.no_favorite_mvs),
+                                style = typo().bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    } else {
                     LazyVerticalGrid(
                         columns = GridCells.Adaptive(minSize = LibraryGridDefaults.minTileSize),
                         horizontalArrangement = LibraryGridDefaults.horizontalArrangement,
@@ -160,6 +176,7 @@ fun MvListScreen(
                                 else -> EndOfPage(includeBottomBarPadding = false)
                             }
                         }
+                    }
                     }
                     TopAppBar(
                         modifier =
