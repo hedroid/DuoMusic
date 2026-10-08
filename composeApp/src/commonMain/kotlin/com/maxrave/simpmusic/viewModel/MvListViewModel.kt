@@ -219,33 +219,54 @@ class MvListViewModel(
         }
     }
 
-    /** 列表内取消收藏成功(服务端对账确认)后原地移除行;计数随 mvs.size 自动回落,
-     *  totalCount 同步 -1(事件到达时服务端计数已减,留着旧值头部会多数一个)。
-     *  幂等:likeChangeEvent 与 likeWriteResults 双通道都会调这里(页内菜单取消一笔
-     *  成功两路都发),行已不在时原样返回不动 totalCount,防头部计数双减。 */
+    /** 已应用过移除的 id:防 likeChangeEvent 与 likeWriteResults 双通道对同一笔取消
+     *  各送达一次导致重复减计。不能用"行是否在列表"当幂等键——未加载页的 MV 取消
+     *  (播放页取消第 31+ 条)行本来就不在,照样要减 totalCount。重新收藏(insertMv)
+     *  时移除,之后的取消是另一笔;refresh 不清(刷新后到达的重复旧事件须继续被吸收,
+     *  新鲜服务端计数不该再减)。 */
+    private val appliedRemovals = mutableSetOf<String>()
+
+    /**
+     * 取消收藏落定(服务端对账确认后)原地移除行并同步计数/分页游标:
+     * - totalCount -1:事件到达时服务端计数已减(未加载页的 MV 同样减——头部计数是
+     *   服务端口径,不是已加载条数);幂等键=appliedRemovals(见上),双通道重复
+     *   送达只减一次。
+     * - consumed -1(仅行在已加载窗口内时):sublist 按 offset 分页,移行后服务端
+     *   后续条目前移一位,游标不回退会从旧 offset 取下一页=跳过原第 consumed+1 条
+     *   (显示去重掩盖不了,那条永远漏掉)。行不在已加载窗口(后面的页)时服务端
+     *   移动发生在窗口之外,已消费位置不变,游标不动。
+     */
     fun removeMv(videoId: String) {
+        val state = _uiState.value as? MvListUIState.Success ?: return
+        if (!appliedRemovals.add(videoId)) return
+        if (state.mvs.any { mv -> mv.videoId == videoId }) {
+            consumed = maxOf(consumed - 1, 0)
+        }
         _uiState.update {
-            val state = it as? MvListUIState.Success ?: return@update it
-            if (state.mvs.none { mv -> mv.videoId == videoId }) {
-                state
-            } else {
-                state.copy(
-                    mvs = state.mvs.filterNot { mv -> mv.videoId == videoId },
-                    totalCount = (state.totalCount - 1).coerceAtLeast(0),
-                )
-            }
+            val s = it as? MvListUIState.Success ?: return@update it
+            s.copy(
+                mvs = s.mvs.filterNot { mv -> mv.videoId == videoId },
+                totalCount = (s.totalCount - 1).coerceAtLeast(0),
+            )
         }
     }
 
-    /** 别处(迷你条/播放页)收藏 MV:插首行(sublist 服务端口径=最新在前;按 id 去重,
-     *  只有真插入才 +1——重复事件不虚增计数) */
+    /** 别处(迷你条/播放页)收藏 MV:插首行(sublist 服务端口径=最新在前=新收藏是
+     *  服务端位置 1,原列表整体后移一位);按 id 去重,只有真插入才 +1 计数——重复
+     *  事件不虚增;真插入时 consumed +1 对齐后移(否则下一页取回已展示的旧末条,
+     *  去重后白费一页窗口);同时清 appliedRemovals——重新收藏后再取消是新的一笔 */
     fun insertMv(track: Track) {
+        appliedRemovals.remove(track.videoId)
+        val state = _uiState.value as? MvListUIState.Success ?: return
+        // 已在列表(重复事件)不动:计数与游标都别动
+        if (state.mvs.any { mv -> mv.videoId == track.videoId }) return
+        consumed += 1
         _uiState.update {
-            val state = it as? MvListUIState.Success ?: return@update it
-            if (state.mvs.any { mv -> mv.videoId == track.videoId }) {
-                state
+            val s = it as? MvListUIState.Success ?: return@update it
+            if (s.mvs.any { mv -> mv.videoId == track.videoId }) {
+                s
             } else {
-                state.copy(mvs = listOf(track) + state.mvs, totalCount = state.totalCount + 1)
+                s.copy(mvs = listOf(track) + s.mvs, totalCount = s.totalCount + 1)
             }
         }
     }
