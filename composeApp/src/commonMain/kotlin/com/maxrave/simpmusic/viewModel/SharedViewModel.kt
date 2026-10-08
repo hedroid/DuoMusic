@@ -836,9 +836,8 @@ class SharedViewModel(
 
     fun setRemoteSongLiked(liked: Boolean) {
         val song = nowPlayingState.value?.songEntity ?: return
-        // 网易 MV:红心=收藏 MV(mv/sub)。**服务端对账模式**:写操作后一律重拉 mvDetail
-        // 的 subed 驱动显示——探针实证取消方向(t=0)回 code=200 但 sublist 不变(端点对 t
-        // 无感的已知怪癖),本地乐观翻转会把失败显示成成功;以服务端回读为准天然免疫。
+        // 网易 MV:红心=收藏/取消收藏 MV。**服务端对账模式**:写操作后一律重拉 mvDetail
+        // 的 subed 驱动显示,避免写入延迟或服务端拒绝时本地状态误报成功。
         if (song.videoId.startsWith(NETEASE_MV_MEDIA_ID_PREFIX)) {
             val mvid = song.videoId.removePrefix(NETEASE_MV_MEDIA_ID_PREFIX).toLongOrNull() ?: return
             viewModelScope.launch {
@@ -850,11 +849,16 @@ class SharedViewModel(
                 delay(800)
                 val fresh = neteaseRepository.getMvDetail(mvid).getOrNull()
                 val subed = fresh?.subed
-                // toast 以回读结果为准:取消方向服务端有"code=200 但不执行"的怪癖
-                // (t 参数被忽略,sublist 不变),按 ok 提示会把没生效说成成功
+                // toast 以回读结果为准。回读失败时不能确认取消已生效。
                 when {
                     !ok -> makeToast(getString(Res.string.cloud_action_failed_netease))
-                    subed == null || subed == liked ->
+                    subed == null ->
+                        makeToast(
+                            getString(
+                                if (liked) Res.string.mv_subscribed else Res.string.cloud_action_failed_netease,
+                            ),
+                        )
+                    subed == liked ->
                         makeToast(getString(if (liked) Res.string.mv_subscribed else Res.string.mv_unsubscribed))
                     else -> makeToast(getString(Res.string.cloud_action_failed_netease))
                 }
@@ -865,9 +869,13 @@ class SharedViewModel(
                         it.copy(neteaseMvData = fresh ?: it.neteaseMvData)
                     }
                 }
+                // UI 状态与 toast 同口径:取消方向 subed=null 时保持点前状态。
                 _remoteSongLikeState.value =
-                    if (ok) RemoteSongLikeState(liked = subed ?: liked)
-                    else _remoteSongLikeState.value.copy(pending = false, failed = true)
+                    if (ok && (subed != null || liked)) {
+                        RemoteSongLikeState(liked = subed ?: liked)
+                    } else {
+                        _remoteSongLikeState.value.copy(pending = false, failed = true)
+                    }
             }
             return
         }
