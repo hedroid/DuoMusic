@@ -132,11 +132,12 @@ internal fun LibraryNeteaseTab(
     val albumList = (albums as? LocalResource.Success)?.data.orEmpty()
     val anyLoading =
         playlists is LocalResource.Loading || artists is LocalResource.Loading || albums is LocalResource.Loading
-    // 收藏的 MV 也算内容(2026-10-09 CR):只有 MV、歌单/歌手/专辑全空的账号不再被判
-    // 成空页吞掉 MV 入口;概要未拉到(null)不计——行本身也没显示
+    // 收藏的 MV 入口常驻(2026-10-09 CR 二轮):概要拉取后恒非 null(空集/失败都是
+    // (0,null)),拉到即算有内容——歌单/歌手/专辑/MV 全空的账号也渲染网格露出 MV
+    // 入口(占位封面,0 不显计数死文案),不再被整页空态挡住;null=还没拉到,不算
     val hasContent =
         playlistList.isNotEmpty() || artistList.isNotEmpty() || albumList.isNotEmpty() ||
-            (subscribedMv?.first ?: 0) > 0
+            subscribedMv != null
 
     PullToRefreshBox(
         modifier = Modifier.fillMaxSize(),

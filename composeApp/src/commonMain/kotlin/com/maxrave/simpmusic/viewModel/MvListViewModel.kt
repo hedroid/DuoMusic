@@ -14,9 +14,12 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import simpmusic.composeapp.generated.resources.Res
 import simpmusic.composeapp.generated.resources.downloaded
 import simpmusic.composeapp.generated.resources.favorite_mvs
+import simpmusic.composeapp.generated.resources.mv_partial_loaded
 import simpmusic.composeapp.generated.resources.no_favorite_mvs
 
 /** 收藏的 MV 列表页状态:items 累积 + hasMore/加载中(整页错误回 Error) */
@@ -47,6 +50,11 @@ class MvListViewModel(
 
     private var inFlight = false
 
+    /** 取页互斥锁:offset 真源是 consumed,读 offset→请求→appendPage(推进 consumed)
+     *  必须整体串行——两路并发取同一 offset 会双推进 consumed,显示去重后无感,
+     *  但真实 offset 跳过一页(近底自动翻页与"全部"动作并发的场景)。 */
+    private val loadMutex = Mutex()
+
     /** 服务端累计已返回条数(去重前)——分页 offset 的真源。展示列表按 id 去重会缩水,
      *  拿去重后的 size 当 offset,跨页出现重复 MV 时会重取一段旧数据 */
     private var consumed = 0
@@ -59,11 +67,22 @@ class MvListViewModel(
         if (inFlight) return
         inFlight = true
         viewModelScope.launch {
+            fetchNextPage()
+            inFlight = false
+        }
+    }
+
+    /** 取一页(锁内);返回本页是否成功落地 */
+    private suspend fun fetchNextPage(): Boolean =
+        loadMutex.withLock {
             val offset = if (_uiState.value is MvListUIState.Success) consumed else 0
             neteaseRepository
                 .getMvSublistPaged(limit = PAGE_SIZE, offset = offset)
                 .fold(
-                    onSuccess = { (mvs, hasMore, totalCount) -> appendPage(mvs, hasMore, totalCount) },
+                    onSuccess = { (mvs, hasMore, totalCount) ->
+                        appendPage(mvs, hasMore, totalCount)
+                        true
+                    },
                     onFailure = { e ->
                         _uiState.update {
                             if (it is MvListUIState.Success) {
@@ -72,11 +91,10 @@ class MvListViewModel(
                                 MvListUIState.Error(e.message ?: "mv sublist failed")
                             }
                         }
+                        false
                     },
                 )
-            inFlight = false
         }
-    }
 
     /** 一页落地:跨页按 id 去重(与歌曲分页同款防护);totalCount 以服务端为准,回 0 保旧值 */
     private fun appendPage(
@@ -121,30 +139,35 @@ class MvListViewModel(
         load()
     }
 
+    /** loadAllRemaining 的结果:complete=false=失败/触顶截断,动作只覆盖已加载部分(必须提示) */
+    data class AllMvs(
+        val mvs: List<Track>,
+        val complete: Boolean,
+    )
+
     /**
      * 显式全量动作(播放全部/添加到队列/批量下载)前置:把剩余页全部拉完再返回全量。
      * 队列哨兵(NETEASE_MV_SUBLIST)禁止续页,只装已加载条目会让"全部"缩水成"已翻到
-     * 的那部分";MV 元数据分页轻量(30 条/页),显式动作值得整备。失败/触顶(防服务端
-     * 异常翻不完)时返回已加载部分,不阻塞动作。
+     * 的那部分";MV 元数据分页轻量(30 条/页),显式动作值得整备。取页走 loadMutex,
+     * 与在途翻页自然串行(锁内读 consumed),不会取到同一 offset。
+     * 失败/触顶(防服务端异常翻不完)时返回已加载部分并标 complete=false——动作照做
+     * 但调用方必须提示范围缩水,不静默装作"全部"。
      */
-    private suspend fun loadAllRemaining(): List<Track> {
+    private suspend fun loadAllRemaining(): AllMvs {
         inFlight = true
         _uiState.update { (it as? MvListUIState.Success)?.copy(loadingMore = true) ?: it }
         try {
             var pages = 0
             while (true) {
-                val state = _uiState.value as? MvListUIState.Success ?: return emptyList()
-                if (!state.hasMore) return state.mvs
-                if (++pages > MAX_ALL_LOAD_PAGES) return state.mvs
-                val failed =
-                    neteaseRepository.getMvSublistPaged(limit = PAGE_SIZE, offset = consumed).fold(
-                        onSuccess = { (mvs, hasMore, totalCount) ->
-                            appendPage(mvs, hasMore, totalCount)
-                            false
-                        },
-                        onFailure = { true },
+                val state = _uiState.value as? MvListUIState.Success ?: return AllMvs(emptyList(), true)
+                if (!state.hasMore) return AllMvs(state.mvs, complete = true)
+                if (++pages > MAX_ALL_LOAD_PAGES) return AllMvs(state.mvs, complete = false)
+                if (!fetchNextPage()) {
+                    return AllMvs(
+                        (_uiState.value as? MvListUIState.Success)?.mvs ?: emptyList(),
+                        complete = false,
                     )
-                if (failed) return (_uiState.value as? MvListUIState.Success)?.mvs ?: emptyList()
+                }
             }
         } finally {
             inFlight = false
@@ -152,10 +175,21 @@ class MvListViewModel(
         }
     }
 
-    /** UI 侧全量入口:拉全后在 Main 线程回调(添加到队列等页面编排用) */
+    /** 范围缩水提示(全量动作只拿到部分):VM 内统一发,三个入口同一文案 */
+    private suspend fun toastPartialIfAny(all: AllMvs) {
+        if (!all.complete && all.mvs.isNotEmpty()) {
+            makeToast(
+                org.jetbrains.compose.resources.getString(Res.string.mv_partial_loaded, all.mvs.size.toString()),
+            )
+        }
+    }
+
+    /** UI 侧全量入口:拉全(含缩水提示)后在 Main 线程回调(添加到队列等页面编排用) */
     fun withAllMvs(block: (List<Track>) -> Unit) {
         viewModelScope.launch {
-            block(loadAllRemaining())
+            val all = loadAllRemaining()
+            toastPartialIfAny(all)
+            block(all.mvs)
         }
     }
 
@@ -165,11 +199,12 @@ class MvListViewModel(
     fun playAll(shuffle: Boolean = false) {
         viewModelScope.launch {
             val all = loadAllRemaining()
-            if (all.isEmpty()) {
+            if (all.mvs.isEmpty()) {
                 makeToast(getString(Res.string.no_favorite_mvs))
                 return@launch
             }
-            val list = if (shuffle) all.shuffled() else all
+            toastPartialIfAny(all)
+            val list = if (shuffle) all.mvs.shuffled() else all.mvs
             setQueueData(
                 QueueData.Data(
                     listTracks = list.toCollection(arrayListOf<Track>()),
@@ -185,14 +220,20 @@ class MvListViewModel(
     }
 
     /** 列表内取消收藏成功(服务端对账确认)后原地移除行;计数随 mvs.size 自动回落,
-     *  totalCount 同步 -1(事件到达时服务端计数已减,留着旧值头部会多数一个) */
+     *  totalCount 同步 -1(事件到达时服务端计数已减,留着旧值头部会多数一个)。
+     *  幂等:likeChangeEvent 与 likeWriteResults 双通道都会调这里(页内菜单取消一笔
+     *  成功两路都发),行已不在时原样返回不动 totalCount,防头部计数双减。 */
     fun removeMv(videoId: String) {
         _uiState.update {
             val state = it as? MvListUIState.Success ?: return@update it
-            state.copy(
-                mvs = state.mvs.filterNot { mv -> mv.videoId == videoId },
-                totalCount = (state.totalCount - 1).coerceAtLeast(0),
-            )
+            if (state.mvs.none { mv -> mv.videoId == videoId }) {
+                state
+            } else {
+                state.copy(
+                    mvs = state.mvs.filterNot { mv -> mv.videoId == videoId },
+                    totalCount = (state.totalCount - 1).coerceAtLeast(0),
+                )
+            }
         }
     }
 
@@ -231,11 +272,13 @@ class MvListViewModel(
      */
     fun requestDownloadAll() {
         viewModelScope.launch {
-            val mvs = loadAllRemaining()
+            val all = loadAllRemaining()
+            val mvs = all.mvs
             if (mvs.isEmpty()) {
                 makeToast(getString(Res.string.no_favorite_mvs))
                 return@launch
             }
+            toastPartialIfAny(all)
             val rows =
                 songRepository.getSongsByListVideoId(mvs.map { it.videoId }).firstOrNull()
                     ?: emptyList()
