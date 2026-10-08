@@ -58,6 +58,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -147,6 +148,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.mapLatest
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
@@ -272,6 +274,10 @@ fun PlaylistScreen(
     var currentItem by remember {
         mutableStateOf<Track?>(null)
     }
+
+    // 红心歌单判定在取消回调发生时做(见 onLikeChanged):页面数据那时必然已就位;
+    // 组合期预判会被 Loading 态抢先钉死成 false
+    val heartCheckScope = rememberCoroutineScope()
 
     var itemBottomSheetShow by remember {
         mutableStateOf(false)
@@ -1331,6 +1337,17 @@ fun PlaylistScreen(
                         },
                         navController = navController,
                         song = track,
+                        // 红心歌单内取消红心:原地移行(乐观,与复选框本行的乐观翻转同口径;
+                        // 云端写失败时 toast 自报,行下次进入对账回归)
+                        onLikeChanged = { liked ->
+                            if (!liked) {
+                                heartCheckScope.launch {
+                                    if (viewModel.isNeteaseLikedPlaylist()) {
+                                        viewModel.removeTrackLocally(track.videoId)
+                                    }
+                                }
+                            }
+                        },
                     )
                 }
                 if (playlistBottomSheetShow) {

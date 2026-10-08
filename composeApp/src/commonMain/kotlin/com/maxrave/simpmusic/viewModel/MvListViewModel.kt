@@ -133,6 +133,14 @@ class MvListViewModel(
     /** 顶栏菜单"添加到队列"目标(已加载 MV 追加进当前队列,不打断播放) */
     fun loadedMvs(): List<Track> = (uiState.value as? MvListUIState.Success)?.mvs ?: emptyList()
 
+    /** 列表内取消收藏成功(服务端对账确认)后原地移除行;计数随 mvs.size 自动回落 */
+    fun removeMv(videoId: String) {
+        _uiState.update {
+            val state = it as? MvListUIState.Success ?: return@update it
+            state.copy(mvs = state.mvs.filterNot { mv -> mv.videoId == videoId })
+        }
+    }
+
     companion object {
         private const val PAGE_SIZE = 30
 

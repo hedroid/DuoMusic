@@ -167,6 +167,20 @@ fun MvListScreen(
     var query by rememberSaveable { mutableStateOf("") }
     var menuTarget by remember { mutableStateOf<Track?>(null) }
     var showListMenu by remember { mutableStateOf(false) }
+    // 列表内取消收藏(行菜单红心)→服务端对账确认后原地移行:MV 写路径不乐观翻转
+    // (对账铁律),onLikeChanged 只登记目标,remoteSongLikeState 落定(pending 结束)再动行;
+    // 失败(failed)保留行,toast 由写路径自报
+    var pendingUnlikeId by remember { mutableStateOf<String?>(null) }
+    val remoteLikeState by sharedViewModel.remoteSongLikeState.collectAsStateWithLifecycle()
+    LaunchedEffect(remoteLikeState) {
+        val pending = pendingUnlikeId ?: return@LaunchedEffect
+        if (!remoteLikeState.pending) {
+            if (!remoteLikeState.failed && remoteLikeState.liked == false) {
+                viewModel.removeMv(pending)
+            }
+            pendingUnlikeId = null
+        }
+    }
 
     // stringResource 不能在 onClick 协程/回调里取——组合期先解析好(项目惯例)
     val emptyText = stringResource(Res.string.no_favorite_mvs)
@@ -547,6 +561,10 @@ fun MvListScreen(
             },
             navController = navController,
             song = mv.toSongEntity(),
+            // 列表内取消收藏:登记目标等对账确认移行(见 pendingUnlikeId)
+            onLikeChanged = { liked ->
+                if (!liked) pendingUnlikeId = mv.videoId
+            },
         )
     }
 

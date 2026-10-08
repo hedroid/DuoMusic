@@ -159,6 +159,15 @@ class PlaylistViewModel(
         return id.toLongOrNull() != null && neteaseRepository.isNeteaseLikedPlaylist(id)
     }
 
+    /**
+     * 红心歌单页内取消红心后的原地移行(2026-10-08 用户定:对齐业内通用处理——
+     * 操作语境在列表内=行应立即消失;云端为准,刷新/下次进入对账)。仅红心歌单调用:
+     * 普通歌单里取消红心≠移出歌单,不移行。
+     */
+    fun removeTrackLocally(videoId: String) {
+        _tracks.value = _tracks.value.filterNot { it.videoId == videoId }
+    }
+
     /** 当前歌单是否网易自建(歌曲菜单露"从歌单移除"的判定;收藏歌单/雷达/YT 恒 false) */
     suspend fun isNeteaseOwnPlaylist(): Boolean {
         val id = (uiState.value as? Success)?.data?.id ?: return false

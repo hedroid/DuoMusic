@@ -330,10 +330,44 @@ class NowPlayingBottomSheetViewModel(
         }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     private fun refreshCloudLiked(videoId: String) {
-        viewModelScope.launch {
-            _cloudLiked.value = songRepository.getRemoteLikeStatus(videoId)
+        cloudLikeJob?.cancel()
+        _cloudLiked.value = null
+        cloudLikeJob = viewModelScope.launch {
+            if (videoId.startsWith(NETEASE_MV_MEDIA_ID_PREFIX)) {
+                val mvid = videoId.removePrefix(NETEASE_MV_MEDIA_ID_PREFIX).toLongOrNull() ?: return@launch
+                // 正在播的 MV:跟播放页状态流(对账回写即时反映);列表行菜单里的
+                // 非播放行播放页流覆盖不到,一次性拉 mv/detail 的 subed 兜底——
+                // 没有它复选框恒灰死(收藏 MV 列表内取消收藏的入口就断了)
+                var oneShotFetched = false
+                sharedViewModel.nowPlayingScreenData.collectLatest { data ->
+                    val playing = data.neteaseMvData?.takeIf { it.id == mvid }?.subed
+                    if (playing != null) {
+                        _cloudLiked.value = playing
+                    } else if (!oneShotFetched) {
+                        oneShotFetched = true
+                        _cloudLiked.value = neteaseRepository.getMvDetail(mvid).getOrNull()?.subed
+                    }
+                }
+            } else {
+                _cloudLiked.value = songRepository.getRemoteLikeStatus(videoId)
+            }
         }
     }
+
+    private fun SongEntity.toSheetSongState() = NowPlayingBottomSheetUIState.SongUIState(
+        videoId = videoId,
+        title = title,
+        listArtists = artistName?.mapIndexed { i, name ->
+            Artist(name = name, id = artistId?.getOrNull(i) ?: "")
+        } ?: emptyList(),
+        thumbnails = thumbnails,
+        liked = liked,
+        downloadState = downloadState,
+        album = albumName?.takeIf { it.isNotEmpty() }?.let { Album(name = it, id = albumId ?: "") },
+        videoType = videoType,
+        neteaseProgramId = neteaseProgramId,
+        downloadedVideoFilePath = downloadedVideoFilePath,
+    )
 
     private fun getSongEntityFlow(videoId: String) {
         getSongAsFlow?.cancel()
@@ -440,6 +474,21 @@ class NowPlayingBottomSheetViewModel(
                 }
 
                 is NowPlayingBottomSheetUIEvent.ToggleLike -> {
+                    if (songUIState.videoId.startsWith(NETEASE_MV_MEDIA_ID_PREFIX)) {
+                        // 显式传目标:列表行菜单打开的 sheet 里这行未必在播,
+                        // 不传会错打到 nowPlayingState 的当前曲
+                        val target = !(_cloudLiked.value ?: songUIState.liked)
+                        sharedViewModel.setRemoteSongLiked(target, songUIState.videoId)
+                        // 复选框不乐观翻转(对账铁律):pending 落定后按服务端确认结果回写
+                        launch {
+                            sharedViewModel.remoteSongLikeState.first { !it.pending }
+                            val settled = sharedViewModel.remoteSongLikeState.value
+                            if (!settled.failed && settled.liked != null) {
+                                _cloudLiked.value = settled.liked
+                            }
+                        }
+                        return@launch
+                    }
                     // 点赞=云端账号红心;成功后镜像本地缓存行(库页"喜欢的歌曲"读它)
                     val target = !(_cloudLiked.value ?: songUIState.liked)
                     val result = songRepository.setRemoteLikeStatus(songUIState.videoId, target)

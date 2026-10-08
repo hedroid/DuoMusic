@@ -834,12 +834,20 @@ class SharedViewModel(
         makeToast(getString(Res.string.need_login_toast))
     }
 
-    fun setRemoteSongLiked(liked: Boolean) {
-        val song = nowPlayingState.value?.songEntity ?: return
+    /**
+     * 云端红心写入口。videoId=null(默认)=作用于正在播放的曲目(播放页红心);
+     * 传 videoId=作用于指定曲目——列表行菜单(收藏 MV 列表等)打开的 sheet 里,
+     * 目标行未必在播,不传会错打到 nowPlayingState 的当前曲。
+     */
+    fun setRemoteSongLiked(
+        liked: Boolean,
+        videoId: String? = null,
+    ) {
+        val targetId = videoId ?: nowPlayingState.value?.songEntity?.videoId ?: return
         // 网易 MV:红心=收藏/取消收藏 MV。**服务端对账模式**:写操作后一律重拉 mvDetail
         // 的 subed 驱动显示,避免写入延迟或服务端拒绝时本地状态误报成功。
-        if (song.videoId.startsWith(NETEASE_MV_MEDIA_ID_PREFIX)) {
-            val mvid = song.videoId.removePrefix(NETEASE_MV_MEDIA_ID_PREFIX).toLongOrNull() ?: return
+        if (targetId.startsWith(NETEASE_MV_MEDIA_ID_PREFIX)) {
+            val mvid = targetId.removePrefix(NETEASE_MV_MEDIA_ID_PREFIX).toLongOrNull() ?: return
             viewModelScope.launch {
                 _remoteSongLikeState.value = _remoteSongLikeState.value.copy(pending = true, failed = false)
                 val ok = neteaseRepository.subscribeMv(mvid, liked).getOrDefault(false)
@@ -881,7 +889,7 @@ class SharedViewModel(
         }
         viewModelScope.launch {
             _remoteSongLikeState.value = _remoteSongLikeState.value.copy(pending = true, failed = false)
-            val result = songRepository.setRemoteLikeStatus(song.videoId, liked)
+            val result = songRepository.setRemoteLikeStatus(targetId, liked)
             val ok = result.getOrDefault(false)
             if (!ok) {
                 makeToast(
@@ -889,14 +897,14 @@ class SharedViewModel(
                         when {
                             result.exceptionOrNull() is com.maxrave.netease.NeteaseRateLimitException ->
                                 Res.string.netease_rate_limited
-                            song.videoId.toLongOrNull() != null -> Res.string.cloud_action_failed_netease
+                            targetId.toLongOrNull() != null -> Res.string.cloud_action_failed_netease
                             else -> Res.string.cloud_action_failed_youtube
                         },
                     ),
                 )
             } else {
                 makeToast(getString(if (liked) Res.string.liked_toast else Res.string.unliked_toast))
-                songRepository.setLikedLocal(song.videoId, if (liked) 1 else 0)
+                songRepository.setLikedLocal(targetId, if (liked) 1 else 0)
                 _liked.value = liked
                 mediaPlayerHandler.like(liked)
             }
