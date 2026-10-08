@@ -245,10 +245,11 @@ class SharedViewModel(
     val remoteSongLikeState: StateFlow<RemoteSongLikeState> = _remoteSongLikeState
 
     /**
-     * 点赞变更事件(videoId+liked+可选 Track):迷你条/播放页红心写成功(或 MV 对账
-     * **确认成请求方向**——写失败/回读停在原状态不发,那不是变化)后发,
-     * 开着的收藏列表页(红心歌单/MV 收藏)据此原地增删行(2026-10-08 用户定案补齐业内实时档)。
-     * 错过事件无妨——云端为准,下次进入/刷新自然对账;通知栏点赞走 core 另一路不发此事件。
+     * 点赞变更事件(videoId+liked+可选 Track):迷你条/播放页红心写成功(或 MV 写入成功
+     * 且回读**确认成请求方向**——写失败/回读停在原状态/回读碰巧已是请求方向,都不发,
+     * 那不是这笔写造成的变化)后发,开着的收藏列表页(红心歌单/MV 收藏)据此原地增删行
+     * (2026-10-08 用户定案补齐业内实时档)。错过事件无妨——云端为准,下次进入/刷新自然
+     * 对账;通知栏点赞走 core 另一路不发此事件。
      */
     private val _likeChangeEvent = MutableSharedFlow<LikeChangeEvent>(extraBufferCapacity = 8)
     val likeChangeEvent: kotlinx.coroutines.flow.SharedFlow<LikeChangeEvent> = _likeChangeEvent
@@ -914,13 +915,12 @@ class SharedViewModel(
                             it.copy(neteaseMvData = fresh ?: it.neteaseMvData)
                         }
                     }
-                    // 收藏变化事件只在"回读确认成请求方向"(subed==liked)时发——写失败/
-                    // 回读停在原状态不是变化,发出去会让收藏页误增删行误动计数(未收藏
-                    // MV 收藏失败回读 false→误减总数;未加载页已收藏 MV 取消失败回读
-                    // true→误插首行虚增总数和 consumed)。回读旧态仍照常校正播放器红心
-                    // (上面分支),两件事口径不同。与 toast/likeWriteResults 的成功判定
-                    // (ok && subed==liked)对齐。
-                    if (subed == liked) {
+                    // 收藏变化事件只在"写入成功且回读确认成请求方向"(ok && subed==liked)时发
+                    // ——与 toast 首分支/likeWriteResults 的成功判定三处同一口径。只看回读
+                    // 不看写结果的话:写失败+回读碰巧已是请求方向(菜单初态过期,如未收藏
+                    // MV 实际早已收藏)会被收藏页当成变化,误插行/误减数,而这笔写被判失败。
+                    // 回读旧态仍照常校正播放器红心(上面分支),两件事口径不同。
+                    if (ok && subed == liked) {
                         _likeChangeEvent.tryEmit(
                             LikeChangeEvent(
                                 videoId = targetId,
