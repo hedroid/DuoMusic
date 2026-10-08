@@ -122,6 +122,7 @@ import simpmusic.composeapp.generated.resources.no_mv_available
 import simpmusic.composeapp.generated.resources.podcast_trial_toast
 import simpmusic.composeapp.generated.resources.Res
 import simpmusic.composeapp.generated.resources.added_to_queue
+import simpmusic.composeapp.generated.resources.already_in_queue
 import simpmusic.composeapp.generated.resources.login_netease_first
 import simpmusic.composeapp.generated.resources.update_check_failed
 import simpmusic.composeapp.generated.resources.added_to_youtube_liked
@@ -2424,8 +2425,11 @@ class SharedViewModel(
                 mediaPlayerHandler.playNext(listTrack.first())
                 makeToast(getString(Res.string.play_next))
             } else {
-                mediaPlayerHandler.loadMoreCatalog(listTrack)
-                makeToast(getString(Res.string.added_to_queue))
+                // isAddToQueue=true:已在队列的歌不加副本(2026-10-08),全撞重时如实相告
+                val added = mediaPlayerHandler.loadMoreCatalog(listTrack, isAddToQueue = true)
+                makeToast(
+                    getString(if (added) Res.string.added_to_queue else Res.string.already_in_queue),
+                )
             }
         }
     }

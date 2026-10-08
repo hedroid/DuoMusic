@@ -35,6 +35,7 @@ import simpmusic.composeapp.generated.resources.Res
 import simpmusic.composeapp.generated.resources.added_to_playlist
 import simpmusic.composeapp.generated.resources.all_songs_already_liked
 import simpmusic.composeapp.generated.resources.added_to_queue
+import simpmusic.composeapp.generated.resources.already_in_queue
 import simpmusic.composeapp.generated.resources.delete_song_from_playlist
 import simpmusic.composeapp.generated.resources.download_no_space
 import simpmusic.composeapp.generated.resources.downloading
@@ -241,11 +242,15 @@ class SongSelectionViewModel(
                 makeToast(getString(Res.string.error_occurred))
                 return@launch
             }
-            mediaPlayerHandler.loadMoreCatalog(
-                ArrayList(songs.map { it.toTrack() }),
-                isAddToQueue = true,
+            val added =
+                mediaPlayerHandler.loadMoreCatalog(
+                    ArrayList(songs.map { it.toTrack() }),
+                    isAddToQueue = true,
+                )
+            // 全部已在队列时如实相告,部分加入仍报"已添加"(2026-10-08)
+            makeToast(
+                getString(if (added) Res.string.added_to_queue else Res.string.already_in_queue),
             )
-            makeToast(getString(Res.string.added_to_queue))
         }
     }
 

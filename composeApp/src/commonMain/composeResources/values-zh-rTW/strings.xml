@@ -447,6 +447,7 @@
     <string name="quality_video">影片畫質</string>
     <string name="add_to_queue">加入至播放佇列</string>
     <string name="added_to_queue">已新增至佇列</string>
+    <string name="already_in_queue">已在佇列中</string>
     <string name="new_release">最新發行</string>
     <string name="music_video">音樂影片</string>
     <string name="your_music_is_always_up_to_date">您隨時都能聆聽最新的音樂</string>

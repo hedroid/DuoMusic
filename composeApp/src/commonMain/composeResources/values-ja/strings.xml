@@ -329,6 +329,7 @@
     <string name="quality_video">画質</string>
     <string name="add_to_queue">キューに追加</string>
     <string name="added_to_queue">キューに追加しました</string>
+    <string name="already_in_queue">既にキューにあります</string>
     <string name="new_release">新作</string>
     <string name="music_video">ミュージックビデオ</string>
     <string name="your_music_is_always_up_to_date">常に最新の状態です</string>

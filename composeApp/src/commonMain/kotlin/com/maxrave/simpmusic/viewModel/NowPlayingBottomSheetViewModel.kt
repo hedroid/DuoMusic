@@ -51,6 +51,7 @@ import org.koin.core.component.inject
 import simpmusic.composeapp.generated.resources.Res
 import simpmusic.composeapp.generated.resources.added_to_playlist
 import simpmusic.composeapp.generated.resources.added_to_queue
+import simpmusic.composeapp.generated.resources.already_in_queue
 import simpmusic.composeapp.generated.resources.added_to_youtube_playlist
 import simpmusic.composeapp.generated.resources.added_to_netease_playlist
 import simpmusic.composeapp.generated.resources.cloud_action_failed_netease
@@ -666,8 +667,12 @@ class NowPlayingBottomSheetViewModel(
 
                 is NowPlayingBottomSheetUIEvent.AddToQueue -> {
                     val songEntity = songRepository.getSongById(songUIState.videoId).singleOrNull() ?: return@launch
-                    mediaPlayerHandler.loadMoreCatalog(arrayListOf(songEntity.toTrack()), isAddToQueue = true)
-                    makeToast(getString(Res.string.added_to_queue))
+                    val added =
+                        mediaPlayerHandler.loadMoreCatalog(arrayListOf(songEntity.toTrack()), isAddToQueue = true)
+                    // 已在队列的歌不加副本(2026-10-08),toast 按实际结果分流
+                    makeToast(
+                        getString(if (added) Res.string.added_to_queue else Res.string.already_in_queue),
+                    )
                 }
 
                 is NowPlayingBottomSheetUIEvent.ChangeLyricsProvider -> {

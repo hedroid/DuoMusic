@@ -337,6 +337,7 @@
     <string name="quality_video">视频质量</string>
     <string name="add_to_queue">添加到队列</string>
     <string name="added_to_queue">加入队列!</string>
+    <string name="already_in_queue">已在队列中</string>
     <string name="new_release">新建发布</string>
     <string name="music_video">音乐视频</string>
     <string name="your_music_is_always_up_to_date">您的所有消息都是最新数据</string>

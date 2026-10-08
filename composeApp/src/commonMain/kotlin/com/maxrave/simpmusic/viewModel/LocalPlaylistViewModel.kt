@@ -72,6 +72,7 @@ import simpmusic.composeapp.generated.resources.Res
 import simpmusic.composeapp.generated.resources.add_to_queue
 import simpmusic.composeapp.generated.resources.added_to_playlist
 import simpmusic.composeapp.generated.resources.added_to_queue
+import simpmusic.composeapp.generated.resources.already_in_queue
 import simpmusic.composeapp.generated.resources.added_to_youtube_playlist
 import simpmusic.composeapp.generated.resources.can_t_add_to_youtube_playlist
 import simpmusic.composeapp.generated.resources.can_t_delete_from_youtube_playlist
@@ -1095,8 +1096,10 @@ class LocalPlaylistViewModel(
             showLoadingDialog(getString(Res.string.add_to_queue))
             val fullTracks = localPlaylistRepository.getFullPlaylistTracks(id = uiState.value.id)
             if (fullTracks.isNotEmpty()) {
-                mediaPlayerHandler.loadMoreCatalog(fullTracks.toArrayListTrack(), true)
-                makeToast(getString(Res.string.added_to_queue))
+                val added = mediaPlayerHandler.loadMoreCatalog(fullTracks.toArrayListTrack(), true)
+                makeToast(
+                    getString(if (added) Res.string.added_to_queue else Res.string.already_in_queue),
+                )
                 hideLoadingDialog()
             } else {
                 makeToast(getString(Res.string.playlist_is_empty))

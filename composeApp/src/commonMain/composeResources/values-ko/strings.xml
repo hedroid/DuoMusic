@@ -324,6 +324,7 @@
     <string name="quality_video">동영상 품질</string>
     <string name="add_to_queue">대기열에 추가</string>
     <string name="added_to_queue">대기열에 추가됨</string>
+    <string name="already_in_queue">이미 대기열에 있음</string>
     <string name="new_release">최신 음악</string>
     <string name="music_video">뮤직비디오</string>
     <string name="your_music_is_always_up_to_date">항상 최신 상태입니다</string>
