@@ -161,7 +161,6 @@ import simpmusic.composeapp.generated.resources.baseline_downloaded
 import simpmusic.composeapp.generated.resources.downloaded
 import simpmusic.composeapp.generated.resources.downloading
 import simpmusic.composeapp.generated.resources.error
-import simpmusic.composeapp.generated.resources.no_description
 import simpmusic.composeapp.generated.resources.playlist
 import simpmusic.composeapp.generated.resources.radio
 import simpmusic.composeapp.generated.resources.search
@@ -1033,27 +1032,24 @@ fun PlaylistScreen(
                                                         }
                                                     }
                                                 }
-                                                val uriHandler = LocalUriHandler.current
-                                                DescriptionView(
-                                                    modifier =
-                                                        Modifier
-                                                            .padding(
-                                                                top = 8.dp,
-                                                            ),
-                                                    text =
-                                                        state.data.description.let {
-                                                            if (!it.isNullOrEmpty()) {
-                                                                it
-                                                            } else {
-                                                                stringResource(Res.string.no_description)
-                                                            }
+                                                // 无描述的歌单(收藏歌单常无)整块隐藏,不显示"无描述"占位
+                                                val playlistDescription = state.data.description
+                                                if (!playlistDescription.isNullOrEmpty()) {
+                                                    val uriHandler = LocalUriHandler.current
+                                                    DescriptionView(
+                                                        modifier =
+                                                            Modifier
+                                                                .padding(
+                                                                    top = 8.dp,
+                                                                ),
+                                                        text = playlistDescription,
+                                                        limitLine = 3,
+                                                        onTimeClicked = {},
+                                                        onURLClicked = { url ->
+                                                            uriHandler.openUri(url)
                                                         },
-                                                    limitLine = 3,
-                                                    onTimeClicked = {},
-                                                    onURLClicked = { url ->
-                                                        uriHandler.openUri(url)
-                                                    },
-                                                )
+                                                    )
+                                                }
                                                 Text(
                                                     text =
                                                         if (data.isRadio) {
