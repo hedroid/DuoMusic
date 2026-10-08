@@ -1069,6 +1069,7 @@ fun AlbumScreen(
                         onDismiss = { albumBottomSheetShow = false },
                         playlistId = browseId,
                         playlistName = uiState.title,
+                        isAlbum = true,
                         isYourYouTubePlaylist = false,
                         onAddToQueue = {
                             sharedViewModel.addListToQueue(

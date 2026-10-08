@@ -2,6 +2,7 @@ package com.maxrave.simpmusic.viewModel
 
 import androidx.lifecycle.viewModelScope
 import com.maxrave.common.Config
+import com.maxrave.data.repository.NeteaseArtistRadio
 import com.maxrave.domain.data.entities.ArtistEntity
 import com.maxrave.domain.data.model.browse.album.Track
 import com.maxrave.domain.data.model.browse.artist.Albums
@@ -333,6 +334,29 @@ class ArtistViewModel(
                     }
                 }
             }
+        }
+    }
+
+    /** 网易没有 RDAT 入口，按页混合该艺人歌曲与相关歌曲。 */
+    fun onNeteaseRadioClick(
+        songs: List<Track>,
+        artistId: String,
+        artistName: String?,
+    ) {
+        val seed = songs.firstOrNull() ?: return
+        viewModelScope.launch {
+            val firstPage = NeteaseArtistRadio.firstPage(songs, neteaseRepository) ?: return@launch
+            setQueueData(
+                QueueData.Data(
+                    listTracks = firstPage.tracks,
+                    firstPlayedTrack = seed,
+                    playlistId = NeteaseArtistRadio.queueId(artistId, seed.videoId),
+                    playlistName = "\"$artistName\" ${getString(Res.string.radio)}",
+                    playlistType = PlaylistType.RADIO,
+                    continuation = firstPage.continuation,
+                ),
+            )
+            loadMediaItem(seed, Config.PLAYLIST_CLICK, 0)
         }
     }
 

@@ -198,6 +198,8 @@ import com.maxrave.common.NETEASE_MV_MEDIA_ID_PREFIX
 import com.maxrave.simpmusic.ui.navigation.destination.list.SimilarSongsDestination
 import com.maxrave.simpmusic.ui.screen.player.deriveOrderIndex
 import com.maxrave.simpmusic.ui.utils.formatCompactCount
+import com.maxrave.simpmusic.ui.utils.albumShareLink
+import com.maxrave.simpmusic.ui.utils.playlistShareLink
 import com.maxrave.simpmusic.ui.theme.seed
 import com.maxrave.simpmusic.ui.theme.typo
 import com.maxrave.simpmusic.viewModel.NowPlayingBottomSheetUIEvent
@@ -3950,6 +3952,7 @@ fun PlaylistBottomSheet(
     onDismiss: () -> Unit,
     playlistId: String,
     playlistName: String,
+    isAlbum: Boolean = false,
     isYourYouTubePlaylist: Boolean,
     onEditTitle: (newTitle: String) -> Unit = {},
     onAddToQueue: (() -> Unit)? = null,
@@ -4097,7 +4100,7 @@ fun PlaylistBottomSheet(
                 }
                 val shareTitle = stringResource(Res.string.share)
                 ActionButton(icon = SimpIcons.Share, text = Res.string.share) {
-                    val url = "https://music.youtube.com/playlist?list=${playlistId.replaceFirst("VL", "")}"
+                    val url = if (isAlbum) albumShareLink(playlistId) else playlistShareLink(playlistId)
                     shareUrl(shareTitle, url)
                 }
                 EndOfModalBottomSheet()

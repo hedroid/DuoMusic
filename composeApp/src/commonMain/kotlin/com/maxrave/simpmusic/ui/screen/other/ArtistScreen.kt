@@ -139,6 +139,7 @@ import com.maxrave.simpmusic.ui.navigation.destination.list.PlaylistDestination
 import com.maxrave.simpmusic.ui.screen.library.LibraryDynamicPlaylistType
 import com.maxrave.simpmusic.ui.theme.typo
 import com.maxrave.simpmusic.ui.utils.toHiResArtworkUrl
+import com.maxrave.simpmusic.ui.utils.artistShareLink
 import com.maxrave.simpmusic.viewModel.ArtistScreenState
 import com.maxrave.simpmusic.viewModel.ArtistViewModel
 import com.maxrave.simpmusic.viewModel.SharedViewModel
@@ -532,7 +533,7 @@ fun ArtistScreen(
                                             }
                                         }
                                         IconButton(
-                                            onClick = { shareUrl(shareTitle, "https://music.youtube.com/channel/$channelId") },
+                                            onClick = { shareUrl(shareTitle, artistShareLink(channelId)) },
                                         ) {
                                             Icon(SimpIcons.IosShare, contentDescription = shareTitle, tint = Color.White)
                                         }
@@ -560,8 +561,15 @@ fun ArtistScreen(
                                                 .border(1.5.dp, artistAccent, CircleShape)
                                                 .clickable {
                                                     val param = state.data.radioParam
+                                                    val neteaseArtistId = state.data.channelId?.takeIf { it.toLongOrNull() != null }
                                                     if (param != null) {
                                                         viewModel.onRadioClick(param)
+                                                    } else if (neteaseArtistId != null && state.data.popularSongs.isNotEmpty()) {
+                                                        viewModel.onNeteaseRadioClick(
+                                                            songs = state.data.popularSongs,
+                                                            artistId = neteaseArtistId,
+                                                            artistName = state.data.title,
+                                                        )
                                                     } else {
                                                         viewModel.makeToast(runBlocking { getString(Res.string.error) })
                                                     }
