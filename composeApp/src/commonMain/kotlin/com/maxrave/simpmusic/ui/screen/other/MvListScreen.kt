@@ -83,6 +83,7 @@ import coil3.request.CachePolicy
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.kmpalette.rememberPaletteState
+import com.maxrave.common.NETEASE_MV_MEDIA_ID_PREFIX
 import com.maxrave.domain.data.model.browse.album.Track
 import com.maxrave.domain.utils.toSongEntity
 import com.maxrave.simpmusic.expect.ui.layerBackdrop
@@ -179,6 +180,20 @@ fun MvListScreen(
                 viewModel.removeMv(pending)
             }
             pendingUnlikeId = null
+        }
+    }
+
+    // 别处(迷你条/播放页)收藏/取消 MV → 开着的本页原地增删行(实时档);
+    // 取消幂等(与 pendingUnlikeId 路径重叠时 filterNot 无害)
+    LaunchedEffect(Unit) {
+        sharedViewModel.likeChangeEvent.collect { ev ->
+            if (ev.videoId.startsWith(NETEASE_MV_MEDIA_ID_PREFIX)) {
+                if (ev.liked) {
+                    ev.track?.let(viewModel::insertMv)
+                } else {
+                    viewModel.removeMv(ev.videoId)
+                }
+            }
         }
     }
 

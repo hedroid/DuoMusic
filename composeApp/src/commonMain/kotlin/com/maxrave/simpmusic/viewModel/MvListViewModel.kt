@@ -141,6 +141,18 @@ class MvListViewModel(
         }
     }
 
+    /** 别处(迷你条/播放页)收藏 MV:插首行(sublist 服务端口径=最新在前;按 id 去重) */
+    fun insertMv(track: Track) {
+        _uiState.update {
+            val state = it as? MvListUIState.Success ?: return@update it
+            if (state.mvs.any { mv -> mv.videoId == track.videoId }) {
+                state
+            } else {
+                state.copy(mvs = listOf(track) + state.mvs)
+            }
+        }
+    }
+
     companion object {
         private const val PAGE_SIZE = 30
 

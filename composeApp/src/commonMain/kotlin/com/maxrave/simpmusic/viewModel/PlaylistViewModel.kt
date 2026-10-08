@@ -168,6 +168,12 @@ class PlaylistViewModel(
         _tracks.value = _tracks.value.filterNot { it.videoId == videoId }
     }
 
+    /** 别处(迷你条/播放页)点亮红心:新歌插红心歌单首行(服务端口径=最新在前;按 id 去重) */
+    fun insertTrackAtTop(track: Track) {
+        if (_tracks.value.any { it.videoId == track.videoId }) return
+        _tracks.value = listOf(track) + _tracks.value
+    }
+
     /** 当前歌单是否网易自建(歌曲菜单露"从歌单移除"的判定;收藏歌单/雷达/YT 恒 false) */
     suspend fun isNeteaseOwnPlaylist(): Boolean {
         val id = (uiState.value as? Success)?.data?.id ?: return false

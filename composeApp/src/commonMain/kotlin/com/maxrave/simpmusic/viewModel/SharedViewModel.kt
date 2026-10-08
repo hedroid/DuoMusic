@@ -87,6 +87,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -241,6 +242,14 @@ class SharedViewModel(
 
     private val _remoteSongLikeState = MutableStateFlow(RemoteSongLikeState())
     val remoteSongLikeState: StateFlow<RemoteSongLikeState> = _remoteSongLikeState
+
+    /**
+     * 点赞变更事件(videoId+liked+可选 Track):迷你条/播放页红心写成功(或 MV 对账确认)后发,
+     * 开着的收藏列表页(红心歌单/MV 收藏)据此原地增删行(2026-10-08 用户定案补齐业内实时档)。
+     * 错过事件无妨——云端为准,下次进入/刷新自然对账;通知栏点赞走 core 另一路不发此事件。
+     */
+    private val _likeChangeEvent = MutableSharedFlow<LikeChangeEvent>(extraBufferCapacity = 8)
+    val likeChangeEvent: kotlinx.coroutines.flow.SharedFlow<LikeChangeEvent> = _likeChangeEvent
 
     var isServiceRunning: Boolean = false
 
@@ -876,6 +885,14 @@ class SharedViewModel(
                     _nowPlayingScreenData.update {
                         it.copy(neteaseMvData = fresh ?: it.neteaseMvData)
                     }
+                    // MV 收藏态以回读为准落定,带 detail 派生的完整 Track 通知开着的收藏页
+                    _likeChangeEvent.tryEmit(
+                        LikeChangeEvent(
+                            videoId = targetId,
+                            liked = subed,
+                            track = fresh?.let { neteaseRepository.mvTrackFromDetail(it) },
+                        ),
+                    )
                 }
                 // UI 状态与 toast 同口径:取消方向 subed=null 时保持点前状态。
                 _remoteSongLikeState.value =
@@ -907,6 +924,15 @@ class SharedViewModel(
                 songRepository.setLikedLocal(targetId, if (liked) 1 else 0)
                 _liked.value = liked
                 mediaPlayerHandler.like(liked)
+                // 迷你条/播放页红心写成功:带在播 Track(目标=在播曲时)通知开着的收藏页。
+                // track 在队列 rebuild 窗口恒 null,回退 songEntity(九轮铁律)——
+                // 恢复队列起播的场景 track 长时间为 null,不兜底收藏方向永远插不了行
+                val playingTrack =
+                    nowPlayingState.value?.track
+                        ?: nowPlayingState.value?.songEntity?.toTrack()
+                playingTrack
+                    ?.takeIf { it.videoId == targetId }
+                    .let { _likeChangeEvent.tryEmit(LikeChangeEvent(targetId, liked, it)) }
             }
             _remoteSongLikeState.value =
                 if (ok) {
@@ -2576,56 +2602,97 @@ class SharedViewModel(
 
     /** 网易 MV 下载(菜单"下载 MV"):mvDetail→brs 按设置选档→mp4 直存(单文件自带音轨,
      *  免 YT 式双流合并);进度走同一个 DownloadProgress 弹窗,失败落错误弹窗不裸抛 */
-    fun downloadMvFile() {
+    fun downloadMvFile(videoId: String? = null) {
         // track 在队列 rebuild 窗口恒 null,回退 songEntity(九轮铁律);两者取名一致
-        val track =
+        val playingTrack =
             nowPlayingState.value?.track
                 ?: nowPlayingState.value?.songEntity?.toTrack()
-                ?: return
-        val mvid = track.videoId.removePrefix(NETEASE_MV_MEDIA_ID_PREFIX).toLongOrNull() ?: return
+        val requestedId = videoId ?: playingTrack?.videoId ?: return
+        val mvid = requestedId.removePrefix(NETEASE_MV_MEDIA_ID_PREFIX).toLongOrNull() ?: return
+        if (!requestedId.startsWith(NETEASE_MV_MEDIA_ID_PREFIX) || _mvDownloadProgress.value.containsKey(requestedId)) return
+        // 同步占位，连续点两次时第二次不会在首个协程启动前再建一个写同名文件的任务。
+        _mvDownloadProgress.update { it + (requestedId to null) }
         viewModelScope.launch {
-            _downloadFileProgress.value = DownloadProgress()
-            val detail = neteaseRepository.getMvDetail(mvid).getOrNull()
-            val brs = detail?.brs
-            if (brs.isNullOrEmpty()) {
-                _downloadFileProgress.value = DownloadProgress.failed("mv stream unavailable")
-                return@launch
-            }
-            val wanted = dataStoreManager.videoQuality.first().removeSuffix("p").toIntOrNull() ?: 720
-            val candidates = brs.keys.filter { it in 240..1080 }.sorted()
-            val pick = candidates.lastOrNull { it <= wanted } ?: candidates.firstOrNull()
-            val url = pick?.let { brs[it] }
-            if (url == null) {
-                _downloadFileProgress.value = DownloadProgress.failed("mv stream unavailable")
-                return@launch
-            }
-            val fileName = sanitizeDownloadFileName("${detail?.name ?: track.title}", track.videoId)
-            val path = "${getDownloadFolderPath()}/$fileName"
-            // 入途即落行 state=DOWNLOADING:管理页"下载中"区实时可见(getDownloadActivitySongs
-            // 按 state 1/2/3 流式命中),完成后转 3 移入"已完成",失败回 0 两区都不显示
-            persistMvSongRow(track, detail, com.maxrave.domain.data.entities.DownloadState.STATE_DOWNLOADING, null)
-            val saved =
-                withContext(Dispatchers.IO) {
-                    downloadUrlToFile(url, path, "mp4")
+            var rowId: String? = null
+            var committedPath: String? = null
+            try {
+                _downloadFileProgress.value = DownloadProgress()
+                val detail = neteaseRepository.getMvDetail(mvid).getOrNull()
+                val brs = detail?.brs
+                if (brs.isNullOrEmpty()) {
+                    // 进度弹窗只在 Info 面板可见;菜单直点路径的终态反馈只能靠 toast,
+                    // 这里早退不补的话用户只见过场的"正在下载",失败原因永远不可见
+                    _downloadFileProgress.value = DownloadProgress.failed("mv stream unavailable")
+                    makeToast(_downloadFileProgress.value.errorMessage ?: getString(Res.string.error))
+                    return@launch
                 }
-            // 菜单路径下 Info 面板未开,进度弹窗不可见(实测"点了没反应")——完成/失败补 toast
-            when {
-                saved -> {
-                    makeToast(getString(Res.string.mv_saved_to_download))
-                    // 接入下载管理体系:行点击播放走 resolver 本地文件直读(videoFilePath 列)
-                    persistMvSongRow(track, detail, com.maxrave.domain.data.entities.DownloadState.STATE_DOWNLOADED, "$path.mp4")
+                val wanted = dataStoreManager.videoQuality.first().removeSuffix("p").toIntOrNull() ?: 720
+                val candidates = brs.keys.filter { it in 240..1080 }.sorted()
+                val pick = candidates.lastOrNull { it <= wanted } ?: candidates.firstOrNull()
+                val url = pick?.let { brs[it] }
+                if (url == null) {
+                    _downloadFileProgress.value = DownloadProgress.failed("mv stream unavailable")
+                    makeToast(_downloadFileProgress.value.errorMessage ?: getString(Res.string.error))
+                    return@launch
                 }
-                !saved -> {
-                    // 失败回 NOT_DOWNLOADED:路径为空,state 归 0 后管理页两区都不再显示
-                    runCatching {
-                        songRepository.updateDownloadState(
-                            track.videoId,
-                            com.maxrave.domain.data.entities.DownloadState.STATE_NOT_DOWNLOADED,
-                        )
+                val track = playingTrack?.takeIf { it.videoId == requestedId }
+                    ?: neteaseRepository.mvTrackFromDetail(detail)
+                rowId = track.videoId
+                val fileName = sanitizeDownloadFileName(detail.name, track.videoId)
+                val path = "${getDownloadFolderPath()}/$fileName"
+                committedPath = "$path.mp4"
+                // Room 活动行与进度 map 合并，管理页在下载中展示；成功后转入已完成。
+                persistMvSongRow(track, detail, com.maxrave.domain.data.entities.DownloadState.STATE_DOWNLOADING, null)
+                val saved =
+                    withContext(Dispatchers.IO) {
+                        downloadUrlToFile(url, path, "mp4") { progress ->
+                            _mvDownloadProgress.update { it + (requestedId to progress) }
+                        }
                     }
+                // 菜单路径下 Info 面板未开,进度弹窗不可见——完成/失败补 toast
+                if (saved) {
+                    // 接入下载管理体系:先写文件路径，再转完成态，避免短暂"文件缺失"。
+                    persistMvSongRow(track, detail, com.maxrave.domain.data.entities.DownloadState.STATE_DOWNLOADED, committedPath)
+                    makeToast(getString(Res.string.mv_saved_to_download))
+                } else {
+                    settleMvRowAfterAbandon(rowId, committedPath)
                     val err = _downloadFileProgress.value.errorMessage
                     makeToast(err ?: getString(Res.string.error))
                 }
+            } catch (e: CancellationException) {
+                // 下载管理页删除/取消:不能让取消后的回写把文件"复活"(先删协程再删条目也赶不上)
+                rowId?.let { settleMvRowAfterAbandon(it, committedPath) }
+                throw e
+            } finally {
+                mvDownloadJobs.remove(requestedId)
+                _mvDownloadProgress.update { it - requestedId }
+            }
+        }.also { mvDownloadJobs[requestedId] = it }
+    }
+
+    /** MV 下载中止(取消/失败)后的 Room 对账:重下被中止时旧成品仍在路径列上,恢复完成态
+     *  (旧文件仍是有效下载);首下被中止则删可能已 rename 提交的成品(取消落在提交后、
+     *  回写前的窗口)+清路径列+归零,行从管理页消失 */
+    private suspend fun settleMvRowAfterAbandon(
+        rowId: String,
+        committedPath: String?,
+    ) {
+        withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) {
+            val stillValid =
+                songRepository.getSongById(rowId).firstOrNull()?.downloadedVideoFilePath
+                    ?.let { java.io.File(it).exists() } == true
+            if (stillValid) {
+                songRepository.updateDownloadState(
+                    rowId,
+                    com.maxrave.domain.data.entities.DownloadState.STATE_DOWNLOADED,
+                )
+            } else {
+                committedPath?.let { java.io.File(it).delete() }
+                songRepository.updateDownloadedVideoFilePath(rowId, null)
+                songRepository.updateDownloadState(
+                    rowId,
+                    com.maxrave.domain.data.entities.DownloadState.STATE_NOT_DOWNLOADED,
+                )
             }
         }
     }
@@ -2937,6 +3004,13 @@ data class RemoteSongLikeState(
     val liked: Boolean? = null,
     val pending: Boolean = false,
     val failed: Boolean = false,
+)
+
+/** 见 SharedViewModel.likeChangeEvent:收藏列表页原地增删行的数据载荷 */
+data class LikeChangeEvent(
+    val videoId: String,
+    val liked: Boolean,
+    val track: Track? = null,
 )
 
 enum class LyricsProvider {

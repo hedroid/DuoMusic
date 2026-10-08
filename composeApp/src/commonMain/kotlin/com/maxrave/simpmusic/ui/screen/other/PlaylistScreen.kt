@@ -90,6 +90,7 @@ import com.maxrave.simpmusic.extension.barBlurStyle
 import com.maxrave.simpmusic.ui.component.DownloadingIndicator
 import com.maxrave.simpmusic.ui.component.BatchDownloadConfirmDialog
 import com.maxrave.domain.data.entities.DownloadState
+import com.maxrave.common.NETEASE_MV_MEDIA_ID_PREFIX
 import com.maxrave.domain.data.model.browse.album.Track
 import com.maxrave.domain.utils.toSongEntity
 import com.maxrave.logger.Logger
@@ -278,6 +279,22 @@ fun PlaylistScreen(
     // 红心歌单判定在取消回调发生时做(见 onLikeChanged):页面数据那时必然已就位;
     // 组合期预判会被 Loading 态抢先钉死成 false
     val heartCheckScope = rememberCoroutineScope()
+
+    // 别处(迷你条/播放页)红心 → 开着的红心歌单页原地增删行(Spotify 式实时档);
+    // 仅红心歌单消费,普通歌单取消红心≠移出歌单
+    LaunchedEffect(Unit) {
+        sharedViewModel.likeChangeEvent.collect { ev ->
+            if (!ev.videoId.startsWith(NETEASE_MV_MEDIA_ID_PREFIX)) {
+                if (viewModel.isNeteaseLikedPlaylist()) {
+                    if (ev.liked) {
+                        ev.track?.let(viewModel::insertTrackAtTop)
+                    } else {
+                        viewModel.removeTrackLocally(ev.videoId)
+                    }
+                }
+            }
+        }
+    }
 
     var itemBottomSheetShow by remember {
         mutableStateOf(false)
