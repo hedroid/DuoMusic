@@ -1569,7 +1569,10 @@ fun QueueBottomSheet(
                                 ) { _ ->
                                     SongFullWidthItems(
                                         track = track,
-                                        isPlaying = track.videoId == songEntity?.videoId,
+                                        // 按 index 而非 videoId 匹配(2026-10-08):队列允许
+                                        // 重复条目(如整队播放后再"添加到队列"同一首),
+                                        // videoId 匹配会把所有同名行一起点亮成"播放中"
+                                        isPlaying = index == currentQueueIndex,
                                         modifier =
                                             Modifier
                                                 .fillMaxWidth(),
