@@ -6,13 +6,16 @@ import com.maxrave.data.repository.NeteaseRepositoryImpl
 import com.maxrave.domain.data.model.browse.album.Track
 import com.maxrave.domain.mediaservice.handler.PlaylistType
 import com.maxrave.domain.mediaservice.handler.QueueData
+import com.maxrave.domain.repository.SongRepository
 import com.maxrave.simpmusic.viewModel.base.BaseViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import simpmusic.composeapp.generated.resources.Res
+import simpmusic.composeapp.generated.resources.downloaded
 import simpmusic.composeapp.generated.resources.favorite_mvs
 import simpmusic.composeapp.generated.resources.no_favorite_mvs
 
@@ -35,6 +38,7 @@ sealed interface MvListUIState {
 /** 收藏的 MV(mv/sublist,offset 分页 30/页);点击行=单 MV 队列起播(SharedViewModel.playMv) */
 class MvListViewModel(
     private val neteaseRepository: NeteaseRepositoryImpl,
+    private val songRepository: SongRepository,
 ) : BaseViewModel() {
     private val _uiState = MutableStateFlow<MvListUIState>(MvListUIState.Loading)
     val uiState: StateFlow<MvListUIState> get() = _uiState.asStateFlow()
@@ -150,6 +154,52 @@ class MvListViewModel(
             } else {
                 state.copy(mvs = listOf(track) + state.mvs)
             }
+        }
+    }
+
+    // ------------------------------------------------ 页级批量下载(2026-10-08 对齐歌单三选口径)
+
+    /** 批量下载分类结果:已下载=视频文件在盘(song 行视频列) */
+    data class MvBatchRequest(
+        val notDownloaded: List<Track> = emptyList(),
+        val downloaded: List<Track> = emptyList(),
+    )
+
+    private val _mvBatchRequest = MutableStateFlow<MvBatchRequest?>(null)
+    val mvBatchRequest: StateFlow<MvBatchRequest?> get() = _mvBatchRequest.asStateFlow()
+
+    fun dismissMvBatchRequest() {
+        _mvBatchRequest.value = null
+    }
+
+    /**
+     * 页级下载入口(按钮/顶栏菜单共用):按 song 行视频列分类——文件在盘=已下载,其余未下载
+     * (在途不单独分:downloadMvFile 内置在途守卫,重复入队自动 no-op)。
+     * 全部已下载→toast 不发请求;否则发请求由页面决定直下(全未下载)或弹三选(部分)。
+     */
+    fun requestDownloadAll() {
+        viewModelScope.launch {
+            val mvs = loadedMvs()
+            if (mvs.isEmpty()) {
+                makeToast(getString(Res.string.no_favorite_mvs))
+                return@launch
+            }
+            val rows =
+                songRepository.getSongsByListVideoId(mvs.map { it.videoId }).firstOrNull()
+                    ?: emptyList()
+            val pathById = rows.associateBy({ it.videoId }, { it.downloadedVideoFilePath })
+            val notDownloaded = mutableListOf<Track>()
+            val downloaded = mutableListOf<Track>()
+            mvs.forEach { mv ->
+                val onDisk =
+                    pathById[mv.videoId]?.let { java.io.File(it).exists() } == true
+                if (onDisk) downloaded += mv else notDownloaded += mv
+            }
+            if (downloaded.size == mvs.size) {
+                makeToast(getString(Res.string.downloaded))
+                return@launch
+            }
+            _mvBatchRequest.value = MvBatchRequest(notDownloaded, downloaded)
         }
     }
 

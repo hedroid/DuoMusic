@@ -94,6 +94,7 @@ import com.maxrave.simpmusic.extension.barBlurStyle
 import com.maxrave.simpmusic.extension.getScreenSizeInfo
 import com.maxrave.simpmusic.extension.toImmersiveBackground
 import com.maxrave.simpmusic.ui.component.ActionButton
+import com.maxrave.simpmusic.ui.component.BatchDownloadConfirmDialog
 import com.maxrave.simpmusic.ui.component.CenterLoadingBox
 import com.maxrave.simpmusic.ui.component.EndOfModalBottomSheet
 import com.maxrave.simpmusic.ui.component.EndOfPage
@@ -334,22 +335,16 @@ fun MvListScreen(
                                             )
                                         }
                                     }
-                                    // 下载全部=逐个入队 MV 视频下载;进度弹窗只在 Info 面板上下文
-                                    // 可见,这里的反馈=toast+下载管理页"下载中"区落行
+                                    // 下载全部=对齐歌单三选口径(2026-10-08):分类在 VM——
+                                    // 全部已下载 toast/部分已下载三选弹窗/全未下载直接入队;
+                                    // 进度弹窗只在 Info 面板上下文可见,反馈=toast+管理页落行
                                     Box(
                                         modifier =
                                             Modifier
                                                 .size(48.dp)
                                                 .clip(CircleShape)
                                                 .background(Color.White.copy(alpha = 0.12f))
-                                                .clickable {
-                                                    if (mvs.isEmpty()) {
-                                                        viewModel.makeToast(emptyText)
-                                                    } else {
-                                                        viewModel.makeToast(downloadingText)
-                                                        mvs.forEach { sharedViewModel.downloadMvFile(it.videoId) }
-                                                    }
-                                                },
+                                                .clickable { viewModel.requestDownloadAll() },
                                         contentAlignment = Alignment.Center,
                                     ) {
                                         Icon(
@@ -596,15 +591,43 @@ fun MvListScreen(
                 }
             },
             onDownloadAll = {
-                val loaded = viewModel.loadedMvs()
-                if (loaded.isEmpty()) {
-                    viewModel.makeToast(emptyText)
-                } else {
-                    viewModel.makeToast(downloadingText)
-                    loaded.forEach { sharedViewModel.downloadMvFile(it.videoId) }
-                }
+                viewModel.requestDownloadAll()
             },
         )
+    }
+
+    // 批量下载分类结果消费(2026-10-08 对齐歌单口径):全未下载=直接入队(不弹窗);
+    // 含已下载=三选弹窗(跳过=只下未下载/覆盖=已下载的重下);全部已下载在 VM 已 toast
+    val mvBatchRequest by viewModel.mvBatchRequest.collectAsStateWithLifecycle()
+    LaunchedEffect(mvBatchRequest) {
+        val req = mvBatchRequest ?: return@LaunchedEffect
+        if (req.downloaded.isEmpty()) {
+            viewModel.dismissMvBatchRequest()
+            if (req.notDownloaded.isNotEmpty()) {
+                viewModel.makeToast(downloadingText)
+                req.notDownloaded.forEach { sharedViewModel.downloadMvFile(it.videoId) }
+            }
+        }
+    }
+    mvBatchRequest?.let { req ->
+        if (req.downloaded.isNotEmpty()) {
+            BatchDownloadConfirmDialog(
+                downloadedCount = req.downloaded.size,
+                onSkip = {
+                    viewModel.dismissMvBatchRequest()
+                    if (req.notDownloaded.isNotEmpty()) {
+                        viewModel.makeToast(downloadingText)
+                        req.notDownloaded.forEach { sharedViewModel.downloadMvFile(it.videoId) }
+                    }
+                },
+                onOverwrite = {
+                    viewModel.dismissMvBatchRequest()
+                    viewModel.makeToast(downloadingText)
+                    (req.notDownloaded + req.downloaded).forEach { sharedViewModel.downloadMvFile(it.videoId) }
+                },
+                onDismiss = viewModel::dismissMvBatchRequest,
+            )
+        }
     }
 }
 

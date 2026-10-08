@@ -236,6 +236,7 @@ val viewModelModule =
         viewModel {
             MvListViewModel(
                 get(),
+                get(),
             )
         }
         viewModel {
