@@ -88,6 +88,7 @@ import simpmusic.composeapp.generated.resources.Res
 import simpmusic.composeapp.generated.resources.continue_playing
 import simpmusic.composeapp.generated.resources.endless_queue
 import simpmusic.composeapp.generated.resources.endless_queue_fm_locked
+import simpmusic.composeapp.generated.resources.endless_queue_radio_locked
 import simpmusic.composeapp.generated.resources.now_playing
 
 /**
@@ -169,6 +170,9 @@ internal fun AppleMusicQueueView(
                 activePillContent = activePillContent,
                 // 网易私人FM队列：语义即无限电台（loadMore 凭哨兵放行，与开关无关），开关锁定为开。
                 isFmQueue = queueDataState?.data?.playlistId == NETEASE_FM_PLAYLIST_ID,
+                // 原生电台形态(YT 电台/FM/网易单曲·艺人电台,且非普通队列转换来的):
+                // 开关锁定为开(点击提示无法关闭);歌单转来的电台不锁,关=裁回原队列。
+                isRadioQueue = queueDataState?.data?.isEndlessRadioQueue == true,
                 // 播客队列不显示无尽开关(与 QueueBottomSheet 同款门控,判定只认前缀 CR-22):
                 // 播客队列播完即止,无尽语义不适用。2026-10-02 上游合并重做 AM 播放器时
                 // 该门控丢失(用户复报"播客播放页无尽队列又回来了")
@@ -492,6 +496,8 @@ private fun AppleMusicContinuePlayingHeader(
     activePillContainer: Color,
     activePillContent: Color,
     isFmQueue: Boolean,
+    // 原生电台形态：无尽开关锁定为开(与 QueueBottomSheet 同款门控,FM 文案单独分流)
+    isRadioQueue: Boolean = false,
     // 播客队列隐藏无尽开关(整个 label+Switch,与 QueueBottomSheet 同款门控)
     isPodcastQueue: Boolean = false,
     onEndlessDisabled: () -> Unit = {},
@@ -545,11 +551,19 @@ private fun AppleMusicContinuePlayingHeader(
                     modifier = Modifier.padding(end = 8.dp),
                 )
                 Switch(
-                    checked = isFmQueue || endlessQueueEnabled,
+                    checked = isRadioQueue || endlessQueueEnabled,
                     onCheckedChange = { checked ->
-                        if (isFmQueue) {
+                        if (isRadioQueue) {
                             showToast(
-                                runBlocking { getString(Res.string.endless_queue_fm_locked) },
+                                runBlocking {
+                                    getString(
+                                        if (isFmQueue) {
+                                            Res.string.endless_queue_fm_locked
+                                        } else {
+                                            Res.string.endless_queue_radio_locked
+                                        },
+                                    )
+                                },
                                 ToastGravity.Bottom,
                             )
                         } else {

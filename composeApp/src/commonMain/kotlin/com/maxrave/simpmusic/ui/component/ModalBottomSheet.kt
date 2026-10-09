@@ -292,6 +292,7 @@ import simpmusic.composeapp.generated.resources.edit_thumbnail
 import simpmusic.composeapp.generated.resources.edit_title
 import simpmusic.composeapp.generated.resources.endless_queue
 import simpmusic.composeapp.generated.resources.endless_queue_fm_locked
+import simpmusic.composeapp.generated.resources.endless_queue_radio_locked
 import simpmusic.composeapp.generated.resources.error_occurred
 import simpmusic.composeapp.generated.resources.extract_source
 import simpmusic.composeapp.generated.resources.itag
@@ -1206,6 +1207,10 @@ fun QueueBottomSheet(
     val endlessQueueEnable by dataStoreManager.endlessQueue.map { it == DataStoreManager.TRUE }.collectAsState(false)
     // 网易私人FM队列：语义即无限电台（loadMore 凭哨兵放行，与开关无关），开关锁定为开。
     val isFmQueue = queueData?.data?.playlistId == NETEASE_FM_PLAYLIST_ID
+    // 原生电台形态(YT 电台/FM/网易单曲·艺人电台,且非普通队列转换来的):语义即无尽,
+    // 开关同样锁定为开(点击提示无法关闭);普通歌单/专辑被无尽钩子转成电台的
+    // (radioConvertedFromQueue)不锁——那种电台身份是开关赋予的,关=裁回原队列。
+    val isRadioQueue = queueData?.data?.isEndlessRadioQueue == true
 
     // 播客队列(剧集播完即止):无尽开关整行隐藏。
     // 判定只认前缀(QueueData.isNeteasePodcastQueue,CR-22)——队列身份三键持久化后
@@ -1454,11 +1459,19 @@ fun QueueBottomSheet(
                             modifier = Modifier.padding(horizontal = 8.dp),
                         )
                         Switch(
-                            checked = isFmQueue || endlessQueueEnable,
+                            checked = isRadioQueue || endlessQueueEnable,
                             onCheckedChange = { checked ->
-                                if (isFmQueue) {
+                                if (isRadioQueue) {
                                     showToast(
-                                        runBlocking { getString(Res.string.endless_queue_fm_locked) },
+                                        runBlocking {
+                                            getString(
+                                                if (isFmQueue) {
+                                                    Res.string.endless_queue_fm_locked
+                                                } else {
+                                                    Res.string.endless_queue_radio_locked
+                                                },
+                                            )
+                                        },
                                         ToastGravity.Bottom,
                                     )
                                 } else {
