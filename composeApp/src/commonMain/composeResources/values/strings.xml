@@ -1012,7 +1012,9 @@
     <string name="mixed_source_selection">Mixes music sources — cannot add</string>
     <string name="favorite_mvs">Favorite MVs</string>
     <string name="cloud_disk">Cloud Disk</string>
-    <string name="cloud_upload_progress_title">Uploading to cloud disk</string>
+    <string name="cloud_upload_waiting">Waiting to upload</string>
+    <string name="cloud_upload_in_progress">Uploading</string>
+    <string name="cloud_upload_row_failed">Upload failed</string>
     <string name="delete_from_cloud_disk">Delete from cloud disk</string>
     <string name="delete_from_cloud_disk_title">Delete %1$d songs?</string>
     <string name="delete_from_cloud_disk_message">The selected songs will be permanently removed from your NetEase cloud disk. This cannot be undone.</string>

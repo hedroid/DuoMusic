@@ -689,7 +689,9 @@
     <string name="need_login_toast">로그인 후 이용할 수 있습니다</string>
     <string name="favorite_mvs">즐겨찾기 MV</string>
     <string name="cloud_disk">클라우드</string>
-    <string name="cloud_upload_progress_title">클라우드에 업로드 중</string>
+    <string name="cloud_upload_waiting">업로드 대기 중</string>
+    <string name="cloud_upload_in_progress">업로드 중</string>
+    <string name="cloud_upload_row_failed">업로드 실패</string>
     <string name="delete_from_cloud_disk">클라우드에서 삭제</string>
     <string name="delete_from_cloud_disk_title">%1$d곡을 삭제할까요?</string>
     <string name="delete_from_cloud_disk_message">선택한 곡이 클라우드에서 영구 삭제되며 복구할 수 없습니다.</string>

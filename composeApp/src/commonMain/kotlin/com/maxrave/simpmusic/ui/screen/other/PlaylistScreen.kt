@@ -72,6 +72,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -134,6 +135,8 @@ import com.maxrave.simpmusic.ui.component.selection.rememberSongSelectionState
 import com.maxrave.simpmusic.ui.icon.ArrowBackIosNew
 import com.maxrave.simpmusic.ui.icon.Cloud
 import com.maxrave.simpmusic.ui.icon.CloudUpload
+import com.maxrave.simpmusic.ui.icon.Error
+import com.maxrave.simpmusic.ui.icon.Pause
 import com.maxrave.simpmusic.ui.icon.Delete
 import com.maxrave.simpmusic.ui.icon.Close
 import com.maxrave.simpmusic.ui.icon.DownloadForOffline
@@ -152,6 +155,7 @@ import com.maxrave.simpmusic.ui.theme.typo
 import com.maxrave.simpmusic.viewModel.ListState
 import com.maxrave.simpmusic.viewModel.PlaylistUIEvent
 import com.maxrave.simpmusic.viewModel.PlaylistUIState
+import com.maxrave.simpmusic.viewModel.PlaylistViewModel.CloudUploadRowState
 import com.maxrave.simpmusic.viewModel.PlaylistViewModel
 import com.maxrave.simpmusic.viewModel.SharedViewModel
 import com.maxrave.simpmusic.viewModel.SongSelectionViewModel
@@ -172,13 +176,15 @@ import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import simpmusic.composeapp.generated.resources.Res
 import simpmusic.composeapp.generated.resources.partially_loaded
+import simpmusic.composeapp.generated.resources.cloud_upload_waiting
+import simpmusic.composeapp.generated.resources.cloud_upload_in_progress
+import simpmusic.composeapp.generated.resources.cloud_upload_row_failed
 import simpmusic.composeapp.generated.resources.album_length
 import simpmusic.composeapp.generated.resources.delete
 import simpmusic.composeapp.generated.resources.delete_from_cloud_disk
 import simpmusic.composeapp.generated.resources.delete_from_cloud_disk_title
 import simpmusic.composeapp.generated.resources.delete_from_cloud_disk_message
 import simpmusic.composeapp.generated.resources.cancel
-import simpmusic.composeapp.generated.resources.cloud_upload_progress_title
 import simpmusic.composeapp.generated.resources.baseline_downloaded
 import simpmusic.composeapp.generated.resources.downloaded
 import simpmusic.composeapp.generated.resources.downloading
@@ -218,7 +224,8 @@ fun PlaylistScreen(
     var showSearchBar by rememberSaveable { mutableStateOf(false) }
     var searchBarHeightPx by remember { mutableStateOf(0) }
 
-    // 云盘批量上传:SAF 多选,回调进 VM 逐首串行(进度弹窗由 cloudUploadProgress 驱动)
+        // 云盘批量上传:SAF 多选,回调进 VM 逐首串行(进度按选择序行内显示在曲目
+        // 列表顶部,由 cloudUploadQueue 驱动,不走弹窗)
     val uploadPicker =
         multiFilePickerResult(mimeType = "audio/*") { uris ->
             if (uris.isNotEmpty()) viewModel.uploadToCloudDisk(uris)
@@ -445,6 +452,8 @@ fun PlaylistScreen(
                 // 无封面曲目行(未匹配歌 thumbnails 空)/头图兜底:安静版深灰+半透明云
                 // (行内兜底成排重复,高饱和蓝会扎眼——业界通用=中性低饱和底+小图标)
                 val cloudCoverFallback = if (isCloudDisk) remember { cloudCoverSubduedPainter() } else null
+                // 上传队列(行内进度,按选择序插在曲目列表顶部)
+                val cloudUploadRows by viewModel.cloudUploadQueue.collectAsStateWithLifecycle()
                 val hazeState =
                     rememberHazeState()
                 LazyColumn(
@@ -1187,6 +1196,24 @@ fun PlaylistScreen(
                             )
                         }
                     }
+                    // 云盘上传队列(2026-10-09 用户定案:进度不走弹窗,按选择序直接
+                    // 显示在曲目列表顶部——未开始=暂停态,上传中=行内百分比)
+                    if (isCloudDisk && cloudUploadRows.isNotEmpty()) {
+                        items(count = cloudUploadRows.size, key = { "cloud_upload_${cloudUploadRows[it].key}" }) { index ->
+                            val uploadRow = cloudUploadRows[index]
+                            Column(modifier = Modifier.animateItem()) {
+                                CloudUploadQueueRow(
+                                    row = uploadRow,
+                                    coverFallback = cloudCoverFallback,
+                                )
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(start = 72.dp, end = 16.dp),
+                                    thickness = 0.5.dp,
+                                    color = Color.White.copy(alpha = 0.12f),
+                                )
+                            }
+                        }
+                    }
                     items(count = filteredTrack.size, key = { index ->
                         val item = filteredTrack.getOrNull(index)
                         (item?.videoId ?: "") + "item_$index"
@@ -1653,46 +1680,6 @@ fun PlaylistScreen(
             }
         }
 
-        // 云盘批量上传进度弹窗(模态:上传不可中断,无按钮)
-        val cloudUploadProgress by viewModel.cloudUploadProgress.collectAsStateWithLifecycle()
-        cloudUploadProgress?.let { p ->
-            val fileFraction =
-                if (p.bytesTotal > 0) (p.bytesSent.toFloat() / p.bytesTotal).coerceIn(0f, 1f) else 0f
-            val overall = ((p.index - 1) + fileFraction) / p.total.coerceAtLeast(1)
-            AlertDialog(
-                containerColor = rememberSurfaceDarkColors().container,
-                onDismissRequest = {},
-                confirmButton = {},
-                title = {
-                    Text(
-                        text = stringResource(Res.string.cloud_upload_progress_title),
-                        style = typo().labelSmall,
-                    )
-                },
-                text = {
-                    Column {
-                        Text(
-                            text = "${p.index}/${p.total}  ${p.fileName}",
-                            style = typo().bodyMedium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        LinearProgressIndicator(
-                            progress = { overall },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "${(overall * 100).toInt()}%",
-                            style = typo().bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                },
-            )
-        }
-
         // 整歌单下载"跳过/覆盖/取消"三选弹窗(2026-10 二期)
         val batchDownloadRequest by viewModel.batchDownloadRequest.collectAsStateWithLifecycle()
         batchDownloadRequest?.let { request ->
@@ -1701,6 +1688,95 @@ fun PlaylistScreen(
                 onSkip = { viewModel.confirmBatchDownload(false) },
                 onOverwrite = { viewModel.confirmBatchDownload(true) },
                 onDismiss = { viewModel.dismissBatchDownload() },
+            )
+        }
+    }
+}
+/**
+ * 云盘上传队列行(2026-10-09 用户定案:进度不走弹窗,按选择序直接显示在曲目列表
+ * 顶部):未开始=暂停图标+"等待上传"(排队态),当前首=上传图标+"上传中"+行尾
+ * 百分比,失败=错误色"上传失败"(保留到批次刷新)。布局对齐曲目行——48dp 封面
+ * (云朵兜底 painter)/titleSmall 标题/bodySmall 副标题/深底白字。
+ */
+@Composable
+private fun CloudUploadQueueRow(
+    row: PlaylistViewModel.CloudUploadQueueRow,
+    coverFallback: Painter?,
+) {
+    val contentColor = Color.White
+    val subtitleColor = Color(0xC4FFFFFF)
+    val failed = row.state == CloudUploadRowState.FAILED
+    val stateColor =
+        if (failed) MaterialTheme.colorScheme.error else subtitleColor
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = 6.dp, horizontal = 15.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Spacer(modifier = Modifier.width(8.dp))
+        Box(
+            modifier = Modifier.size(48.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Image(
+                painter = coverFallback ?: rememberHolderPainter(),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                alpha = if (failed) 0.4f else 1f,
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(4.dp)),
+            )
+        }
+        Column(
+            Modifier
+                .weight(1f)
+                .padding(start = 12.dp, end = 10.dp)
+                .align(Alignment.CenterVertically),
+            verticalArrangement = Arrangement.SpaceEvenly,
+        ) {
+            Text(
+                text = row.fileName,
+                style = typo().titleSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                color = contentColor,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector =
+                        when (row.state) {
+                            CloudUploadRowState.PENDING -> SimpIcons.Pause
+                            CloudUploadRowState.UPLOADING -> SimpIcons.CloudUpload
+                            CloudUploadRowState.FAILED -> SimpIcons.Error
+                        },
+                    contentDescription = null,
+                    tint = stateColor,
+                    modifier = Modifier.size(14.dp),
+                )
+                Spacer(modifier = Modifier.width(5.dp))
+                Text(
+                    text =
+                        when (row.state) {
+                            CloudUploadRowState.PENDING -> stringResource(Res.string.cloud_upload_waiting)
+                            CloudUploadRowState.UPLOADING -> stringResource(Res.string.cloud_upload_in_progress)
+                            CloudUploadRowState.FAILED -> stringResource(Res.string.cloud_upload_row_failed)
+                        },
+                    style = typo().bodySmall,
+                    maxLines = 1,
+                    color = stateColor,
+                )
+            }
+        }
+        if (row.state == CloudUploadRowState.UPLOADING && row.bytesTotal > 0) {
+            Text(
+                text = "${row.bytesSent * 100 / row.bytesTotal}%",
+                style = typo().titleSmall,
+                color = subtitleColor,
             )
         }
     }

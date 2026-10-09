@@ -16,5 +16,11 @@ data class CloudUploadLocalFile(
  */
 expect fun readCloudUploadFile(uri: String): CloudUploadLocalFile?
 
+/**
+ * 轻量文件名读取(上传队列行显示用):只查显示名,不读文件内容不算 md5——
+ * 整队入列要立刻拿到名字,重活(readCloudUploadFile)留在逐首上传时做。
+ */
+expect fun readCloudUploadFileName(uri: String): String?
+
 /** 上传流工厂:每次调用返回新的整文件流(上传链读 body 一遍);null=打不开 */
 expect fun cloudUploadBodyFactory(uri: String): (() -> ByteReadChannel)?

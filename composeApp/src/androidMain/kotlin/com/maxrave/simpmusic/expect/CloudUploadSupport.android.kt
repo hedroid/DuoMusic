@@ -49,6 +49,19 @@ actual fun readCloudUploadFile(uri: String): CloudUploadLocalFile? {
     }.getOrNull()
 }
 
+actual fun readCloudUploadFileName(uri: String): String? {
+    val context = CloudUploadStore.appContext ?: return null
+    return runCatching {
+        context.contentResolver
+            .query(Uri.parse(uri), null, null, null, null)
+            ?.use { cursor ->
+                val nameIdx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                if (cursor.moveToFirst() && nameIdx >= 0) cursor.getString(nameIdx) else null
+            }
+            ?: uri.substringAfterLast('/')
+    }.getOrNull() ?: uri.substringAfterLast('/')
+}
+
 actual fun cloudUploadBodyFactory(uri: String): (() -> ByteReadChannel)? {
     val context = CloudUploadStore.appContext ?: return null
     val parsed = Uri.parse(uri)

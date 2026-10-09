@@ -20,6 +20,7 @@ import com.maxrave.domain.data.model.browse.playlist.PlaylistBrowse
 import com.maxrave.domain.data.model.browse.playlist.PlaylistState
 import com.maxrave.simpmusic.expect.cloudUploadBodyFactory
 import com.maxrave.simpmusic.expect.readCloudUploadFile
+import com.maxrave.simpmusic.expect.readCloudUploadFileName
 import com.maxrave.domain.extension.now
 import com.maxrave.domain.mediaservice.handler.DownloadHandler
 import com.maxrave.domain.mediaservice.handler.PlaylistType
@@ -746,39 +747,74 @@ class PlaylistViewModel(
     /** 上传在飞标志:同一时间只跑一批,再点直接忽略 */
     private var cloudUploadInFlight = false
 
-    /** 批量上传进度(弹窗消费);null=不在上传 */
-    data class CloudUploadProgress(
-        val index: Int,
-        val total: Int,
+    /** 上传队列行(云盘页列表顶部行内进度,2026-10-09 用户定案替代进度弹窗) */
+    enum class CloudUploadRowState {
+        /** 排队未开始(暂停态显示) */
+        PENDING,
+
+        /** 当前正在上传(带字节进度) */
+        UPLOADING,
+
+        /** 本首失败(保留行,批次结束刷新后清场) */
+        FAILED,
+    }
+
+    data class CloudUploadQueueRow(
+        val key: String,
         val fileName: String,
-        val bytesSent: Long,
-        val bytesTotal: Long,
+        val bytesSent: Long = 0,
+        val bytesTotal: Long = 0,
+        val state: CloudUploadRowState = CloudUploadRowState.PENDING,
     )
 
-    private val _cloudUploadProgress = MutableStateFlow<CloudUploadProgress?>(null)
-    val cloudUploadProgress: StateFlow<CloudUploadProgress?> = _cloudUploadProgress.asStateFlow()
+    private val _cloudUploadQueue = MutableStateFlow<List<CloudUploadQueueRow>>(emptyList())
+    val cloudUploadQueue: StateFlow<List<CloudUploadQueueRow>> = _cloudUploadQueue.asStateFlow()
 
     /**
-     * 批量上传歌曲到云盘(SAF 多选回调进来):逐首串行(读元数据+流式 md5 → 端点五步
-     * 上传,nos 直传带字节进度),全部完成后汇总 toast+原地刷新列表。元数据从文件名
-     * "艺人-标题"启发式解析,只作匹配失败的显示兜底——服务端转码后按音频指纹匹配
-     * 曲库并覆盖(探针实证)。
+     * 批量上传歌曲到云盘(SAF 多选回调进来):选择序整队入列(行内显示排队/上传
+     * 进度),逐首串行(读元数据+流式 md5 → 端点五步上传,nos 直传带字节进度);
+     * 成功即移行(队列随进度缩水),失败保留行到刷新,全部完成后汇总 toast+原地
+     * 刷新列表。元数据从文件名"艺人-标题"启发式解析,只作匹配失败的显示兜底——
+     * 服务端转码后按音频指纹匹配曲库并覆盖(探针实证)。
      */
     fun uploadToCloudDisk(uris: List<String>) {
         if (cloudUploadInFlight || uris.isEmpty()) return
         cloudUploadInFlight = true
         viewModelScope.launch {
+            // 先整队入列:文件名轻量读取(readCloudUploadFileName 只查显示名,
+            // md5 等重活留在逐首上传时做),未开始的行显示排队态
+            _cloudUploadQueue.value =
+                withContext(Dispatchers.IO) {
+                    uris.map { uri ->
+                        CloudUploadQueueRow(
+                            key = uri,
+                            fileName =
+                                (readCloudUploadFileName(uri) ?: uri.substringAfterLast('/'))
+                                    .substringBeforeLast('.'),
+                        )
+                    }
+                }
             var ok = 0
             var fail = 0
-            for ((i, uri) in uris.withIndex()) {
+            for (uri in uris) {
                 val meta = withContext(Dispatchers.IO) { readCloudUploadFile(uri) }
                 val bodyFactory = cloudUploadBodyFactory(uri)
                 if (meta == null || bodyFactory == null) {
                     fail++
+                    _cloudUploadQueue.update { rows ->
+                        rows.map { if (it.key == uri) it.copy(state = CloudUploadRowState.FAILED) else it }
+                    }
                     continue
                 }
-                _cloudUploadProgress.value =
-                    CloudUploadProgress(i + 1, uris.size, meta.fileName, 0, meta.sizeBytes)
+                _cloudUploadQueue.update { rows ->
+                    rows.map {
+                        if (it.key == uri) {
+                            it.copy(bytesTotal = meta.sizeBytes, state = CloudUploadRowState.UPLOADING)
+                        } else {
+                            it
+                        }
+                    }
+                }
                 val displayName = meta.fileName.substringBeforeLast('.')
                 val parsedArtist = displayName.substringBefore('-', "").trim()
                 val parsedSong = displayName.substringAfter('-', "").trim()
@@ -789,6 +825,7 @@ class PlaylistViewModel(
                         displayName to ""
                     }
                 // 上传回调在 IO 线程高频触发,按 1% 步进节流再进 StateFlow
+                // (update 是 CAS 重试,回调线程直接用安全)
                 var lastReported = -1L
                 neteaseRepository
                     .uploadToCloudDisk(
@@ -806,14 +843,24 @@ class PlaylistViewModel(
                                 if (meta.sizeBytes > 0) (sent * 100 / meta.sizeBytes) else 100
                             if (pct != lastReported) {
                                 lastReported = pct
-                                _cloudUploadProgress.value =
-                                    _cloudUploadProgress.value?.copy(bytesSent = sent)
+                                _cloudUploadQueue.update { rows ->
+                                    rows.map { if (it.key == uri) it.copy(bytesSent = sent) else it }
+                                }
                             }
                         },
                     ).fold(
-                        onSuccess = { ok++ },
+                        onSuccess = {
+                            ok++
+                            // 成功即移行:队列随进度缩水,行内反馈=逐首完成
+                            _cloudUploadQueue.update { rows -> rows.filterNot { it.key == uri } }
+                        },
                         onFailure = { e ->
                             fail++
+                            _cloudUploadQueue.update { rows ->
+                                rows.map {
+                                    if (it.key == uri) it.copy(state = CloudUploadRowState.FAILED) else it
+                                }
+                            }
                             Logger.w(
                                 tag,
                                 "cloud upload failed: ${meta.fileName} ${e.message}",
@@ -821,7 +868,6 @@ class PlaylistViewModel(
                         },
                     )
             }
-            _cloudUploadProgress.value = null
             makeToast(
                 when {
                     fail == 0 -> getString(Res.string.cloud_upload_all_done, ok)
@@ -832,6 +878,8 @@ class PlaylistViewModel(
             // 服务端发布+转码是异步的,稍等再刷(窗口期会 500,刷新内部还会再重试一次)
             delay(2500)
             getCloudDiskData(firstLoad = false)
+            // 刷新落定后清场(含失败行——汇总 toast 已报数,新歌由列表刷新呈现)
+            _cloudUploadQueue.value = emptyList()
             cloudUploadInFlight = false
         }
     }

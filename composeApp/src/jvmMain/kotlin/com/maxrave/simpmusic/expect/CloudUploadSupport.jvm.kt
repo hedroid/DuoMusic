@@ -30,6 +30,8 @@ actual fun readCloudUploadFile(uri: String): CloudUploadLocalFile? {
     }.getOrNull()
 }
 
+actual fun readCloudUploadFileName(uri: String): String? = File(uri).name
+
 actual fun cloudUploadBodyFactory(uri: String): (() -> ByteReadChannel)? =
     File(uri).takeIf { it.isFile }?.let { file ->
         { file.inputStream().toByteReadChannel() }

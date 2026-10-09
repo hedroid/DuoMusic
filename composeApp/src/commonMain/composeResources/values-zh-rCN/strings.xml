@@ -951,7 +951,9 @@
     <string name="mixed_source_selection">包含不同音源的歌曲，无法添加</string>
     <string name="favorite_mvs">收藏的 MV</string>
     <string name="cloud_disk">云盘</string>
-    <string name="cloud_upload_progress_title">上传到云盘</string>
+    <string name="cloud_upload_waiting">等待上传</string>
+    <string name="cloud_upload_in_progress">上传中</string>
+    <string name="cloud_upload_row_failed">上传失败</string>
     <string name="delete_from_cloud_disk">从云盘中删除</string>
     <string name="delete_from_cloud_disk_title">删除 %1$d 首歌曲？</string>
     <string name="delete_from_cloud_disk_message">所选歌曲将从网易云盘中永久删除，不可恢复。</string>

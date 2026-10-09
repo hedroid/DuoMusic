@@ -203,7 +203,9 @@
     <string name="mixed_source_selection">包含不同音源的歌曲，無法添加</string>
     <string name="favorite_mvs">收藏的 MV</string>
     <string name="cloud_disk">雲盤</string>
-    <string name="cloud_upload_progress_title">上傳到雲盤</string>
+    <string name="cloud_upload_waiting">等待上傳</string>
+    <string name="cloud_upload_in_progress">上傳中</string>
+    <string name="cloud_upload_row_failed">上傳失敗</string>
     <string name="delete_from_cloud_disk">從雲盤中刪除</string>
     <string name="delete_from_cloud_disk_title">刪除 %1$d 首歌曲？</string>
     <string name="delete_from_cloud_disk_message">所選歌曲將從網易雲盤中永久刪除，不可復原。</string>
