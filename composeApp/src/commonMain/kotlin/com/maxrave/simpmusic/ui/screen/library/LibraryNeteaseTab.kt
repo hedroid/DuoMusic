@@ -1,5 +1,6 @@
 package com.maxrave.simpmusic.ui.screen.library
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -38,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.style.TextOverflow
@@ -116,7 +118,7 @@ internal fun LibraryNeteaseTab(
     /** 收藏的 MV 概要(count+封面);null=尚未拉取(行暂不显示,拉完即常驻,空集也显示) */
     subscribedMv: Pair<Int, String?>? = null,
     /** 云盘入口封面(第一首歌);null=空云盘/未拉到(云朵兜底) */
-    cloudDiskCover: String? = null,
+    cloudDiskEntry: Pair<String?, Int>? = null,
     onScrolling: (onTop: Boolean) -> Unit = {},
 ) {
     // 长按目标:待确认取消收藏/删除的歌单/专辑(均为写操作,弹窗确认;删除不可逆,文案更强)
@@ -214,7 +216,8 @@ internal fun LibraryNeteaseTab(
                     // 云盘入口(2026-10-09 二轮:红心行上方,云朵封面),点击进云盘伪歌单页
                     item(span = { GridItemSpan(maxLineSpan) }, key = "netease_cloud_disk_row") {
                         CloudDiskRow(
-                            coverUrl = cloudDiskCover,
+                            coverUrl = cloudDiskEntry?.first,
+                            trackCount = cloudDiskEntry?.second,
                             onClick = {
                                 navController.navigate(PlaylistDestination(NETEASE_CLOUD_DISK_PLAYLIST_ID))
                             },
@@ -460,12 +463,15 @@ private fun SubscribedMvRow(
 }
 
 /**
- * 云盘入口满行横卡:HeartPlaylistRow 同款视觉,封面槽换成主题渐变底+云朵图标
- * (云盘无网络封面);副标题是固定引导文案(不拉云盘列表,数量进详情页才知道)。
+ * 云盘入口满行横卡:HeartPlaylistRow 同款视觉。封面=第一首歌的封面,其上**居中
+ * 叠印白色云朵图标**(2026-10-10 用户澄清:照红心歌单做法把图标印在歌曲封面上,
+ * 不是换蓝底牌面);空云盘/无封面退蓝底白云牌面(自带云朵,不再叠印)。
+ * 副标题=云盘曲目数(拉到时"N 首",没拉到退固定引导文案)。
  */
 @Composable
 private fun CloudDiskRow(
     coverUrl: String?,
+    trackCount: Int?,
     onClick: () -> Unit,
 ) {
     Row(
@@ -476,25 +482,41 @@ private fun CloudDiskRow(
                 .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // 封面=云盘第一首歌(用户 2026-10-09 定案);空云盘/未拉到落蓝底白云兜底
-        AsyncImage(
-            model =
-                ImageRequest
-                    .Builder(LocalPlatformContext.current)
-                    .data(coverUrl)
-                    .diskCachePolicy(CachePolicy.ENABLED)
-                    .diskCacheKey(coverUrl)
-                    .crossfade(550)
-                    .build(),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            placeholder = remember { cloudCoverPainter() },
-            error = remember { cloudCoverPainter() },
+        Box(
             modifier =
                 Modifier
                     .size(112.dp)
+                    .aspectRatio(1f)
                     .clip(RoundedCornerShape(10.dp)),
-        )
+        ) {
+            AsyncImage(
+                model =
+                    ImageRequest
+                        .Builder(LocalPlatformContext.current)
+                        .data(coverUrl)
+                        .diskCachePolicy(CachePolicy.ENABLED)
+                        .diskCacheKey(coverUrl)
+                        .crossfade(550)
+                        .build(),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                placeholder = remember { cloudCoverPainter() },
+                error = remember { cloudCoverPainter() },
+                modifier = Modifier.matchParentSize(),
+            )
+            // 云朵印章:仅真有歌曲封面时叠印(兜底牌面自带云朵,叠了变双云)
+            if (coverUrl != null) {
+                Icon(
+                    imageVector = SimpIcons.Cloud,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.9f),
+                    modifier =
+                        Modifier
+                            .align(Alignment.Center)
+                            .size(44.dp),
+                )
+            }
+        }
         Column(
             modifier =
                 Modifier
@@ -509,7 +531,9 @@ private fun CloudDiskRow(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = stringResource(Res.string.cloud_disk_entry_hint),
+                text =
+                    trackCount?.let { stringResource(Res.string.track_count_short, it.toString()) }
+                        ?: stringResource(Res.string.cloud_disk_entry_hint),
                 style = typo().bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,

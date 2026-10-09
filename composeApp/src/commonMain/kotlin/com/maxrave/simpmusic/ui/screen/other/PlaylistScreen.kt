@@ -1785,15 +1785,15 @@ private fun CloudUploadQueueRow(
             )
         }
         }
-        // 进度条:对齐文字列(封面右侧到行尾内边距),覆盖式叠在行底不占行高,
-        // 3dp 圆角胶囊,只在上传中画
+        // 进度条:对齐文字列(封面右侧到三点按钮区左缘),覆盖式叠在行底不占行高,
+        // 3dp 圆角胶囊,只在上传中画。end=63dp=行边距 15+三点按钮触区 48
         if (row.state == CloudUploadRowState.UPLOADING && row.bytesTotal > 0) {
             LinearProgressIndicator(
                 progress = { (row.bytesSent.toFloat() / row.bytesTotal).coerceIn(0f, 1f) },
                 modifier =
                     Modifier
                         .align(Alignment.BottomCenter)
-                        .padding(start = 83.dp, end = 15.dp)
+                        .padding(start = 83.dp, end = 63.dp)
                         .fillMaxWidth()
                         .height(3.dp)
                         .clip(RoundedCornerShape(50)),
