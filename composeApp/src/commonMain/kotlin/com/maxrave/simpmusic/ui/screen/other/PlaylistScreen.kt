@@ -1695,8 +1695,9 @@ fun PlaylistScreen(
 /**
  * 云盘上传队列行(2026-10-09 用户定案:进度不走弹窗,按选择序直接显示在曲目列表
  * 顶部):未开始=暂停图标+"等待上传"(排队态),当前首=上传图标+"上传中"+行尾
- * 百分比,失败=错误色"上传失败"(保留到批次刷新)。布局对齐曲目行——48dp 封面
- * (云朵兜底 painter)/titleSmall 标题/bodySmall 副标题/深底白字。
+ * 百分比+**行底细进度条**(Box 覆盖式叠在底边,不占行高——状态切换无跳动),
+ * 失败=错误色"上传失败"(保留到批次刷新)。布局对齐曲目行——48dp 封面(云朵兜底
+ * painter)/titleSmall 标题/bodySmall 副标题/深底白字。
  */
 @Composable
 private fun CloudUploadQueueRow(
@@ -1708,13 +1709,14 @@ private fun CloudUploadQueueRow(
     val failed = row.state == CloudUploadRowState.FAILED
     val stateColor =
         if (failed) MaterialTheme.colorScheme.error else subtitleColor
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(vertical = 6.dp, horizontal = 15.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
+    Box(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 6.dp, horizontal = 15.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
         Spacer(modifier = Modifier.width(8.dp))
         Box(
             modifier = Modifier.size(48.dp),
@@ -1777,6 +1779,20 @@ private fun CloudUploadQueueRow(
                 text = "${row.bytesSent * 100 / row.bytesTotal}%",
                 style = typo().titleSmall,
                 color = subtitleColor,
+            )
+        }
+        }
+        // 行底细进度条:覆盖式叠在底边(不占行高,状态切换无跳动),只在上传中画
+        if (row.state == CloudUploadRowState.UPLOADING && row.bytesTotal > 0) {
+            LinearProgressIndicator(
+                progress = { (row.bytesSent.toFloat() / row.bytesTotal).coerceIn(0f, 1f) },
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .height(2.dp),
+                color = subtitleColor,
+                trackColor = Color.White.copy(alpha = 0.15f),
             )
         }
     }
