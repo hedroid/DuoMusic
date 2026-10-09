@@ -3,6 +3,7 @@ package com.maxrave.simpmusic.expect
 import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
+import androidx.compose.ui.graphics.asImageBitmap
 import io.ktor.util.cio.toByteReadChannel
 import io.ktor.utils.io.ByteReadChannel
 import java.security.MessageDigest
@@ -60,6 +61,21 @@ actual fun readCloudUploadFileName(uri: String): String? {
             }
             ?: uri.substringAfterLast('/')
     }.getOrNull() ?: uri.substringAfterLast('/')
+}
+
+actual fun readCloudUploadArtwork(uri: String): androidx.compose.ui.graphics.ImageBitmap? {
+    val context = CloudUploadStore.appContext ?: return null
+    return runCatching {
+        val retriever = android.media.MediaMetadataRetriever()
+        try {
+            retriever.setDataSource(context, android.net.Uri.parse(uri))
+            retriever.embeddedPicture
+                ?.let { android.graphics.BitmapFactory.decodeByteArray(it, 0, it.size) }
+                ?.asImageBitmap()
+        } finally {
+            retriever.release()
+        }
+    }.getOrNull()
 }
 
 actual fun cloudUploadBodyFactory(uri: String): (() -> ByteReadChannel)? {

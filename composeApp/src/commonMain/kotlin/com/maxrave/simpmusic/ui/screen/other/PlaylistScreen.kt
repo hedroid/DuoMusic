@@ -72,6 +72,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.ContentScale
@@ -1695,9 +1696,9 @@ fun PlaylistScreen(
 /**
  * 云盘上传队列行(2026-10-09 用户定案:进度不走弹窗,按选择序直接显示在曲目列表
  * 顶部):未开始=暂停图标+"等待上传"(排队态),当前首=上传图标+"上传中"+行尾
- * 百分比+**行底细进度条**(Box 覆盖式叠在底边,不占行高——状态切换无跳动),
- * 失败=错误色"上传失败"(保留到批次刷新)。布局对齐曲目行——48dp 封面(云朵兜底
- * painter)/titleSmall 标题/bodySmall 副标题/深底白字。
+ * 百分比+**文字列下的细进度条**(对齐标题列起止、圆角,不铺满行宽),失败=错误色
+ * "上传失败"(保留到批次刷新)。封面=文件内嵌封面(入列时读),无内嵌退云朵兜底。
+ * 布局对齐曲目行——48dp 封面/titleSmall 标题/bodySmall 副标题/深底白字。
  */
 @Composable
 private fun CloudUploadQueueRow(
@@ -1717,22 +1718,24 @@ private fun CloudUploadQueueRow(
                     .padding(vertical = 6.dp, horizontal = 15.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-        Spacer(modifier = Modifier.width(8.dp))
-        Box(
-            modifier = Modifier.size(48.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Image(
-                painter = coverFallback ?: rememberHolderPainter(),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                alpha = if (failed) 0.4f else 1f,
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .clip(RoundedCornerShape(4.dp)),
-            )
-        }
+            Spacer(modifier = Modifier.width(8.dp))
+            Box(
+                modifier = Modifier.size(48.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                val artworkPainter =
+                    row.artwork?.let { remember(row.artwork) { BitmapPainter(it) } }
+                Image(
+                    painter = artworkPainter ?: coverFallback ?: rememberHolderPainter(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    alpha = if (failed) 0.4f else 1f,
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .clip(RoundedCornerShape(4.dp)),
+                )
+            }
         Column(
             Modifier
                 .weight(1f)
@@ -1782,15 +1785,18 @@ private fun CloudUploadQueueRow(
             )
         }
         }
-        // 行底细进度条:覆盖式叠在底边(不占行高,状态切换无跳动),只在上传中画
+        // 进度条:对齐文字列(封面右侧到行尾内边距),覆盖式叠在行底不占行高,
+        // 3dp 圆角胶囊,只在上传中画
         if (row.state == CloudUploadRowState.UPLOADING && row.bytesTotal > 0) {
             LinearProgressIndicator(
                 progress = { (row.bytesSent.toFloat() / row.bytesTotal).coerceIn(0f, 1f) },
                 modifier =
                     Modifier
                         .align(Alignment.BottomCenter)
+                        .padding(start = 83.dp, end = 15.dp)
                         .fillMaxWidth()
-                        .height(2.dp),
+                        .height(3.dp)
+                        .clip(RoundedCornerShape(50)),
                 color = subtitleColor,
                 trackColor = Color.White.copy(alpha = 0.15f),
             )

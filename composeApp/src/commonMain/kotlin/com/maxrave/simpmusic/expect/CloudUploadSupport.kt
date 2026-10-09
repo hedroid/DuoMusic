@@ -1,5 +1,6 @@
 package com.maxrave.simpmusic.expect
 
+import androidx.compose.ui.graphics.ImageBitmap
 import io.ktor.utils.io.ByteReadChannel
 
 /** 待上传本地文件的元数据(md5 由平台层流式算好,大文件不进内存) */
@@ -21,6 +22,13 @@ expect fun readCloudUploadFile(uri: String): CloudUploadLocalFile?
  * 整队入列要立刻拿到名字,重活(readCloudUploadFile)留在逐首上传时做。
  */
 expect fun readCloudUploadFileName(uri: String): String?
+
+/**
+ * 读文件内嵌封面(上传队列行显示用,Android=MediaMetadataRetriever 的 embedded
+ * picture,只解析头部元数据);null=无内嵌封面/读取失败,行内退云朵兜底。
+ * 桌面 picker no-op,恒 null。
+ */
+expect fun readCloudUploadArtwork(uri: String): ImageBitmap?
 
 /** 上传流工厂:每次调用返回新的整文件流(上传链读 body 一遍);null=打不开 */
 expect fun cloudUploadBodyFactory(uri: String): (() -> ByteReadChannel)?

@@ -20,6 +20,7 @@ import com.maxrave.domain.data.model.browse.playlist.PlaylistBrowse
 import com.maxrave.domain.data.model.browse.playlist.PlaylistState
 import com.maxrave.simpmusic.expect.cloudUploadBodyFactory
 import com.maxrave.simpmusic.expect.readCloudUploadFile
+import com.maxrave.simpmusic.expect.readCloudUploadArtwork
 import com.maxrave.simpmusic.expect.readCloudUploadFileName
 import com.maxrave.domain.extension.now
 import com.maxrave.domain.mediaservice.handler.DownloadHandler
@@ -762,6 +763,8 @@ class PlaylistViewModel(
     data class CloudUploadQueueRow(
         val key: String,
         val fileName: String,
+        /** 文件内嵌封面(入列时读,整个上传期间显示);null=退云朵兜底 */
+        val artwork: androidx.compose.ui.graphics.ImageBitmap? = null,
         val bytesSent: Long = 0,
         val bytesTotal: Long = 0,
         val state: CloudUploadRowState = CloudUploadRowState.PENDING,
@@ -781,8 +784,8 @@ class PlaylistViewModel(
         if (cloudUploadInFlight || uris.isEmpty()) return
         cloudUploadInFlight = true
         viewModelScope.launch {
-            // 先整队入列:文件名轻量读取(readCloudUploadFileName 只查显示名,
-            // md5 等重活留在逐首上传时做),未开始的行显示排队态
+            // 先整队入列:文件名+内嵌封面轻量读取(只解析头部元数据,md5 等重活留在
+            // 逐首上传时做),未开始的行显示排队态
             _cloudUploadQueue.value =
                 withContext(Dispatchers.IO) {
                     uris.map { uri ->
@@ -791,6 +794,7 @@ class PlaylistViewModel(
                             fileName =
                                 (readCloudUploadFileName(uri) ?: uri.substringAfterLast('/'))
                                     .substringBeforeLast('.'),
+                            artwork = readCloudUploadArtwork(uri),
                         )
                     }
                 }

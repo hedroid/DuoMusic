@@ -32,6 +32,8 @@ actual fun readCloudUploadFile(uri: String): CloudUploadLocalFile? {
 
 actual fun readCloudUploadFileName(uri: String): String? = File(uri).name
 
+actual fun readCloudUploadArtwork(uri: String): androidx.compose.ui.graphics.ImageBitmap? = null
+
 actual fun cloudUploadBodyFactory(uri: String): (() -> ByteReadChannel)? =
     File(uri).takeIf { it.isFile }?.let { file ->
         { file.inputStream().toByteReadChannel() }
