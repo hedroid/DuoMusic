@@ -1020,7 +1020,12 @@ internal fun ExpressiveCollapsedToolbar(
                         }
                     }
                     Spacer(modifier = Modifier.width(15.dp))
-                    HeartCheckBox(checked = state.controllerState.isLiked, size = 30) {
+                    HeartCheckBox(
+                        checked = state.controllerState.isLiked,
+                        size = 30,
+                        enabled = state.likeEnabled,
+                        modifier = Modifier.alpha(if (state.likeEnabled) 1f else 0.38f),
+                    ) {
                         actions.onUIEvent(UIEvent.ToggleLike)
                     }
                     Spacer(modifier = Modifier.width(15.dp))

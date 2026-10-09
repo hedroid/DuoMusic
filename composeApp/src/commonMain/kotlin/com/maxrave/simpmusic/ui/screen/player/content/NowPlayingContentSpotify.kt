@@ -1679,7 +1679,7 @@ fun NowPlayingContentSpotify(
                             }
                         }
                         Spacer(modifier = Modifier.width(15.dp))
-                        if (!state.isPodcastSong) HeartCheckBox(
+                        HeartCheckBox(
                             checked = state.controllerState.isLiked,
                             size = 30,
                             enabled = state.likeEnabled,
@@ -1881,14 +1881,13 @@ internal fun NowPlayingTrackInfoRow(
             }
         }
         Spacer(modifier = Modifier.size(12.dp))
-        // 歌曲互动区:收藏在左、网易评论在右。播客没有收藏语义,但保留原有评论入口,
-        // 此时评论按钮单独占据行尾,避免移动位置时把播客评论功能一起删掉。
+        // 歌曲/节目互动区:红心在左、网易评论在右；节目红心由播放 VM 走资源赞。
         Row(
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             // 红心=云端账号喜欢态;未登录源置灰,点击提示登录
-            if (!state.isPodcastSong) {
+            run {
                 Box(modifier = Modifier.size(36.dp), contentAlignment = Alignment.Center) {
                     HeartCheckBox(
                         checked = state.controllerState.isLiked,

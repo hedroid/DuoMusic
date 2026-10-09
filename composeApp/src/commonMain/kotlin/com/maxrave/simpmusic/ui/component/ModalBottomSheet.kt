@@ -85,6 +85,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -225,7 +226,7 @@ import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import simpmusic.composeapp.generated.resources.Res
-import simpmusic.composeapp.generated.resources.podcast_comment_like_unsupported
+import simpmusic.composeapp.generated.resources.netease_action_failed
 import simpmusic.composeapp.generated.resources.comment_label
 import simpmusic.composeapp.generated.resources.create
 import simpmusic.composeapp.generated.resources.added_to_netease_playlist
@@ -397,9 +398,15 @@ fun InfoPlayerBottomSheet(
     val extractSource by sharedViewModel.extractSource.collectAsState()
     val downloadProgress by sharedViewModel.downloadFileProgress.collectAsStateWithLifecycle()
     // 播客队列判定(统一走 QueueData.isNeteasePodcastQueue,CR-22):mainSong 的点赞数端点恒 0,点赞行不展示
-    val isPodcastQueue =
-        koinInject<com.maxrave.domain.mediaservice.handler.MediaPlayerHandler>()
-            .queueData.value?.data?.isNeteasePodcastQueue == true
+    val playerHandler = koinInject<com.maxrave.domain.mediaservice.handler.MediaPlayerHandler>()
+    val isPodcastQueue = playerHandler.queueData.value?.data?.isNeteasePodcastQueue == true
+    val programId = playerHandler.nowPlayingState.value.track?.takeIf { it.videoId == currentMediaId }?.neteaseProgramId
+        ?: songEntity?.takeIf { it.videoId == currentMediaId }?.neteaseProgramId
+        ?: if (isPodcastQueue) playerHandler.queueData.value?.data?.listTracks?.firstOrNull { it.videoId == currentMediaId }?.neteaseProgramId else null
+    val neteaseRepository = koinInject<NeteaseRepositoryImpl>()
+    val podcastLikeCount by produceState<Long?>(null, programId) {
+        value = programId?.let { neteaseRepository.getDjProgramLikeInfo(it).getOrNull()?.likedCount }
+    }
 
     ModalBottomSheet(
         onDismissRequest = {
@@ -992,8 +999,7 @@ fun InfoPlayerBottomSheet(
                         )
                     }
                 } else if (isNeteaseSong && neteaseMeta != null) {
-                    // 播客节目点赞数拿不到(端点对 mainSong 恒 0)——不展示,别挂一个"点赞 0"
-                    if (!isPodcastQueue) neteaseMeta.likeCount?.let { likeCount ->
+                    (if (programId != null) podcastLikeCount else neteaseMeta.likeCount)?.let { likeCount ->
                         Text(
                             text = stringResource(Res.string.like),
                             modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
@@ -1857,6 +1863,7 @@ fun NowPlayingBottomSheet(
             .queueData.value?.data?.isNeteasePodcastQueue == true
     // 点赞/添加到歌单按源登录置灰:cloudLiked 为 null = 未登录(或云端态未知)
     val cloudLikedForGate by viewModel.cloudLiked.collectAsStateWithLifecycle()
+    val programLikePending by viewModel.programLikePending.collectAsStateWithLifecycle()
     val neteaseLoggedIn by koinInject<com.maxrave.simpmusic.viewModel.SharedViewModel>()
         .neteaseLoggedIn.collectAsStateWithLifecycle()
     // "下载视频"行的下载中态(DownloadManager 视频条目在途实时流)
@@ -2434,27 +2441,27 @@ fun NowPlayingBottomSheet(
                             }
                         }
                     }
-                    // 播客节目红心走 /song/like 报 524"歌单不支持添加播客声音"(歌曲/声音链路
-                    // 分离,声音喜欢端点多形状穷举全 400)——隐藏防假失败(2026-09-29)
+                    // 播客节目用自身 programId 走 A_DJ_1_ 资源赞，不进歌曲红心链。
+                    val isPodcastEpisode = uiState.songUIState.neteaseProgramId != null
                     val isNeteaseMvSong = uiState.songUIState.videoId.startsWith(NETEASE_MV_MEDIA_ID_PREFIX)
-                    if (!isPodcastQueue) CheckBoxActionButton(
+                    CheckBoxActionButton(
                         // 云端态优先(登录时拉取,~几百 ms 到):本地 Room 的 liked 可能过期
                         // (YT 红心歌单里本地未赞、云端已赞,读作"状态不对");云端未到/未登录
                         // 退回本地值。checkbox 以 defaultChecked 为 key,云端晚到会重置显示
                         defaultChecked = cloudLikedForGate ?: uiState.songUIState.liked,
                         isHeartIcon = true,
-                        enable = cloudLikedForGate != null && (!isNeteaseMvSong || neteaseLoggedIn),
-                        optimistic = !isNeteaseMvSong,
+                        enable = cloudLikedForGate != null && !programLikePending &&
+                            (if (isNeteaseMvSong || isPodcastEpisode) neteaseLoggedIn else true),
+                        optimistic = !isNeteaseMvSong && !isPodcastEpisode,
                         onChangeListener = { liked ->
                             viewModel.onUIEvent(NowPlayingBottomSheetUIEvent.ToggleLike)
-                            onLikeChanged?.invoke(liked)
+                            if (!isPodcastEpisode) onLikeChanged?.invoke(liked)
                         },
                     )
 
                     // 播客节目不提供下载(2026-10-01 用户定):"下载/删除下载"两行隐藏。
                     // 只按行自身 neteaseProgramId 判定——不能用队列哨兵:播客队列播放期间
                     // 打开普通歌曲的 sheet 会把歌曲的下载行一起误隐(实测踩坑)
-                    val isPodcastEpisode = uiState.songUIState.neteaseProgramId != null
                     // 视频歌=真实视频类型(OMV/UGC;ATV=纯音频曲目):mv 不需要音频下载,
                     // 整组只留"下载视频/删除视频"(2026-10-03 用户定)
                     val isRealVideoSong =
@@ -4637,10 +4644,9 @@ private enum class NeteaseCommentSort(val wire: Int, val firstCursor: String) {
 fun NeteaseCommentsSheet(
     onDismiss: () -> Unit,
     songId: String,
-    totalCount: Int,
-    /** 评论线程 id;null=歌曲默认(R_SO_4)。播客节目传 A_DJ_1_<programId>;""=反查完成未命中(同样回退歌曲线程) */
+    /** 评论线程 id;null=歌曲默认(R_SO_4)。播客节目传 A_DJ_1_<programId>;""=反查完成未命中(禁用写入) */
     threadId: String? = null,
-    /** 播客节目(不依赖 threadId 反查时序):标题不带数字+点赞禁用。threadId 为按需反查,
+    /** 播客节目(不依赖 threadId 反查时序):标题从节目详情/评论线程取数。threadId 为按需反查,
      *  null 且 isPodcast=true 表示反查在途——首载等它落地,否则会拿 R_SO_4 歌曲线程加载错评论 */
     isPodcast: Boolean = false,
     neteaseRepository: com.maxrave.data.repository.NeteaseRepositoryImpl = koinInject(),
@@ -4652,42 +4658,64 @@ fun NeteaseCommentsSheet(
         if (isMv) {
             threadId?.takeIf { it.startsWith("R_MV_5_") }
                 ?: "R_MV_5_${songId.removePrefix(NETEASE_MV_MEDIA_ID_PREFIX)}"
+        } else if (isPodcast) {
+            threadId?.takeIf { it.startsWith("A_DJ_1_") && it.removePrefix("A_DJ_1_").toLongOrNull() != null }
         } else {
             threadId?.takeIf { it.isNotEmpty() }
         }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val dark = rememberSurfaceDarkColors()
-    var sort by remember { mutableStateOf(NeteaseCommentSort.RECOMMEND) }
-    var comments by remember { mutableStateOf<List<com.maxrave.domain.data.entities.NeteaseSongInfoEntity.HotComment>>(emptyList()) }
+    // 面板可在切歌时保持打开；列表、排序和请求状态必须跟评论线程一起切换。
+    var sort by remember(songId, commentThreadId) { mutableStateOf(NeteaseCommentSort.RECOMMEND) }
+    var comments by remember(songId, commentThreadId) {
+        mutableStateOf<List<com.maxrave.domain.data.entities.NeteaseSongInfoEntity.HotComment>>(emptyList())
+    }
     var pendingLocalComments by remember(songId, commentThreadId) {
         mutableStateOf<List<com.maxrave.domain.data.entities.NeteaseSongInfoEntity.HotComment>>(emptyList())
     }
     var fetchedTotalCount by remember(songId, commentThreadId) { mutableStateOf<Int?>(null) }
+    var programDetailCount by remember(songId, commentThreadId) { mutableStateOf<Int?>(null) }
     var localCountFloor by remember(songId, commentThreadId) { mutableStateOf<Int?>(null) }
-    val displayTotalCount = maxOf(fetchedTotalCount ?: totalCount, localCountFloor ?: 0)
+    val knownServerCount = fetchedTotalCount ?: programDetailCount
+    val displayTotalCount = maxOf(knownServerCount ?: 0, localCountFloor ?: 0)
+    // 歌曲/MV 等对应评论线程首屏响应；节目详情的 commentCount 可独立填播客标题。
+    // 详情卡计数可能是旧值或失败时的默认 0，不能拿来充当评论区的已加载计数。
+    LaunchedEffect(isPodcast, commentThreadId) {
+        val programId = if (isPodcast) commentThreadId?.removePrefix("A_DJ_1_")?.toLongOrNull() else null
+        if (programId != null) {
+            programDetailCount = neteaseRepository.getDjProgramLikeInfo(programId).getOrNull()
+                ?.commentCount?.coerceIn(0L, Int.MAX_VALUE.toLong())?.toInt()
+        }
+    }
     // 首载/切档=loading,追加=loadingMore(重入守卫读两者);失败置 failed 出重试行——
     // 旧版失败直接 hasMore=false 假装到底,网络抖一下评论列表就"没了"
-    var loading by remember { mutableStateOf(false) }
-    var loadingMore by remember { mutableStateOf(false) }
-    var hasMore by remember { mutableStateOf(true) }
-    var failed by remember { mutableStateOf(false) }
+    var loading by remember(songId, commentThreadId) { mutableStateOf(true) }
+    var loadingMore by remember(songId, commentThreadId) { mutableStateOf(false) }
+    var hasMore by remember(songId, commentThreadId) { mutableStateOf(true) }
+    var failed by remember(songId, commentThreadId) { mutableStateOf(false) }
+    var requestVersion by remember(songId, commentThreadId) { mutableIntStateOf(0) }
     // v2 cursor 分页:服务端算好下一页游标,透传即可(null=没有更多);
     // pageNo 必须随页递增(恒 1 时服务端无视 cursor 原样返回第一页,探针实证)
-    var cursor by remember { mutableStateOf<String?>(null) }
-    var pageNo by remember { mutableStateOf(1) }
+    var cursor by remember(songId, commentThreadId) { mutableStateOf<String?>(null) }
+    var pageNo by remember(songId, commentThreadId) { mutableStateOf(1) }
     // 楼中楼:同时只展开一条,收起即清
-    var expandedCommentId by remember { mutableStateOf<Long?>(null) }
-    var floorComments by remember { mutableStateOf<List<com.maxrave.domain.data.entities.NeteaseSongInfoEntity.HotComment>>(emptyList()) }
-    var floorCursor by remember { mutableStateOf<Long?>(null) }
-    var floorLoading by remember { mutableStateOf(false) }
-    var floorFailed by remember { mutableStateOf(false) }
+    var expandedCommentId by remember(songId, commentThreadId) { mutableStateOf<Long?>(null) }
+    var floorComments by remember(songId, commentThreadId) {
+        mutableStateOf<List<com.maxrave.domain.data.entities.NeteaseSongInfoEntity.HotComment>>(emptyList())
+    }
+    var floorCursor by remember(songId, commentThreadId) { mutableStateOf<Long?>(null) }
+    var floorLoading by remember(songId, commentThreadId) { mutableStateOf(false) }
+    var floorFailed by remember(songId, commentThreadId) { mutableStateOf(false) }
 
     fun loadFirst(target: NeteaseCommentSort) {
-        if (loading) return
+        if (isPodcast && commentThreadId == null) { failed = true; return }
+        if (loading && requestVersion != 0) return
         loading = true
         failed = false
         cursor = null
         pageNo = 1
+        requestVersion += 1
+        val version = requestVersion
         coroutineScope.launch {
             val page =
                 neteaseRepository.getSongCommentsPage(
@@ -4695,9 +4723,9 @@ fun NeteaseCommentsSheet(
                     sortType = target.wire,
                     cursor = target.firstCursor,
                     pageNo = 1,
-                    // ""=反查未命中的哨兵,按无 threadId 处理回退歌曲线程
                     threadId = commentThreadId,
                 )
+            if (version != requestVersion) return@launch
             if (page == null) {
                 failed = true
             } else {
@@ -4716,11 +4744,13 @@ fun NeteaseCommentsSheet(
     }
 
     fun loadMore() {
+        if (isPodcast && commentThreadId == null) return
         com.maxrave.logger.Logger.w("NeteaseComments", "loadMore called: loading=$loading loadingMore=$loadingMore hasMore=$hasMore cursor=$cursor size=${comments.size}")
         if (loading || loadingMore || !hasMore) return
         val next = cursor ?: return
         loadingMore = true
         pageNo += 1
+        val version = requestVersion
         coroutineScope.launch {
             val page =
                 neteaseRepository.getSongCommentsPage(
@@ -4730,6 +4760,7 @@ fun NeteaseCommentsSheet(
                     pageNo = pageNo,
                     threadId = commentThreadId,
                 )
+            if (version != requestVersion) return@launch
             if (page == null) {
                 failed = true
                 pageNo -= 1
@@ -4765,6 +4796,7 @@ fun NeteaseCommentsSheet(
         time: Long,
         isFirstPage: Boolean,
     ) {
+        if (isPodcast && commentThreadId == null) return
         if (floorLoading) return
         floorLoading = true
         floorFailed = false
@@ -4789,7 +4821,7 @@ fun NeteaseCommentsSheet(
     }
 
     // 点赞乐观更新+失败回退:服务端按账号/设备可能风控拒绝(250"存在安全风险"等)
-    var likePending by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    var likePending by remember(songId, commentThreadId) { mutableStateOf<Set<Long>>(emptySet()) }
 
     fun toggleLike(
         comment: com.maxrave.domain.data.entities.NeteaseSongInfoEntity.HotComment,
@@ -4797,11 +4829,10 @@ fun NeteaseCommentsSheet(
     ) {
         val id = comment.commentId ?: return
         if (id in likePending) return
-        // 节目线程(A_DJ_1)的 like 写通道未验证支持——禁用防"显示成功实则失败"。
-        // (runBlocking 取串:本函数非 Composable,stringResource 不可用)
-        if (isPodcast || (!isMv && threadId != null)) {
+        // 节目线程未解析时禁止回退到 mainSong 的歌曲评论。
+        if (isPodcast && commentThreadId == null) {
             showToast(
-                message = runBlocking { getString(Res.string.podcast_comment_like_unsupported) },
+                message = runBlocking { getString(Res.string.netease_action_failed) },
                 duration = ToastDuration.Short,
                 gravity = ToastGravity.Bottom,
             )
@@ -4844,21 +4875,27 @@ fun NeteaseCommentsSheet(
     }
 
     LaunchedEffect(songId, commentThreadId) {
-        // 播客 threadId 是面板打开后才反查的:在途(null)不首发,落地(含 "" 未命中)再载
-        if (isPodcast && threadId == null) return@LaunchedEffect
+        // 播客 threadId 缺失时绝不请求歌曲线程。
+        if (isPodcast && commentThreadId == null) {
+            if (threadId != null) failed = true
+            return@LaunchedEffect
+        }
         loadFirst(sort)
     }
 
     // 发表/回复评论:官方交互=点评论弹回复框;对话框形态(居中 AlertDialog)避开
     // ModalBottomSheet 内 IME inset 不可用的已知问题
-    var showPostDialog by remember { mutableStateOf(false) }
-    var replyTarget by remember { mutableStateOf<com.maxrave.domain.data.entities.NeteaseSongInfoEntity.HotComment?>(null) }
-    var postText by remember { mutableStateOf("") }
-    var posting by remember { mutableStateOf(false) }
+    var showPostDialog by remember(songId, commentThreadId) { mutableStateOf(false) }
+    var replyTarget by remember(songId, commentThreadId) {
+        mutableStateOf<com.maxrave.domain.data.entities.NeteaseSongInfoEntity.HotComment?>(null)
+    }
+    var postText by remember(songId, commentThreadId) { mutableStateOf("") }
+    var posting by remember(songId, commentThreadId) { mutableStateOf(false) }
     val postSuccessText = stringResource(Res.string.post_comment_success)
     val waitingToSyncText = stringResource(Res.string.comment_waiting_to_sync)
 
     fun submitPost() {
+        if (isPodcast && commentThreadId == null) return
         val text = postText.trim()
         if (text.isEmpty() || posting) return
         val target = replyTarget
@@ -4975,9 +5012,8 @@ fun NeteaseCommentsSheet(
                 ) {}
                 Text(
                     text =
-                        // 节目评论计数与歌曲不同源,入参(歌曲详情卡)对节目恒不可信(实测 0)——
-                        // 节目态不带数字
-                        if (isPodcast) {
+                        // 三类评论只在对应线程拿到正数时显示数字；未知和 0 都只显示“评论”。
+                        if (knownServerCount == null || displayTotalCount <= 0) {
                             stringResource(Res.string.comment_label)
                         } else {
                             stringResource(
@@ -5048,8 +5084,12 @@ fun NeteaseCommentsSheet(
                                 if (available.y > 0) available else Velocity.Zero
                         }
                     }
+                val commentListState = remember(songId, commentThreadId, sort) {
+                    androidx.compose.foundation.lazy.LazyListState()
+                }
                 LazyColumn(
                     modifier = Modifier.weight(1f).nestedScroll(listGestureSink),
+                    state = commentListState,
                     contentPadding = PaddingValues(vertical = 6.dp),
                 ) {
                     items(pendingLocalComments + comments) { comment ->
@@ -5311,8 +5351,7 @@ fun NeteaseCommentsSheet(
                         }
                     }
                 }
-                // 节目评论发布写通道未验证——输入栏整行隐藏(2026-09-29)
-                if (!isPodcast && (threadId == null || isMv)) Row(
+                if ((!isPodcast && (threadId == null || isMv)) || (isPodcast && commentThreadId != null)) Row(
                     modifier =
                         Modifier
                             .fillMaxWidth()

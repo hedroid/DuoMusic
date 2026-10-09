@@ -49,6 +49,7 @@ import kotlinx.coroutines.flow.lastOrNull
 import kotlinx.coroutines.flow.singleOrNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import org.koin.core.component.inject
 import simpmusic.composeapp.generated.resources.Res
 import simpmusic.composeapp.generated.resources.added_to_playlist
@@ -72,6 +73,8 @@ import simpmusic.composeapp.generated.resources.removed_download
 import simpmusic.composeapp.generated.resources.removed_from_YouTube_playlist
 import simpmusic.composeapp.generated.resources.share_url
 import simpmusic.composeapp.generated.resources.sleep_timer_off_done
+import simpmusic.composeapp.generated.resources.liked_toast
+import simpmusic.composeapp.generated.resources.unliked_toast
 
 class NowPlayingBottomSheetViewModel(
     private val dataStoreManager: DataStoreManager,
@@ -301,6 +304,8 @@ class NowPlayingBottomSheetViewModel(
         val songOrNowPlaying = songEntity ?: (nowPlaying.songEntity?.let { current ->
             if (currentMvId != null) current.copy(videoId = currentMvId) else current
         } ?: return)
+        val programId = songOrNowPlaying.neteaseProgramId
+            ?: nowPlaying.track?.takeIf { it.videoId == songOrNowPlaying.videoId }?.neteaseProgramId
         loadNeteasePlaylists(songOrNowPlaying.videoId.toLongOrNull() != null)
         if (songOrNowPlaying.videoId.startsWith(NETEASE_MV_MEDIA_ID_PREFIX)) {
             // MV 不属于歌曲库:菜单使用队列实体，已有下载行只读观察，绝不插入 song 表。
@@ -327,6 +332,8 @@ class NowPlayingBottomSheetViewModel(
             }
             return
         }
+        // 先落目标身份再拉云端态：云端回包快于 Room 行时，菜单也不能把节目误判成歌曲。
+        _uiState.update { it.copy(songUIState = songOrNowPlaying.toSheetSongState().copy(neteaseProgramId = programId)) }
         viewModelScope.launch {
             _uiState.update { state ->
                 state.copy(
@@ -338,10 +345,10 @@ class NowPlayingBottomSheetViewModel(
             }
             songRepository.getSongById(songOrNowPlaying.videoId).lastOrNull().let { song ->
                 if (song != null) {
-                    getSongEntityFlow(videoId = song.videoId)
+                    getSongEntityFlow(videoId = song.videoId, programId = song.neteaseProgramId ?: programId)
                 } else {
                     songRepository.insertSong(songOrNowPlaying).singleOrNull()?.let {
-                        getSongEntityFlow(videoId = songOrNowPlaying.videoId)
+                        getSongEntityFlow(videoId = songOrNowPlaying.videoId, programId = programId)
                     }
                 }
             }
@@ -354,6 +361,8 @@ class NowPlayingBottomSheetViewModel(
      */
     private val _cloudLiked = MutableStateFlow<Boolean?>(null)
     val cloudLiked: StateFlow<Boolean?> = _cloudLiked
+    private val _programLikePending = MutableStateFlow(false)
+    val programLikePending: StateFlow<Boolean> = _programLikePending
     private var cloudLikeJob: Job? = null
 
     /**
@@ -367,11 +376,15 @@ class NowPlayingBottomSheetViewModel(
             id.isNotEmpty() && downloadUtils.isVideoQueuedOrDownloading(id)
         }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
-    private fun refreshCloudLiked(videoId: String) {
+    private fun refreshCloudLiked(videoId: String, programId: Long? = null) {
         cloudLikeJob?.cancel()
         _cloudLiked.value = null
         cloudLikeJob = viewModelScope.launch {
-            if (videoId.startsWith(NETEASE_MV_MEDIA_ID_PREFIX)) {
+            if (programId != null) {
+                if (neteaseRepository.isLoggedIn.first()) {
+                    _cloudLiked.value = neteaseRepository.getDjProgramLikeInfo(programId).getOrNull()?.liked
+                }
+            } else if (videoId.startsWith(NETEASE_MV_MEDIA_ID_PREFIX)) {
                 val mvid = videoId.removePrefix(NETEASE_MV_MEDIA_ID_PREFIX).toLongOrNull() ?: return@launch
                 // 正在播的 MV:跟播放页状态流(对账回写即时反映);列表行菜单里的
                 // 非播放行播放页流覆盖不到,一次性拉 mv/detail 的 subed 兜底——
@@ -407,10 +420,10 @@ class NowPlayingBottomSheetViewModel(
         downloadedVideoFilePath = downloadedVideoFilePath,
     )
 
-    private fun getSongEntityFlow(videoId: String) {
+    private fun getSongEntityFlow(videoId: String, programId: Long? = null) {
         getSongAsFlow?.cancel()
         if (videoId.isEmpty()) return
-        refreshCloudLiked(videoId)
+        refreshCloudLiked(videoId, programId)
         getSongAsFlow =
             viewModelScope.launch {
                 songRepository.getSongAsFlow(videoId).collectLatest { song ->
@@ -434,7 +447,7 @@ class NowPlayingBottomSheetViewModel(
                                                 Album(name = name, id = song.albumId ?: "")
                                             },
                                         videoType = song.videoType,
-                                        neteaseProgramId = song.neteaseProgramId,
+                                        neteaseProgramId = song.neteaseProgramId ?: programId,
                                         downloadedVideoFilePath = song.downloadedVideoFilePath,
                                     ),
                             )
@@ -512,6 +525,46 @@ class NowPlayingBottomSheetViewModel(
                 }
 
                 is NowPlayingBottomSheetUIEvent.ToggleLike -> {
+                    if (songUIState.neteaseProgramId == null &&
+                        mediaPlayerHandler.queueData.value?.data?.takeIf { it.isNeteasePodcastQueue }
+                            ?.listTracks?.any { it.videoId == songUIState.videoId } == true
+                    ) {
+                        makeToast(getString(Res.string.cloud_action_failed_netease))
+                        return@launch
+                    }
+                    songUIState.neteaseProgramId?.let { programId ->
+                        val current = _cloudLiked.value ?: return@launch
+                        if (_programLikePending.value) return@launch
+                        _programLikePending.value = true
+                        try {
+                            val target = !current
+                            val playing = sharedViewModel.nowPlayingState.value?.let {
+                                (it.songEntity?.videoId ?: it.track?.videoId) == songUIState.videoId
+                            } == true
+                            if (playing && sharedViewModel.remoteSongLikeState.value.pending) return@launch
+                            val written = if (playing) {
+                                sharedViewModel.setRemoteSongLiked(target, songUIState.videoId)
+                                true
+                            } else {
+                                neteaseRepository.setDjProgramLiked(programId, target).isSuccess
+                            }
+                            var settled: Boolean? = null
+                            for (attempt in 0 until 10) {
+                                delay(800)
+                                settled = neteaseRepository.getDjProgramLikeInfo(programId).getOrNull()?.liked
+                                if (settled == target || !written) break
+                            }
+                            if (settled != null) _cloudLiked.value = settled
+                            if (!playing) {
+                                makeToast(getString(if (written && settled == target) {
+                                    if (target) Res.string.liked_toast else Res.string.unliked_toast
+                                } else Res.string.cloud_action_failed_netease))
+                            }
+                        } finally {
+                            _programLikePending.value = false
+                        }
+                        return@launch
+                    }
                     if (songUIState.videoId.startsWith(NETEASE_MV_MEDIA_ID_PREFIX)) {
                         // 显式传目标:列表行菜单打开的 sheet 里这行未必在播,
                         // 不传会错打到 nowPlayingState 的当前曲

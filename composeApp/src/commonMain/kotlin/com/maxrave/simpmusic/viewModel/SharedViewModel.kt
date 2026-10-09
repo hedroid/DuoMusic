@@ -829,6 +829,12 @@ class SharedViewModel(
     /** 网易歌详情卡:艺人(头像/粉丝)+专辑(发行/简介)+评论(总数/热评),各路独立降级 */
     private var neteaseSongInfoJob: Job? = null
 
+    private fun playingPodcastProgramId(videoId: String): Long? {
+        return nowPlayingState.value?.track?.takeIf { it.videoId == videoId }?.neteaseProgramId
+            ?: nowPlayingState.value?.songEntity?.takeIf { it.videoId == videoId }?.neteaseProgramId
+            ?: mediaPlayerHandler.queueData.value?.data?.listTracks?.firstOrNull { it.videoId == videoId }?.neteaseProgramId
+    }
+
     /**
      * 红心=云端账号状态(云端是唯一事实源):切歌时拉云端态,驱动显示与本地缓存镜像
      * (song.liked 行,库页"喜欢的歌曲"等本地视图读它)。未登录/拉取失败时保持本地
@@ -838,6 +844,28 @@ class SharedViewModel(
         _remoteSongLikeState.value = RemoteSongLikeState(videoId = song.videoId)
         // MV 收藏态由 getNeteaseMvData 的 subed 驱动,不走歌曲云端红心(YT 端点对 MV id 白打)
         if (song.videoId.startsWith(NETEASE_MV_MEDIA_ID_PREFIX)) return
+        if (song.neteaseProgramId != null || mediaPlayerHandler.queueData.value?.data?.isNeteasePodcastQueue == true) {
+            val programId = song.neteaseProgramId ?: playingPodcastProgramId(song.videoId) ?: return
+            viewModelScope.launch {
+                val liked = neteaseRepository.getDjProgramLikeInfo(programId).getOrNull()?.liked
+                if (playingMediaId() == song.videoId) {
+                    _remoteSongLikeState.value = RemoteSongLikeState(liked = liked, videoId = song.videoId)
+                    if (liked != null) {
+                        _liked.value = liked
+                        mediaPlayerHandler.like(liked)
+                    }
+                }
+                // 镜像回写 Room(歌曲分支同款):handler 的曲目装载/通知刷新路径都读
+                // song.liked,不回写的话云端真值落地后 100ms 内就会被 Room 旧值翻回
+                if (liked != null) {
+                    val localLiked = songRepository.getSongById(song.videoId).lastOrNull()?.liked == true
+                    if (localLiked != liked) {
+                        songRepository.setLikedLocal(song.videoId, if (liked) 1 else 0)
+                    }
+                }
+            }
+            return
+        }
         viewModelScope.launch {
             val cloudLiked = songRepository.getRemoteLikeStatus(song.videoId)
             _remoteSongLikeState.value = RemoteSongLikeState(liked = cloudLiked, videoId = song.videoId)
@@ -875,8 +903,51 @@ class SharedViewModel(
         liked: Boolean,
         videoId: String? = null,
     ) {
-        val targetId = videoId ?: nowPlayingState.value?.songEntity?.videoId ?: return
+        val targetId = videoId ?: nowPlayingState.value?.songEntity?.videoId ?: nowPlayingState.value?.track?.videoId ?: return
         val isPlayingTarget = playingMediaId() == targetId
+        if (isPlayingTarget && mediaPlayerHandler.queueData.value?.data?.isNeteasePodcastQueue == true && playingPodcastProgramId(targetId) == null) {
+            makeToast(getString(Res.string.cloud_action_failed_netease))
+            return
+        }
+        val programId = if (isPlayingTarget) playingPodcastProgramId(targetId) else null
+        if (programId != null) {
+            if (!neteaseLoggedIn.value) {
+                notifyFavoriteNeedsLogin()
+                return
+            }
+            if (_remoteSongLikeState.value.pending) return
+            _remoteSongLikeState.value = _remoteSongLikeState.value.copy(pending = true, failed = false, videoId = targetId)
+            viewModelScope.launch {
+                val written = neteaseRepository.setDjProgramLiked(programId, liked).isSuccess
+                var confirmed: Boolean? = null
+                // 节目资源赞是异步落地；2026-10-09 探针观察到即时详情仍是旧态。
+                for (attempt in 0 until 10) {
+                    delay(800)
+                    confirmed = neteaseRepository.getDjProgramLikeInfo(programId).getOrNull()?.liked
+                    if (confirmed == liked || !written) break
+                }
+                val success = written && confirmed == liked
+                // 镜像回写 Room(歌曲写路径同款):写已确认落服务端,不回写的话 handler
+                // 任意一次 Room 读都会把显示翻回旧值(节目赞此前不落库的根因)
+                if (confirmed != null) {
+                    songRepository.setLikedLocal(targetId, if (confirmed) 1 else 0)
+                }
+                if (playingMediaId() == targetId && playingPodcastProgramId(targetId) == programId) {
+                    if (confirmed != null) {
+                        _liked.value = confirmed
+                        mediaPlayerHandler.like(confirmed)
+                    }
+                    _remoteSongLikeState.value = RemoteSongLikeState(
+                        liked = confirmed,
+                        pending = false,
+                        failed = !success,
+                        videoId = targetId,
+                    )
+                }
+                makeToast(getString(if (success) { if (liked) Res.string.liked_toast else Res.string.unliked_toast } else Res.string.cloud_action_failed_netease))
+            }
+            return
+        }
         // 网易 MV:红心=收藏/取消收藏 MV。**服务端对账模式**:写操作后一律重拉 mvDetail
         // 的 subed 驱动显示,避免写入延迟或服务端拒绝时本地状态误报成功。
         if (targetId.startsWith(NETEASE_MV_MEDIA_ID_PREFIX)) {

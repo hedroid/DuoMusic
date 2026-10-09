@@ -176,13 +176,20 @@ fun MiniPlayer(
     val nowPlayingVideoIdMini =
         sharedViewModel.nowPlayingState.collectAsStateWithLifecycle(initialValue = null).value
             ?.let { it.songEntity?.videoId ?: it.track?.videoId }
-    val likeEnabledMini =
-        if (nowPlayingVideoIdMini?.toLongOrNull() != null) miniNeteaseLoggedIn else miniYtLoggedIn
-    // 播客节目(剧集):歌曲红心链路对节目无效(/song/like 报 524)——迷你条红心隐藏。
+    // 播客节目走 A_DJ_1_ 资源点赞；只有读到节目身份与云端态才允许切换。
     // 判定只认 NETEASE_PODCAST_ 前缀(QueueData.isNeteasePodcastQueue,CR-22):
     // 旧"全数字+单一 album.id"指纹与普通网易专辑整队同形,会把专辑队列的红心一并误伤
-    val isPodcastMini =
+    val queuePodcastMini =
         sharedViewModel.getQueueDataState().collectAsStateWithLifecycle(initialValue = null).value?.data?.isNeteasePodcastQueue == true
+    val miniNowPlaying = sharedViewModel.nowPlayingState.collectAsStateWithLifecycle(initialValue = null).value
+    val miniRemoteLike by sharedViewModel.remoteSongLikeState.collectAsStateWithLifecycle()
+    val miniProgramId = miniNowPlaying?.track?.neteaseProgramId ?: miniNowPlaying?.songEntity?.neteaseProgramId
+    val isPodcastMini = queuePodcastMini || miniProgramId != null
+    val likeEnabledMini =
+        if (isPodcastMini) {
+            miniNeteaseLoggedIn && miniRemoteLike.videoId == nowPlayingVideoIdMini && miniRemoteLike.liked != null &&
+                !miniRemoteLike.pending && miniProgramId != null
+        } else if (nowPlayingVideoIdMini?.toLongOrNull() != null) miniNeteaseLoggedIn else miniYtLoggedIn
     val timelineState by sharedViewModel.timeline.collectAsStateWithLifecycle()
     // The Desktop capsule's quality line between its timestamps — see toAudioQualityLabel.
     val formatState by sharedViewModel.format.collectAsStateWithLifecycle(initialValue = null)
@@ -543,8 +550,8 @@ fun MiniPlayer(
                     // Flat: 40dp in the 56dp pill leaves an even 8dp ring.
                     val controlSize = if (isFlat) 40.dp else 48.dp
                     val playColor = if (isFlat) MaterialTheme.colorScheme.onPrimary else textColor
-                    // 播客态整格隐藏:flat 变体的圆形底色属于容器而非红心,单藏红心会剩一个空圈
-                    if (!isPodcastMini) {
+                    // 节目赞复用红心槽位，写入目标由 SharedViewModel 按节目 id 分流。
+                    run {
                         Spacer(modifier = Modifier.width(if (isFlat) 8.dp else 15.dp))
                         // background(shape), not clip: the heart's like-burst draws outside its bounds.
                         Box(
@@ -1002,7 +1009,7 @@ fun MiniPlayer(
                     // glyph the neighbouring icons draw at — 26 left an 18dp heart that read
                     // as extra padding around a smaller icon.
                     Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
-                        if (!isPodcastMini) HeartCheckBox(
+                        HeartCheckBox(
                             checked = controllerState.isLiked,
                             size = 32,
                             enabled = likeEnabledMini,

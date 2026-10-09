@@ -382,7 +382,7 @@ internal fun AppleMusicHeaderActions(
         val likeBurst = rememberHeartBurstState()
         // 红心(星)=云端账号喜欢态;未登录源置灰,点击提示登录
         run {
-            if (!state.isPodcastSong) Box(
+            Box(
                 modifier =
                     Modifier
                         .appleMusicPressInflate()

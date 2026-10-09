@@ -673,6 +673,10 @@ fun NowPlayingScreenContent(
     if (screenDataState.lyricsData != null && controllerState.isPlaying) {
         KeepScreenOn()
     }
+    val playingProgramId = mediaPlayerHandler.nowPlayingState.value.track?.neteaseProgramId
+        ?: mediaPlayerHandler.nowPlayingState.value.songEntity?.neteaseProgramId
+        ?: mediaPlayerHandler.queueData.value?.data?.listTracks?.firstOrNull { it.videoId == nowPlayingVideoId }?.neteaseProgramId
+    val isPodcastEpisode = mediaPlayerHandler.queueData.value?.data?.isNeteasePodcastQueue == true || playingProgramId != null
     val state =
         NowPlayingContentState(
             screenData = screenDataState,
@@ -683,11 +687,14 @@ fun NowPlayingScreenContent(
             shouldShowVideo = shouldShowVideo || isNeteaseMv ||
                 com.maxrave.domain.data.player.ExplicitVideoPlayback.includes(nowPlayingVideoId),
             isNeteaseSong = nowPlayingVideoId?.toLongOrNull() != null || isNeteaseMv,
-            isPodcastSong = mediaPlayerHandler.queueData.value?.data?.isNeteasePodcastQueue == true,
+            isPodcastSong = isPodcastEpisode,
             remoteLikeState = remoteLikeState,
             // 红心=云端态;未登录源置灰(点击提示登录);MV 红心=收藏,吃网易登录态
             likeEnabled =
-                if (nowPlayingVideoId?.toLongOrNull() != null || isNeteaseMv) {
+                if (isPodcastEpisode) {
+                    neteaseLoggedIn && remoteLikeState.videoId == nowPlayingVideoId && remoteLikeState.liked != null &&
+                        !remoteLikeState.pending && playingProgramId != null
+                } else if (nowPlayingVideoId?.toLongOrNull() != null || isNeteaseMv) {
                     neteaseLoggedIn
                 } else {
                     isUserLoggedIn
@@ -920,23 +927,29 @@ fun NowPlayingScreenContent(
     // 已打开"时进行(CR-23)——旧实现按每首网易歌切歌都拿 album.id 当 radioId 最多
     // 翻 5 页,普通歌曲纯浪费且挤占 byradio 限流队列;队列判定只认前缀(身份三键
     // 持久化后恢复路径带前缀,不再有 SAVED_QUEUE 丢前缀的老问题)。
-    // 值语义:null=反查在途(面板等落地才首发,防首载走错线程) / ""=完成但未命中
-    // (回退歌曲线程——空数据总比错线程好) / A_DJ_1_<id>=命中。
+    // 值语义:null=反查在途 / ""=完成但未命中(只显示失败,绝不写歌曲线程)
+    // / A_DJ_1_<id>=命中。队列 Track 带 programId 时直接 O(1) 命中。
     val podcastProgramThreadId =
         produceState<String?>(
             null,
             nowPlayingVideoId,
-            queueDataState?.data?.isNeteasePodcastQueue,
+            isPodcastEpisode,
+            playingProgramId,
             showNeteaseComments,
         ) {
             val vid = nowPlayingVideoId ?: return@produceState
-            if (!showNeteaseComments || queueDataState?.data?.isNeteasePodcastQueue != true) {
+            if (!showNeteaseComments || !isPodcastEpisode) {
+                return@produceState
+            }
+            val directId = playingProgramId
+            if (directId != null) {
+                value = "A_DJ_1_$directId"
                 return@produceState
             }
             val radioId =
                 mediaPlayerHandler.queueData.value?.data?.listTracks
                     ?.firstOrNull { it.videoId == vid }?.album?.id?.toLongOrNull()
-                    ?: return@produceState
+                    ?: run { value = ""; return@produceState }
             com.maxrave.logger.Logger.w("PodcastComments", "resolving programId for $vid in radio $radioId")
             var found: Long? = null
             var offset = 0
@@ -963,17 +976,14 @@ fun NowPlayingScreenContent(
             songId =
                 if (isNeteaseMv) nowPlayingVideoId.orEmpty()
                 else mediaPlayerHandler.nowPlayingState.value.songEntity?.videoId ?: nowPlayingVideoId.orEmpty(),
-            // MV:详情响应直接带 R_MV_5_<mvid>,零反查
-            totalCount =
-                if (isNeteaseMv) screenDataState.neteaseMvData?.commentCount?.toInt() ?: 0
-                else screenDataState.neteaseSongData?.commentCount ?: 0,
+            // MV:详情响应直接带 R_MV_5_<mvid>,零反查；计数由评论线程响应提供。
             threadId =
                 if (isNeteaseMv) {
                     screenDataState.neteaseMvData?.commentThreadId ?: ""
                 } else {
                     podcastProgramThreadId.value
                 },
-            isPodcast = mediaPlayerHandler.queueData.value?.data?.isNeteasePodcastQueue == true,
+            isPodcast = isPodcastEpisode,
         )
     }
 

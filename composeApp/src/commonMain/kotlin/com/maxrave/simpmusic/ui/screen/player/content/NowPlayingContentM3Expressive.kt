@@ -761,8 +761,8 @@ internal fun ExpressiveTrackInfoRow(
             }
         }
         Spacer(modifier = Modifier.size(8.dp))
-        // 红心=云端账号喜欢态;未登录源置灰;播客节目隐藏(歌曲红心对节目 524)
-        if (!state.isPodcastSong) run {
+        // 播客节目由 SharedViewModel 分流到 A_DJ_1_ 资源赞。
+        run {
         val likeBurst = rememberHeartBurstState()
         Box(modifier = Modifier.size(48.dp).heartBurst(likeBurst).alpha(if (state.likeEnabled) 1f else 0.38f)) {
             FilledIconToggleButton(
