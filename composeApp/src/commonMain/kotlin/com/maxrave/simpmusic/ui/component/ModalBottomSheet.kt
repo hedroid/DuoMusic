@@ -2450,9 +2450,9 @@ fun NowPlayingBottomSheet(
                     // 云盘页单曲菜单(onDeleteFromCloudDisk 仅云盘页传入)。探针实证
                     // simpleSong 三形状:①完整库元数据;②匹配但 ar/al 只有名字 id=0
                     // (core 已剥成 null);③未匹配=ar/al 整个缺席(艺人列表为空)。
-                    // ③=私人文件,不开放曲库功能——分享会生成私人 id 冒充的公开链接,
-                    // 点赞/加网易歌单/相似歌曲/电台/看 MV 的服务端语义只对曲库 id 成立
-                    // (私人文件行为未实测)。①②已匹配,曲库功能照常。
+                    // ③=私人文件,连点赞/加歌单也不开放(写类语义未实测);
+                    // ①②已匹配,点赞(写入往返探针实证有效)/加歌单照常。
+                    // 电台/相似/看MV/分享对全部云盘歌曲隐藏(见各条目注释)。
                     val isCloudDiskPage = onDeleteFromCloudDisk != null
                     val isCloudPrivateFile =
                         isCloudDiskPage && uiState.songUIState.listArtists.isEmpty()
@@ -2727,7 +2727,9 @@ fun NowPlayingBottomSheet(
                             navController.navigate(AlbumDestination(browseId = id))
                         }
                     }
-                    if (!isPodcastQueue && !isNeteaseMvSong && !isCloudPrivateFile) ActionButton(
+                    // 云盘歌曲整组隐藏(2026-10-10 探针+用户实测:simiSong 对云盘 id 恒空,
+                    // 电台起播即空转;id 能查详情但电台/相似体验=无效)
+                    if (!isPodcastQueue && !isNeteaseMvSong && !isCloudDiskPage) ActionButton(
                         icon = SimpIcons.Sensors,
                         text = Res.string.start_radio,
                     ) {
@@ -2739,10 +2741,9 @@ fun NowPlayingBottomSheet(
                         )
                         hideModalBottomSheet()
                     }
-                    // 网易歌独有:simiSong 相似歌曲列表页(2026-09-25 落地,2026-09-15 曾从
-                    // 详情卡摘除的入口以独立页形态回归);YT 歌的相似=电台,无列表形态;
-                    // 云盘私人文件的 simiSong 语义未实测,不开放
-                    if (uiState.songUIState.videoId.toLongOrNull() != null && !isPodcastQueue && !isCloudPrivateFile) {
+                    // 网易歌独有:simiSong 相似歌曲列表页(2026-09-25 落地);YT 歌的相似=
+                    // 电台,无列表形态;云盘歌曲 simiSong 恒空(探针实证)不开放
+                    if (uiState.songUIState.videoId.toLongOrNull() != null && !isPodcastQueue && !isCloudDiskPage) {
                         ActionButton(
                             icon = SimpIcons.LibraryMusic,
                             text = Res.string.similar_songs,
@@ -2776,9 +2777,8 @@ fun NowPlayingBottomSheet(
                             }
                         }
                     }
-                    // 网易歌独有:看 MV(歌曲→mv 字段解析,详情拉取后单 MV 队列起播);
-                    // 云盘私人文件查不到曲库 mv 字段,不开放
-                    if (uiState.songUIState.videoId.toLongOrNull() != null && !isPodcastQueue && !isCloudPrivateFile) {
+                    // 网易歌独有:看 MV(歌曲→mv 字段解析);云盘歌曲查不到曲库 mv,不开放
+                    if (uiState.songUIState.videoId.toLongOrNull() != null && !isPodcastQueue && !isCloudDiskPage) {
                         ActionButton(
                             icon = SimpIcons.Movie,
                             text = Res.string.watch_mv,
@@ -2858,9 +2858,9 @@ fun NowPlayingBottomSheet(
                             }
                         }
                     }
-                    // 云盘私人文件:videoId 是云盘私有 id,生成的 music.163.com/song?id=
-                    // 链接不是有效公开链接——不开放分享
-                    if (!isCloudPrivateFile) {
+                    // 云盘歌曲:不开放分享(2026-10-10 用户定案——id 虽能查详情,
+                    // 但按无效处理与电台/相似/看MV 一并隐藏)
+                    if (!isCloudDiskPage) {
                         ActionButton(
                             icon = SimpIcons.Share,
                             text = Res.string.share,

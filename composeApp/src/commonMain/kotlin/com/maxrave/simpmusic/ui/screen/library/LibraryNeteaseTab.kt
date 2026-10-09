@@ -504,7 +504,9 @@ private fun CloudDiskRow(
                 error = remember { cloudCoverPainter() },
                 modifier = Modifier.matchParentSize(),
             )
-            // 云朵印章:仅真有歌曲封面时叠印(兜底牌面自带云朵,叠了变双云)
+            // 云朵印章:仅真有歌曲封面时叠印(兜底牌面自带云朵,叠了变双云)。
+            // 尺寸对标红心歌单封面的心形视觉大小(2026-10-10 用户问:实测心形宽
+            // ≈封面的 35-40%,Material cloud 图标扁宽 ~2:1,取 44x22dp→宽≈39%)
             if (coverUrl != null) {
                 Icon(
                     imageVector = SimpIcons.Cloud,
@@ -513,7 +515,7 @@ private fun CloudDiskRow(
                     modifier =
                         Modifier
                             .align(Alignment.Center)
-                            .size(44.dp),
+                            .size(width = 44.dp, height = 22.dp),
                 )
             }
         }
