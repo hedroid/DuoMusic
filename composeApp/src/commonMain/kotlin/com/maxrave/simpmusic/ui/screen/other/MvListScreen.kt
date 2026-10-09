@@ -240,6 +240,16 @@ fun MvListScreen(
     var shouldHideTopBar by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(firstItemVisible) { shouldHideTopBar = !firstItemVisible }
 
+    // 打开搜索=先拉全再过滤+滚回顶部(歌单页 getFullTracks+scrollToItem 同款):
+    // 收藏总数大于已加载页数时只过滤已加载条目会漏结果;列表停在深处时搜索态
+    // 顶部换成 Spacer,不回顶视口悬在半空。withAllMvs 与近底翻页在 VM 锁内串行
+    LaunchedEffect(showSearchBar) {
+        if (showSearchBar) {
+            viewModel.withAllMvs { }
+            listState.animateScrollToItem(0)
+        }
+    }
+
     val paletteState = rememberPaletteState()
     val headerCover = mvs.firstOrNull()?.thumbnails?.lastOrNull()?.url
     val mutedPaletteBg = paletteState.palette.toImmersiveBackground()
@@ -450,7 +460,10 @@ fun MvListScreen(
                                 modifier =
                                     Modifier
                                         .fillMaxWidth()
-                                        .padding(16.dp),
+                                        .padding(16.dp)
+                                        // statusBars 避让(歌单页同款):不加的话搜索条直接顶进
+                                        // 状态栏,返回/关闭按钮被时间电池图标压住
+                                        .windowInsetsPadding(WindowInsets.statusBars),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 IconButton(onClick = navController::navigateUp) {
