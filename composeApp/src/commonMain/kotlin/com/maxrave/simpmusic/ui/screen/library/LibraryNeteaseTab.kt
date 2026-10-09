@@ -65,7 +65,7 @@ import com.maxrave.simpmusic.ui.navigation.destination.list.PlaylistDestination
 import com.maxrave.simpmusic.ui.screen.home.NeteaseAlbumRow
 import com.maxrave.simpmusic.ui.screen.home.NeteaseArtistRow
 import com.maxrave.simpmusic.ui.theme.LibraryGridDefaults
-import com.maxrave.simpmusic.ui.utils.CloudDiskArt
+import com.maxrave.simpmusic.ui.utils.cloudCoverPainter
 import com.maxrave.simpmusic.ui.theme.typo
 import com.maxrave.logger.Logger
 import org.jetbrains.compose.resources.stringResource
@@ -115,6 +115,8 @@ internal fun LibraryNeteaseTab(
     onCreatePlaylist: (name: String) -> Unit = {},
     /** 收藏的 MV 概要(count+封面);null=尚未拉取(行暂不显示,拉完即常驻,空集也显示) */
     subscribedMv: Pair<Int, String?>? = null,
+    /** 云盘入口封面(第一首歌);null=空云盘/未拉到(云朵兜底) */
+    cloudDiskCover: String? = null,
     onScrolling: (onTop: Boolean) -> Unit = {},
 ) {
     // 长按目标:待确认取消收藏/删除的歌单/专辑(均为写操作,弹窗确认;删除不可逆,文案更强)
@@ -212,6 +214,7 @@ internal fun LibraryNeteaseTab(
                     // 云盘入口(2026-10-09 二轮:红心行上方,云朵封面),点击进云盘伪歌单页
                     item(span = { GridItemSpan(maxLineSpan) }, key = "netease_cloud_disk_row") {
                         CloudDiskRow(
+                            coverUrl = cloudDiskCover,
                             onClick = {
                                 navController.navigate(PlaylistDestination(NETEASE_CLOUD_DISK_PLAYLIST_ID))
                             },
@@ -461,7 +464,10 @@ private fun SubscribedMvRow(
  * (云盘无网络封面);副标题是固定引导文案(不拉云盘列表,数量进详情页才知道)。
  */
 @Composable
-private fun CloudDiskRow(onClick: () -> Unit) {
+private fun CloudDiskRow(
+    coverUrl: String?,
+    onClick: () -> Unit,
+) {
     Row(
         modifier =
             Modifier
@@ -470,28 +476,25 @@ private fun CloudDiskRow(onClick: () -> Unit) {
                 .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
+        // 封面=云盘第一首歌(用户 2026-10-09 定案);空云盘/未拉到落蓝底白云兜底
+        AsyncImage(
+            model =
+                ImageRequest
+                    .Builder(LocalPlatformContext.current)
+                    .data(coverUrl)
+                    .diskCachePolicy(CachePolicy.ENABLED)
+                    .diskCacheKey(coverUrl)
+                    .crossfade(550)
+                    .build(),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            placeholder = remember { cloudCoverPainter() },
+            error = remember { cloudCoverPainter() },
             modifier =
                 Modifier
                     .size(112.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(
-                        Brush.linearGradient(
-                            listOf(
-                                CloudDiskArt.gradientTop,
-                                CloudDiskArt.gradientBottom,
-                            ),
-                        ),
-                    ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = SimpIcons.Cloud,
-                contentDescription = null,
-                tint = CloudDiskArt.cloudTint,
-                modifier = Modifier.size(48.dp),
-            )
-        }
+                    .clip(RoundedCornerShape(10.dp)),
+        )
         Column(
             modifier =
                 Modifier

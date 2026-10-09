@@ -215,6 +215,10 @@ class LibraryViewModel(
     private val _neteaseRefreshing = MutableStateFlow(false)
     val neteaseRefreshing: StateFlow<Boolean> get() = _neteaseRefreshing.asStateFlow()
 
+    /** 云盘入口封面=云盘第一首歌的封面(用户 2026-10-09 定案;null=空云盘/失败,入口行云朵兜底) */
+    private val _cloudDiskCover = MutableStateFlow<String?>(null)
+    val cloudDiskCover: StateFlow<String?> get() = _cloudDiskCover.asStateFlow()
+
     /** 自建网易歌单 ID 集(creatorId==账号 uid);长按"取消收藏"只对收藏歌单露出,自建的不能误删 */
     private val _ownNeteasePlaylistIds = MutableStateFlow<Set<String>>(emptySet())
     val ownNeteasePlaylistIds: StateFlow<Set<String>> get() = _ownNeteasePlaylistIds.asStateFlow()
@@ -546,6 +550,11 @@ class LibraryViewModel(
                 // 空集/失败都回 (0,null),空态由列表页自己表达
                 launch {
                     _subscribedMvSummary.value = neteaseRepository.getMvSublistSummary() ?: (0 to null)
+                }
+                // 云盘入口封面(第一首歌,limit=1 轻拉;失败保持旧值,不阻塞其余分区)
+                launch {
+                    runCatching { neteaseRepository.getCloudDiskCoverUrl() }
+                        .onSuccess { cover -> if (cover != null) _cloudDiskCover.value = cover }
                 }
             }
             _neteaseRefreshing.value = false

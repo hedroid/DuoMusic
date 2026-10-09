@@ -477,53 +477,29 @@ fun PlaylistScreen(
                                                 // Inner Box — backdrop SOURCE (artwork + overlays only, NO glass)
                                                 Box(modifier = Modifier.fillMaxSize().layerBackdrop(artworkBackdrop)) {
                                                     // 头图全屏宽展示,数据侧 URL 只有 544/500 —— 请求侧升 1080
+                                                    // 云盘头图=第一首歌封面(thumbnail 由 VM 填);空云盘/未匹配
+                                                    // 歌无封面,走蓝底白云兜底不落音符占位
                                                     val hiResThumb = data.thumbnail.toHiResArtworkUrl()
-                                                    if (isCloudDisk) {
-                                                        // 云盘无封面:主题渐变+大云朵(库页入口行同款视觉),
-                                                        // 不落 holder 音乐占位图
-                                                        Box(
-                                                            modifier =
-                                                                Modifier
-                                                                    .fillMaxSize()
-                                                                    .background(
-                                                                        Brush.linearGradient(
-                                                                            listOf(
-                                                                                CloudDiskArt.gradientTop,
-                                                                                CloudDiskArt.gradientBottom,
-                                                                            ),
-                                                                        ),
-                                                                    ),
-                                                            contentAlignment = Alignment.Center,
-                                                        ) {
-                                                            Icon(
-                                                                imageVector = SimpIcons.Cloud,
-                                                                contentDescription = null,
-                                                                tint = CloudDiskArt.cloudTint,
-                                                                modifier = Modifier.size(140.dp),
-                                                            )
-                                                        }
-                                                    } else {
-                                                        AsyncImage(
-                                                            model =
-                                                                ImageRequest
-                                                                    .Builder(LocalPlatformContext.current)
-                                                                    .data(hiResThumb)
-                                                                    .diskCachePolicy(CachePolicy.ENABLED)
-                                                                    .memoryCachePolicy(CachePolicy.ENABLED)
-                                                                    .diskCacheKey(hiResThumb)
-                                                                    .memoryCacheKey(hiResThumb)
-                                                                    .crossfade(false)
-                                                                    .build(),
-                                                            placeholder = rememberHolderPainter(),
-                                                            error = rememberHolderPainter(),
-                                                            contentDescription = null,
-                                                            contentScale = ContentScale.Crop,
-                                                            onSuccess = {
-                                                                bitmap = it.result.image.toImageBitmap()
-                                                            },
-                                                            modifier = Modifier.fillMaxSize(),
-                                                        )
-                                                    }
+                                                    AsyncImage(
+                                                        model =
+                                                            ImageRequest
+                                                                .Builder(LocalPlatformContext.current)
+                                                                .data(hiResThumb)
+                                                                .diskCachePolicy(CachePolicy.ENABLED)
+                                                                .memoryCachePolicy(CachePolicy.ENABLED)
+                                                                .diskCacheKey(hiResThumb)
+                                                                .memoryCacheKey(hiResThumb)
+                                                                .crossfade(false)
+                                                                .build(),
+                                                        placeholder = cloudCoverFallback ?: rememberHolderPainter(),
+                                                        error = cloudCoverFallback ?: rememberHolderPainter(),
+                                                        contentDescription = null,
+                                                        contentScale = ContentScale.Crop,
+                                                        onSuccess = {
+                                                            bitmap = it.result.image.toImageBitmap()
+                                                        },
+                                                        modifier = Modifier.fillMaxSize(),
+                                                    )
                                                     // Scrim spans 70% of the artwork (not a fixed 200dp): the
                                                     // shorter the ramp, the steeper the alpha, and a steep ramp
                                                     // is what makes the fade read as an edge. See
@@ -710,56 +686,31 @@ fun PlaylistScreen(
                                                         verticalAlignment = Alignment.Top,
                                                     ) {
                                                         // 280dp≈735px 槽位,同样请求侧升 1080(与竖屏头图同源同缓存)
+                                                        // 云盘头图=第一首歌封面,无封面走蓝底白云兜底
                                                         val landscapeThumb = data.thumbnail.toHiResArtworkUrl()
-                                                        if (isCloudDisk) {
-                                                            // 云盘无封面:渐变+云朵,与竖屏头图/库页入口同款视觉
-                                                            Box(
-                                                                modifier =
-                                                                    Modifier
-                                                                        .size(280.dp)
-                                                                        .clip(RoundedCornerShape(8.dp))
-                                                                        .background(
-                                                                            Brush.linearGradient(
-                                                                                listOf(
-                                                                                    CloudDiskArt.gradientTop,
-                                                                                    CloudDiskArt.gradientBottom,
-                                                                                ),
-                                                                            ),
-                                                                        ),
-                                                                contentAlignment = Alignment.Center,
-                                                            ) {
-                                                                Icon(
-                                                                    imageVector = SimpIcons.Cloud,
-                                                                    contentDescription = null,
-                                                                    tint = CloudDiskArt.cloudTint,
-                                                                    modifier = Modifier.size(120.dp),
-                                                                )
-                                                            }
-                                                        } else {
-                                                            AsyncImage(
-                                                                model =
-                                                                    ImageRequest
-                                                                        .Builder(LocalPlatformContext.current)
-                                                                        .data(landscapeThumb)
-                                                                        .diskCachePolicy(CachePolicy.ENABLED)
-                                                                        .memoryCachePolicy(CachePolicy.ENABLED)
-                                                                        .diskCacheKey(landscapeThumb)
-                                                                        .memoryCacheKey(landscapeThumb)
-                                                                        .crossfade(false)
-                                                                        .build(),
-                                                                placeholder = rememberHolderPainter(),
-                                                                error = rememberHolderPainter(),
-                                                                contentDescription = null,
-                                                                contentScale = ContentScale.Crop,
-                                                                onSuccess = {
-                                                                    bitmap = it.result.image.toImageBitmap()
-                                                                },
-                                                                modifier =
-                                                                    Modifier
-                                                                        .size(280.dp)
-                                                                        .clip(RoundedCornerShape(8.dp)),
-                                                            )
-                                                        }
+                                                        AsyncImage(
+                                                            model =
+                                                                ImageRequest
+                                                                    .Builder(LocalPlatformContext.current)
+                                                                    .data(landscapeThumb)
+                                                                    .diskCachePolicy(CachePolicy.ENABLED)
+                                                                    .memoryCachePolicy(CachePolicy.ENABLED)
+                                                                    .diskCacheKey(landscapeThumb)
+                                                                    .memoryCacheKey(landscapeThumb)
+                                                                    .crossfade(false)
+                                                                    .build(),
+                                                            placeholder = cloudCoverFallback ?: rememberHolderPainter(),
+                                                            error = cloudCoverFallback ?: rememberHolderPainter(),
+                                                            contentDescription = null,
+                                                            contentScale = ContentScale.Crop,
+                                                            onSuccess = {
+                                                                bitmap = it.result.image.toImageBitmap()
+                                                            },
+                                                            modifier =
+                                                                Modifier
+                                                                    .size(280.dp)
+                                                                    .clip(RoundedCornerShape(8.dp)),
+                                                        )
                                                         Column(
                                                             modifier = Modifier.weight(1f),
                                                         ) {

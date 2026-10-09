@@ -702,7 +702,9 @@ class PlaylistViewModel(
                             title = getString(Res.string.cloud_disk),
                             isRadio = false,
                             author = Author(id = "", name = nickname ?: "NetEase Cloud"),
-                            thumbnail = null,
+                            // 头图=第一首歌的封面(用户 2026-10-09 定案;无封面歌走云朵兜底
+                            // painter,调色板自动跟随封面取色)
+                            thumbnail = browse.tracks.firstOrNull()?.thumbnails?.lastOrNull()?.url,
                             description = cloudDiskCapacityText(browse),
                             trackCount = browse.totalCount,
                             year = "",
