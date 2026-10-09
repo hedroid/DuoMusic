@@ -18,11 +18,14 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.exclude
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -66,6 +69,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.BlurredEdgeTreatment
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -100,6 +105,7 @@ import com.maxrave.simpmusic.ui.component.EndOfModalBottomSheet
 import com.maxrave.simpmusic.ui.component.EndOfPage
 import com.maxrave.simpmusic.ui.component.LiquidGlassIconButton
 import com.maxrave.simpmusic.ui.component.NowPlayingBottomSheet
+import com.maxrave.simpmusic.ui.component.RippleIconButton
 import com.maxrave.simpmusic.ui.component.SearchBarEnter
 import com.maxrave.simpmusic.ui.component.SearchBarExit
 import com.maxrave.simpmusic.ui.component.liquidGlass
@@ -466,9 +472,11 @@ fun MvListScreen(
                                         .windowInsetsPadding(WindowInsets.statusBars),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                IconButton(onClick = navController::navigateUp) {
-                                    Icon(SimpIcons.ArrowBackIosNew, null, tint = Color.White)
-                                }
+                            RippleIconButton(
+                                imageVector = SimpIcons.ArrowBackIosNew,
+                            ) {
+                                navController.navigateUp()
+                            }
                                 SearchBar(
                                     modifier =
                                         Modifier
@@ -517,6 +525,10 @@ fun MvListScreen(
                         exit = fadeOut() + slideOutVertically(),
                     ) {
                         TopAppBar(
+                            windowInsets =
+                                TopAppBarDefaults.windowInsets.exclude(
+                                    TopAppBarDefaults.windowInsets.only(WindowInsetsSides.Start),
+                                ),
                             title = {
                                 Text(
                                     text = stringResource(Res.string.favorite_mvs),
@@ -534,8 +546,12 @@ fun MvListScreen(
                             },
                             navigationIcon = {
                                 Box(Modifier.padding(horizontal = 5.dp)) {
-                                    IconButton(onClick = navController::navigateUp) {
-                                        Icon(SimpIcons.ArrowBackIosNew, null, tint = Color.White)
+                                    RippleIconButton(
+                                        SimpIcons.ArrowBackIosNew,
+                                        Modifier.size(32.dp),
+                                        true,
+                                    ) {
+                                        navController.navigateUp()
                                     }
                                 }
                             },
@@ -673,6 +689,10 @@ private fun ImmersiveMvHeader(
                 .height((screenInfo.hDP / 2).dp),
     ) {
         Box(modifier = Modifier.fillMaxSize().layerBackdrop(artworkBackdrop)) {
+            // MV 封面是 16:9 宽幅,和歌曲头图(方形专辑图)不同——半屏竖版区域直接
+            // Crop 会裁掉左右各一半(封面"显示不全")。双层法(AM 播放页磨砂同款):
+            // 同图放大 Crop+blur 垫底当氛围层,前景 16:9 Fit 完整显示居中;两张图
+            // 同 URL 共享 coil 缓存,不重复下载
             AsyncImage(
                 model =
                     ImageRequest
@@ -688,6 +708,17 @@ private fun ImmersiveMvHeader(
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 onSuccess = { onBitmap(it.result.image.toImageBitmap()) },
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .blur(80.dp, BlurredEdgeTreatment.Unbounded),
+            )
+            AsyncImage(
+                model = coverUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                placeholder = rememberHolderPainter(isVideo = true),
+                error = rememberHolderPainter(isVideo = true),
                 modifier = Modifier.fillMaxSize(),
             )
             Box(
