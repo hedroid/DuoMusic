@@ -2444,18 +2444,6 @@ fun NowPlayingBottomSheet(
                             }
                         }
                     }
-                    // 云盘页单曲菜单的"从云盘中删除"(不可逆,调用方弹确认;垃圾桶=真删)
-                    Crossfade(targetState = onDeleteFromCloudDisk != null) {
-                        if (it) {
-                            ActionButton(
-                                icon = SimpIcons.Delete,
-                                text = Res.string.delete_from_cloud_disk,
-                            ) {
-                                hideModalBottomSheet()
-                                onDeleteFromCloudDisk?.invoke()
-                            }
-                        }
-                    }
                     // 播客节目用自身 programId 走 A_DJ_1_ 资源赞，不进歌曲红心链。
                     val isPodcastEpisode = uiState.songUIState.neteaseProgramId != null
                     val isNeteaseMvSong = uiState.songUIState.videoId.startsWith(NETEASE_MV_MEDIA_ID_PREFIX)
@@ -2625,6 +2613,21 @@ fun NowPlayingBottomSheet(
                                 }
 
                                 else -> Unit
+                            }
+                        }
+                    }
+                    // 云盘页单曲菜单的"从云盘中删除"(2026-10-09 用户定:位置统一在下载组
+                    // 之下、警示红;不可逆,调用方弹确认;垃圾桶=真删)
+                    Crossfade(targetState = onDeleteFromCloudDisk != null) {
+                        if (it) {
+                            ActionButton(
+                                icon = SimpIcons.Delete,
+                                text = Res.string.delete_from_cloud_disk,
+                                iconColor = MaterialTheme.colorScheme.error,
+                                textColor = MaterialTheme.colorScheme.error,
+                            ) {
+                                hideModalBottomSheet()
+                                onDeleteFromCloudDisk?.invoke()
                             }
                         }
                     }

@@ -259,6 +259,16 @@ fun SelectedSongsBottomSheet(
                             )
                         }
                     }
+                    // 扩展行(删除类,2026-10-09 用户定:统一放"下载"之下,红=警示)
+                    extraActions.forEach { action ->
+                        ActionButton(
+                            icon = action.icon,
+                            text = null,
+                            textString = action.label,
+                            textColor = action.tint,
+                            iconColor = action.tint ?: Color.Unspecified,
+                        ) { hideThen(action.onClick) }
+                    }
                     if (onAddToFavorite != null) {
                         // 文案与单曲三点菜单一致("点赞");favorite="收藏"易误读成本地收藏。
                         // 未登录置灰+带源名提示(2026-09-25 与"添加到歌单"对齐);混源不挡——
@@ -289,15 +299,6 @@ fun SelectedSongsBottomSheet(
                                         .padding(start = 78.dp, end = 20.dp, top = 0.dp, bottom = 2.dp),
                             )
                         }
-                    }
-                    extraActions.forEach { action ->
-                        ActionButton(
-                            icon = action.icon,
-                            text = null,
-                            textString = action.label,
-                            textColor = action.tint,
-                            iconColor = action.tint ?: Color.Unspecified,
-                        ) { hideThen(action.onClick) }
                     }
                     EndOfModalBottomSheet()
                 }
