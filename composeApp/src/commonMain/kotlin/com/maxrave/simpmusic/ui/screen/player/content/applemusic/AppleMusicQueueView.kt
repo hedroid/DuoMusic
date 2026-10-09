@@ -51,8 +51,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.maxrave.common.NETEASE_FM_PLAYLIST_ID
 import com.maxrave.domain.manager.DataStoreManager
+import com.maxrave.domain.mediaservice.handler.EndlessRadioLockKind
 import com.maxrave.domain.mediaservice.handler.MediaPlayerHandler
 import com.maxrave.domain.mediaservice.handler.QueueData
 import com.maxrave.domain.mediaservice.handler.RepeatState
@@ -87,7 +87,9 @@ import org.koin.compose.koinInject
 import simpmusic.composeapp.generated.resources.Res
 import simpmusic.composeapp.generated.resources.continue_playing
 import simpmusic.composeapp.generated.resources.endless_queue
+import simpmusic.composeapp.generated.resources.endless_queue_artist_radio_locked
 import simpmusic.composeapp.generated.resources.endless_queue_fm_locked
+import simpmusic.composeapp.generated.resources.endless_queue_heart_radio_locked
 import simpmusic.composeapp.generated.resources.endless_queue_radio_locked
 import simpmusic.composeapp.generated.resources.now_playing
 
@@ -168,11 +170,10 @@ internal fun AppleMusicQueueView(
                 typography = typography,
                 activePillContainer = activePillContainer,
                 activePillContent = activePillContent,
-                // 网易私人FM队列：语义即无限电台（loadMore 凭哨兵放行，与开关无关），开关锁定为开。
-                isFmQueue = queueDataState?.data?.playlistId == NETEASE_FM_PLAYLIST_ID,
                 // 原生电台形态(YT 电台/FM/网易单曲·艺人电台,且非普通队列转换来的):
-                // 开关锁定为开(点击提示无法关闭);歌单转来的电台不锁,关=裁回原队列。
-                isRadioQueue = queueDataState?.data?.isEndlessRadioQueue == true,
+                // 开关锁定为开,点击按队列类型提示"XX不能关闭无尽队列"(分流在 domain 的
+                // endlessRadioLockKind);歌单转来的电台不锁,关=裁回原队列。
+                radioLockKind = queueDataState?.data?.endlessRadioLockKind,
                 // 播客队列不显示无尽开关(与 QueueBottomSheet 同款门控,判定只认前缀 CR-22):
                 // 播客队列播完即止,无尽语义不适用。2026-10-02 上游合并重做 AM 播放器时
                 // 该门控丢失(用户复报"播客播放页无尽队列又回来了")
@@ -495,9 +496,8 @@ private fun AppleMusicContinuePlayingHeader(
     typography: AppleMusicTypography,
     activePillContainer: Color,
     activePillContent: Color,
-    isFmQueue: Boolean,
-    // 原生电台形态：无尽开关锁定为开(与 QueueBottomSheet 同款门控,FM 文案单独分流)
-    isRadioQueue: Boolean = false,
+    // 原生电台形态：无尽开关锁定为开(与 QueueBottomSheet 同款门控),toast 按本 kind 分流文案
+    radioLockKind: EndlessRadioLockKind? = null,
     // 播客队列隐藏无尽开关(整个 label+Switch,与 QueueBottomSheet 同款门控)
     isPodcastQueue: Boolean = false,
     onEndlessDisabled: () -> Unit = {},
@@ -551,16 +551,17 @@ private fun AppleMusicContinuePlayingHeader(
                     modifier = Modifier.padding(end = 8.dp),
                 )
                 Switch(
-                    checked = isRadioQueue || endlessQueueEnabled,
+                    checked = radioLockKind != null || endlessQueueEnabled,
                     onCheckedChange = { checked ->
-                        if (isRadioQueue) {
+                        if (radioLockKind != null) {
                             showToast(
                                 runBlocking {
                                     getString(
-                                        if (isFmQueue) {
-                                            Res.string.endless_queue_fm_locked
-                                        } else {
-                                            Res.string.endless_queue_radio_locked
+                                        when (radioLockKind) {
+                                            EndlessRadioLockKind.HEART_RADIO -> Res.string.endless_queue_heart_radio_locked
+                                            EndlessRadioLockKind.ARTIST_RADIO -> Res.string.endless_queue_artist_radio_locked
+                                            EndlessRadioLockKind.FM -> Res.string.endless_queue_fm_locked
+                                            else -> Res.string.endless_queue_radio_locked
                                         },
                                     )
                                 },

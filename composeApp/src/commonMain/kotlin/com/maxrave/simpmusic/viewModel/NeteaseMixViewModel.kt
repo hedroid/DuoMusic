@@ -3,6 +3,7 @@ package com.maxrave.simpmusic.viewModel
 import androidx.lifecycle.viewModelScope
 import com.maxrave.common.Config
 import com.maxrave.common.NETEASE_FM_PLAYLIST_ID
+import com.maxrave.common.NETEASE_HEART_RADIO_QUEUE_NAME
 import com.maxrave.data.repository.NeteaseRepositoryImpl
 import com.maxrave.domain.data.model.home.Content
 import com.maxrave.domain.mediaservice.handler.PlaylistType
@@ -24,10 +25,6 @@ import simpmusic.composeapp.generated.resources.personal_fm
 
 /** 下拉指示器时长上限,与 [NeteaseHomeViewModel] 同款:确认信号而非进度条 */
 private const val REFRESH_INDICATOR_MS = 600L
-
-/** 红心电台起播写入 queueData 的 playlistName([playHeartRadio] 与播放态判定共用;
- *  FM 批次队列名=personal_fm 本地化串,两类队列同挂 [NETEASE_FM_PLAYLIST_ID] 哨兵,靠名字区分) */
-private const val HEART_RADIO_QUEUE_NAME = "红心电台"
 
 /**
  * 网易"混合"tab(私人FM)独立 ViewModel:与 [NeteaseHomeViewModel] 同款模式——数据全部来自
@@ -108,7 +105,7 @@ class NeteaseMixViewModel(
                         queueData.data.playlistName == fmQueueName
                 val isHeartQueue =
                     queueData?.data?.playlistId == NETEASE_FM_PLAYLIST_ID &&
-                        queueData.data.playlistName == HEART_RADIO_QUEUE_NAME
+                        queueData.data.playlistName == NETEASE_HEART_RADIO_QUEUE_NAME
                 MixPlaybackState(
                     isFmQueue = isFmQueue,
                     isHeartQueue = isHeartQueue,
@@ -241,7 +238,7 @@ class NeteaseMixViewModel(
                     if (contents.isEmpty()) {
                         makeToast("红心歌单为空")
                     } else {
-                        playQueue(contents, 0, playlistId = NETEASE_FM_PLAYLIST_ID, name = HEART_RADIO_QUEUE_NAME)
+                        playQueue(contents, 0, playlistId = NETEASE_FM_PLAYLIST_ID, name = NETEASE_HEART_RADIO_QUEUE_NAME)
                     }
                 },
                 onFailure = { makeToast(it.message ?: "红心电台启动失败") },

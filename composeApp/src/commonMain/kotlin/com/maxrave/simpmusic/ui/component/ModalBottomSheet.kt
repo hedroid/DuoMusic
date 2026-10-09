@@ -126,7 +126,6 @@ import coil3.compose.LocalPlatformContext
 import coil3.request.CachePolicy
 import coil3.request.ImageRequest
 import coil3.request.crossfade
-import com.maxrave.common.NETEASE_FM_PLAYLIST_ID
 import com.maxrave.data.io.readLocalImageBytes
 import com.maxrave.domain.data.entities.DownloadState
 import com.maxrave.domain.data.entities.LocalPlaylistEntity
@@ -138,6 +137,7 @@ import com.maxrave.domain.data.model.searchResult.playlists.PlaylistsResult
 import com.maxrave.domain.data.model.searchResult.songs.Artist
 import com.maxrave.domain.data.model.searchResult.songs.Thumbnail
 import com.maxrave.domain.manager.DataStoreManager
+import com.maxrave.domain.mediaservice.handler.EndlessRadioLockKind
 import com.maxrave.domain.mediaservice.handler.MediaPlayerHandler
 import com.maxrave.domain.mediaservice.handler.QueueData
 import com.maxrave.domain.repository.PlaylistRepository
@@ -291,7 +291,9 @@ import simpmusic.composeapp.generated.resources.downloading_video
 import simpmusic.composeapp.generated.resources.edit_thumbnail
 import simpmusic.composeapp.generated.resources.edit_title
 import simpmusic.composeapp.generated.resources.endless_queue
+import simpmusic.composeapp.generated.resources.endless_queue_artist_radio_locked
 import simpmusic.composeapp.generated.resources.endless_queue_fm_locked
+import simpmusic.composeapp.generated.resources.endless_queue_heart_radio_locked
 import simpmusic.composeapp.generated.resources.endless_queue_radio_locked
 import simpmusic.composeapp.generated.resources.error_occurred
 import simpmusic.composeapp.generated.resources.extract_source
@@ -1205,12 +1207,11 @@ fun QueueBottomSheet(
         }
     }
     val endlessQueueEnable by dataStoreManager.endlessQueue.map { it == DataStoreManager.TRUE }.collectAsState(false)
-    // 网易私人FM队列：语义即无限电台（loadMore 凭哨兵放行，与开关无关），开关锁定为开。
-    val isFmQueue = queueData?.data?.playlistId == NETEASE_FM_PLAYLIST_ID
     // 原生电台形态(YT 电台/FM/网易单曲·艺人电台,且非普通队列转换来的):语义即无尽,
-    // 开关同样锁定为开(点击提示无法关闭);普通歌单/专辑被无尽钩子转成电台的
-    // (radioConvertedFromQueue)不锁——那种电台身份是开关赋予的,关=裁回原队列。
-    val isRadioQueue = queueData?.data?.isEndlessRadioQueue == true
+    // 开关锁定为开(点击按队列类型提示"XX不能关闭无尽队列");普通歌单/专辑被无尽钩子
+    // 转成电台的(radioConvertedFromQueue)不锁——那种电台身份是开关赋予的,关=裁回原队列。
+    val radioLockKind = queueData?.data?.endlessRadioLockKind
+    val isRadioQueue = radioLockKind != null
 
     // 播客队列(剧集播完即止):无尽开关整行隐藏。
     // 判定只认前缀(QueueData.isNeteasePodcastQueue,CR-22)——队列身份三键持久化后
@@ -1465,10 +1466,11 @@ fun QueueBottomSheet(
                                     showToast(
                                         runBlocking {
                                             getString(
-                                                if (isFmQueue) {
-                                                    Res.string.endless_queue_fm_locked
-                                                } else {
-                                                    Res.string.endless_queue_radio_locked
+                                                when (radioLockKind) {
+                                                    EndlessRadioLockKind.HEART_RADIO -> Res.string.endless_queue_heart_radio_locked
+                                                    EndlessRadioLockKind.ARTIST_RADIO -> Res.string.endless_queue_artist_radio_locked
+                                                    EndlessRadioLockKind.FM -> Res.string.endless_queue_fm_locked
+                                                    else -> Res.string.endless_queue_radio_locked
                                                 },
                                             )
                                         },
