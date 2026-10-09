@@ -589,6 +589,7 @@
     <string name="favorite_mvs">お気に入りのMV</string>
     <string name="cloud_disk">クラウド</string>
     <string name="cloud_upload_waiting">アップロード待ち</string>
+    <string name="cloud_comments_unavailable">クラウドの楽曲にはコメントできません</string>
     <string name="cloud_upload_in_progress">アップロード中</string>
     <string name="cloud_upload_row_failed">アップロード失敗</string>
     <string name="delete_from_cloud_disk">クラウドから削除</string>

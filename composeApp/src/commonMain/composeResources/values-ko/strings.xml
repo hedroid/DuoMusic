@@ -690,6 +690,7 @@
     <string name="favorite_mvs">즐겨찾기 MV</string>
     <string name="cloud_disk">클라우드</string>
     <string name="cloud_upload_waiting">업로드 대기 중</string>
+    <string name="cloud_comments_unavailable">클라우드 노래에는 댓글을 달 수 없습니다</string>
     <string name="cloud_upload_in_progress">업로드 중</string>
     <string name="cloud_upload_row_failed">업로드 실패</string>
     <string name="delete_from_cloud_disk">클라우드에서 삭제</string>

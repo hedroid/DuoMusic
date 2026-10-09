@@ -1013,6 +1013,7 @@
     <string name="favorite_mvs">Favorite MVs</string>
     <string name="cloud_disk">Cloud Disk</string>
     <string name="cloud_upload_waiting">Waiting to upload</string>
+    <string name="cloud_comments_unavailable">Can't comment on cloud disk songs</string>
     <string name="cloud_upload_in_progress">Uploading</string>
     <string name="cloud_upload_row_failed">Upload failed</string>
     <string name="delete_from_cloud_disk">Delete from cloud disk</string>

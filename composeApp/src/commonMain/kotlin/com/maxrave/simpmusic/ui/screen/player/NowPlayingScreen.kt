@@ -3,6 +3,9 @@
 package com.maxrave.simpmusic.ui.screen.player
 
 import androidx.compose.animation.Animatable
+import simpmusic.composeapp.generated.resources.Res
+import org.jetbrains.compose.resources.stringResource
+import simpmusic.composeapp.generated.resources.cloud_comments_unavailable
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -97,6 +100,7 @@ import com.maxrave.simpmusic.ui.icon.SimpIcons
 import com.maxrave.simpmusic.ui.navigation.destination.home.ListenTogetherDestination
 import com.maxrave.simpmusic.ui.navigation.destination.list.ArtistDestination
 import com.maxrave.simpmusic.ui.navigation.destination.player.FullscreenDestination
+import com.maxrave.common.NETEASE_CLOUD_DISK_PLAYLIST_ID
 import com.maxrave.common.NETEASE_MV_MEDIA_ID_PREFIX
 import com.maxrave.simpmusic.ui.screen.player.content.ArtworkPagerSnapAnimation
 import com.maxrave.simpmusic.ui.screen.player.content.NowPlayingContentActions
@@ -306,6 +310,8 @@ fun NowPlayingScreenContent(
     // The pager wraps the Canvas + Thumbnail layers. Controller layout below stays fixed.
     val nowPlayingState by sharedViewModel.nowPlayingState.collectAsStateWithLifecycle()
     val queueDataState by sharedViewModel.getQueueDataState().collectAsStateWithLifecycle()
+    // 云盘评论拦截提示(组合期解析,回调里不能取 stringResource)
+    val cloudCommentsUnavailableHint = stringResource(Res.string.cloud_comments_unavailable)
     val artworkQueue by remember {
         derivedStateOf { queueDataState?.data?.listTracks ?: emptyList() }
     }
@@ -329,6 +335,7 @@ fun NowPlayingScreenContent(
     val nowPlayingVideoId: String? = nowPlayingState?.track?.videoId ?: nowPlayingState?.songEntity?.videoId
     // 当前曲是网易 MV(队列/媒体 id 带 NETEASE_MV_ 哨兵):强制渲染视频 + 评论走 R_MV_5_ 线程
     val isNeteaseMv = nowPlayingVideoId?.startsWith(NETEASE_MV_MEDIA_ID_PREFIX) == true
+    val isCloudDiskQueue = queueDataState?.data?.playlistId == NETEASE_CLOUD_DISK_PLAYLIST_ID
     // currentOrderIndex() is a plain getter over the player, NOT Compose state, so it is read
     // inside this remember block — whose keys (the queue, and the track now playing) are exactly
     // the two things that can move the player's position. nowPlayingState is published FROM the
@@ -689,6 +696,7 @@ fun NowPlayingScreenContent(
             isNeteaseSong = nowPlayingVideoId?.toLongOrNull() != null || isNeteaseMv,
             isPodcastSong = isPodcastEpisode,
             isNeteaseMv = isNeteaseMv,
+            isCloudDiskQueue = isCloudDiskQueue,
             remoteLikeState = remoteLikeState,
             // 红心=云端态;未登录源置灰(点击提示登录);MV 红心=收藏,吃网易登录态
             likeEnabled =
@@ -756,7 +764,15 @@ fun NowPlayingScreenContent(
                 showHideJob = true
                 showHideControlLayout = !showHideControlLayout
             },
-            onShowNeteaseComments = { showNeteaseComments = true },
+            // 云盘队列:评论端点对云盘 id 无效(探针同族结论),拦在壳层统一提示,
+            // 三主题入口只负责置灰外观——点击都会走到这里
+            onShowNeteaseComments = {
+                if (isCloudDiskQueue) {
+                    sharedViewModel.makeToast(cloudCommentsUnavailableHint)
+                } else {
+                    showNeteaseComments = true
+                }
+            },
             onNavigateToArtist = {
                 val song = sharedViewModel.nowPlayingState.value?.songEntity
                 (

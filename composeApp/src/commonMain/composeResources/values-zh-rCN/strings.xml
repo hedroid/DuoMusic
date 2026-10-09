@@ -952,6 +952,7 @@
     <string name="favorite_mvs">收藏的 MV</string>
     <string name="cloud_disk">云盘</string>
     <string name="cloud_upload_waiting">等待上传</string>
+    <string name="cloud_comments_unavailable">无法评论云盘歌曲</string>
     <string name="cloud_upload_in_progress">上传中</string>
     <string name="cloud_upload_row_failed">上传失败</string>
     <string name="delete_from_cloud_disk">从云盘中删除</string>

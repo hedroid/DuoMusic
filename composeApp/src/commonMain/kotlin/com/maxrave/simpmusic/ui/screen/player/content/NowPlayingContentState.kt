@@ -240,6 +240,9 @@ class NowPlayingContentState(
     /** 网易 MV(媒体 id=NETEASE_MV_ 哨兵):MV 不进歌单(官方同款,歌单只装歌曲)——
      *  "添加到歌单"按钮三处(Spotify/M3E 控制行+AM 队列药丸)置灰,与播客同款 */
     val isNeteaseMv: Boolean = false,
+    /** 云盘队列(NETEASE_CLOUD_DISK 哨兵):评论端点对云盘 id 无效(与相似/歌词同族),
+     *  三主题评论入口置灰,点击 toast"无法评论云盘歌曲"(壳层 onShowNeteaseComments 拦) */
+    val isCloudDiskQueue: Boolean = false,
     /** 红心=云端账号状态;该源未登录时置灰(onLoginRequired 提示) */
     val likeEnabled: Boolean = true,
     val remoteLikeState: RemoteSongLikeState,

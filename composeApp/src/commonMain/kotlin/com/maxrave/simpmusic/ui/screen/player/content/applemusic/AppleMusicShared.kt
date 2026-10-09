@@ -354,12 +354,14 @@ internal fun AppleMusicGlyphButton(
     modifier: Modifier = Modifier,
     size: Dp = 24.dp,
     tint: Color = Color.White,
+    /** 置灰外观(按钮仍可点,提示由调用链上层发) */
+    dimmed: Boolean = false,
 ) {
     IconButton(
         onClick = onClick,
         modifier = modifier.appleMusicPressInflate().size(size).clip(CircleShape),
     ) {
-        Icon(imageVector = icon, contentDescription = "", tint = tint)
+        Icon(imageVector = icon, contentDescription = "", tint = if (dimmed) tint.copy(alpha = 0.4f) else tint)
     }
 }
 
@@ -409,7 +411,12 @@ internal fun AppleMusicHeaderActions(
         // 网易歌:评论入口(收藏心右边),打开 NeteaseCommentsSheet;与 dock 版互斥——2026-10-02
         // 用户定案从 dock 第四钮移到这里,更贴近"对这首歌"的语义。
         if (state.isNeteaseSong) {
-            AppleMusicGlyphButton(icon = SimpIcons.Comment, onClick = { actions.onShowNeteaseComments() })
+            // 云盘队列:评论区无效置灰(点击由壳层 toast 提示)
+            AppleMusicGlyphButton(
+                icon = SimpIcons.Comment,
+                onClick = { actions.onShowNeteaseComments() },
+                dimmed = state.isCloudDiskQueue,
+            )
         }
         AppleMusicGlyphButton(icon = SimpIcons.MoreVert, onClick = { actions.onShowMoreSheet() })
     }
