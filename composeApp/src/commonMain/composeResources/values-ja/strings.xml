@@ -605,6 +605,7 @@
     <string name="mv_saved_to_download">MVをDownloadに保存しました</string>
     <string name="mv_count_short">%1$s 本の動画</string>
     <string name="mv_partial_loaded">%1$s 本のMVを読み込み済み、残りは読み込めませんでした。読み込み済みのものを使用します</string>
+    <string name="partially_loaded">%1$s 曲を読み込み済み、残りは読み込めませんでした。読み込み済みのものを使用します</string>
     <string name="liked_toast">「いいね」しました</string>
     <string name="mv_subscribed">MVをお気に入りに追加しました</string>
     <string name="mv_unsubscribed">MVのお気に入りを解除しました</string>

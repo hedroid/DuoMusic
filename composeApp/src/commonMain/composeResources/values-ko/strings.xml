@@ -706,6 +706,7 @@
     <string name="mv_saved_to_download">MV가 Download에 저장되었습니다</string>
     <string name="mv_count_short">동영상 %1$s개</string>
     <string name="mv_partial_loaded">MV %1$s개만 로드되었고 나머지는 로드되지 않았습니다. 로드된 항목을 사용합니다</string>
+    <string name="partially_loaded">%1$s곡만 로드되었고 나머지는 로드되지 않았습니다. 로드된 항목을 사용합니다</string>
     <string name="liked_toast">좋아요함</string>
     <string name="mv_subscribed">MV를 즐겨찾기에 저장했습니다</string>
     <string name="mv_unsubscribed">MV 즐겨찾기를 해제했습니다</string>

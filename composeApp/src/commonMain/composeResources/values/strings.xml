@@ -1029,6 +1029,7 @@
     <string name="mv_saved_to_download">MV saved to Download</string>
     <string name="mv_count_short">%1$s videos</string>
     <string name="mv_partial_loaded">Loaded %1$s MVs; the rest could not be loaded, continuing with what is available</string>
+    <string name="partially_loaded">Loaded %1$s songs; the rest could not be loaded, continuing with what is available</string>
     <string name="liked_toast">Liked</string>
     <string name="mv_subscribed">MV saved to favorites</string>
     <string name="mv_unsubscribed">Removed MV from favorites</string>

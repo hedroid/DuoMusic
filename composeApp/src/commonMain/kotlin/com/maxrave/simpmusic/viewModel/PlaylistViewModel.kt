@@ -60,12 +60,14 @@ import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.singleOrNull
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import org.koin.core.component.inject
 import simpmusic.composeapp.generated.resources.Res
+import simpmusic.composeapp.generated.resources.partially_loaded
 import simpmusic.composeapp.generated.resources.auto_created_by_youtube_music
 import simpmusic.composeapp.generated.resources.cloud_delete_done
 import simpmusic.composeapp.generated.resources.cloud_delete_partial
@@ -462,7 +464,7 @@ class PlaylistViewModel(
                             newUpdateJob?.cancel()
                             val id = playlistEntity.value?.id ?: return@collectLatest
                             if (state == STATE_DOWNLOADING || state == STATE_DOWNLOADED) {
-                                getFullTracks { tracks ->
+                                getFullTracks { tracks, _ ->
                                     // The fetch outlives this collector's cancellation, so an
                                     // in-flight callback can land after removeDownloadedPlaylist()
                                     // already reset the playlist to NOT_DOWNLOADED — with the
@@ -714,7 +716,10 @@ class PlaylistViewModel(
                 )
             _tracks.value = browse.tracks
             _continuation.value = browse.nextOffset?.let { "$NETEASE_CLOUD_DISK_PAGE_PREFIX$it" }
-            if (_continuation.value == null) _tracksListState.value = ListState.PAGINATION_EXHAUST
+            // 刷新(上传/删歌后)可能从"到底"回到"有下一页"(如上传后超过 200 首):
+            // 有下一页必须显式回 IDLE,否则残留的 EXHAUST 把翻页入口锁死
+            _tracksListState.value =
+                if (_continuation.value == null) ListState.PAGINATION_EXHAUST else ListState.IDLE
             // 云盘没有"收藏歌单"语义,顶栏心恒藏
             _favoriteAvailable.value = false
         }
@@ -1197,7 +1202,13 @@ class PlaylistViewModel(
         }
     }
 
-    fun getFullTracks(callback: (List<Track>) -> Unit) {
+    /**
+     * 拉全曲目(整单下载/添加到队列/搜索前展开):分页未到底时循环续拉直到
+     * [ListState.PAGINATION_EXHAUST]。回调第二参 complete=false = 中途续页失败
+     * 放弃(云盘续页失败保留可重试状态回 IDLE,不再被当"到底"),拿到的是部分
+     * 列表——调用方必须提示用户缺页,不能把部分列表当全量。
+     */
+    fun getFullTracks(callback: (List<Track>, Boolean) -> Unit) {
         viewModelScope.launch {
             if (tracksListState.value == ListState.PAGINATION_EXHAUST) {
                 _playlistEntity.value
@@ -1207,21 +1218,41 @@ class PlaylistViewModel(
                     )?.let {
                         playlistRepository.insertAndReplacePlaylist(it)
                     }
-                callback(tracks.value)
+                callback(tracks.value, true)
             } else {
                 val id = uiState.value.data?.id ?: return@launch
-                tracksListState.collectLatest { state ->
-                    if (state == ListState.PAGINATION_EXHAUST) {
-                        _playlistEntity.value
-                            ?.copy(
-                                tracks = tracks.value.toListVideoId(),
-                                trackCount = tracks.value.size,
-                            )?.let {
-                                playlistRepository.insertAndReplacePlaylist(it)
+                // 云盘续页失败回 IDLE 且令牌保留,直接循环会打死循环:按"曲目数无
+                // 增长"计停,连续 2 个无进展页放弃,按部分加载回调。lastSize=-1 起
+                // 步让首个 IDLE(尚未拉过任何页)不计停
+                var finished = false
+                var lastSize = -1
+                var stalled = 0
+                tracksListState.takeWhile { !finished }.collectLatest { state ->
+                    when (state) {
+                        ListState.PAGINATION_EXHAUST -> {
+                            finished = true
+                            _playlistEntity.value
+                                ?.copy(
+                                    tracks = tracks.value.toListVideoId(),
+                                    trackCount = tracks.value.size,
+                                )?.let {
+                                    playlistRepository.insertAndReplacePlaylist(it)
+                                }
+                            callback(tracks.value, true)
+                        }
+
+                        ListState.PAGINATING -> Unit
+
+                        else -> {
+                            if (tracks.value.size == lastSize) stalled++ else stalled = 0
+                            lastSize = tracks.value.size
+                            if (stalled >= 2) {
+                                finished = true
+                                callback(tracks.value, false)
+                            } else {
+                                getContinuationTrack(id, continuation.value)
                             }
-                        callback(tracks.value)
-                    } else if (state != ListState.PAGINATING) {
-                        getContinuationTrack(id, continuation.value)
+                        }
                     }
                 }
             }
@@ -1237,8 +1268,12 @@ class PlaylistViewModel(
             val id =
                 playlistEntity.value?.id
                     ?: if (isCloudDisk) NETEASE_CLOUD_DISK_PLAYLIST_ID else return@launch
-            getFullTracks { tracks ->
+            getFullTracks { tracks, complete ->
                 viewModelScope.launch {
+                    // 部分加载(续页失败放弃):不能把部分列表当全量,先告知缺页再继续
+                    if (!complete) {
+                        makeToast(getString(Res.string.partially_loaded, tracks.size.toString()))
+                    }
                     // 三选分类(2026-09-30 定稿):在途跳过;文件式已下载→弹窗;其余直接入队
                     val songs =
                         songRepository.getSongsByListVideoId(tracks.toListVideoId()).firstOrNull()
@@ -1293,7 +1328,13 @@ class PlaylistViewModel(
         val request = _batchDownloadRequest.value ?: return
         _batchDownloadRequest.value = null
         viewModelScope.launch {
-            val id = playlistEntity.value?.id ?: return@launch
+            // 云盘伪歌单没有 Room 歌单行(downloadFullPlaylist 同款):哨兵 id 顶上,
+            // 整单下载态回写对云盘跳过——否则"部分已下载→确认跳过/覆盖"会在这里
+            // 因 playlistEntity 为 null 直接 return,剩余歌曲永远入不了队
+            val isCloudDisk = uiState.value.data?.id == NETEASE_CLOUD_DISK_PLAYLIST_ID
+            val id =
+                playlistEntity.value?.id
+                    ?: if (isCloudDisk) NETEASE_CLOUD_DISK_PLAYLIST_ID else return@launch
             val target =
                 if (overwrite) {
                     // 覆盖:降级引用容器防 watcher 重排队,再删旧文件重新入队
@@ -1313,12 +1354,17 @@ class PlaylistViewModel(
             if (target.isEmpty()) {
                 // 跳过且无可入队项=文件都在:直接落"已下载"。置"下载中"的话,文件式
                 // 条目转存完即从 DownloadIndex 清除,完成事件永远不来,按钮永久卡死
-                // (用户 2026-10-02 实测:整单下完→点下载→跳过→一直"下载中")
-                updatePlaylistDownloadState(id, STATE_DOWNLOADED)
+                // (用户 2026-10-02 实测:整单下完→点下载→跳过→一直"下载中")。
+                // 云盘没有按钮态可翻,toast 一句作为反馈
+                if (isCloudDisk) {
+                    makeToast(getString(Res.string.downloaded))
+                } else {
+                    updatePlaylistDownloadState(id, STATE_DOWNLOADED)
+                }
                 return@launch
             }
-            updatePlaylistDownloadState(id, STATE_DOWNLOADING)
-            if (!queueBatchDownload(target)) {
+            if (!isCloudDisk) updatePlaylistDownloadState(id, STATE_DOWNLOADING)
+            if (!queueBatchDownload(target) && !isCloudDisk) {
                 // 全部被磁盘预检拒绝=没有任何任务能纠正容器态,回滚(否则永久"下载中",CR P1-3)
                 updatePlaylistDownloadState(id, STATE_DOWNLOADED)
             }
@@ -1369,7 +1415,7 @@ class PlaylistViewModel(
             // Same beat as LocalPlaylistViewModel: let the NOT_DOWNLOADED flip reach the init
             // watcher (which would otherwise re-queue missing tracks) before rows change.
             delay(500)
-            getFullTracks { tracks ->
+            getFullTracks { tracks, _ ->
                 // Only songs no other downloaded container references are actually removed.
                 viewModelScope.launch {
                     removeExclusiveTrackDownloads(
@@ -1396,7 +1442,7 @@ class PlaylistViewModel(
             val id = playlistEntity.value?.id ?: return@launch
             updatePlaylistDownloadState(id, STATE_NOT_DOWNLOADED)
             delay(500)
-            getFullTracks { tracks ->
+            getFullTracks { tracks, _ ->
                 viewModelScope.launch {
                     songRepository.getSongsByListVideoId(tracks.toListVideoId()).firstOrNull()?.forEach { song ->
                         if (song.downloadState == STATE_PREPARING || song.downloadState == STATE_DOWNLOADING) {

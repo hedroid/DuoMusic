@@ -171,6 +171,7 @@ import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import simpmusic.composeapp.generated.resources.Res
+import simpmusic.composeapp.generated.resources.partially_loaded
 import simpmusic.composeapp.generated.resources.album_length
 import simpmusic.composeapp.generated.resources.delete
 import simpmusic.composeapp.generated.resources.delete_from_cloud_disk
@@ -260,7 +261,7 @@ fun PlaylistScreen(
 
     LaunchedEffect(showSearchBar) {
         if (showSearchBar) {
-            viewModel.getFullTracks {}
+            viewModel.getFullTracks { _, _ -> }
             lazyState.animateScrollToItem(0)
         }
     }
@@ -1553,8 +1554,14 @@ fun PlaylistScreen(
                 }
                 if (playlistBottomSheetShow) {
                     Logger.w("PlaylistScreen", "PlaylistBottomSheet")
+                    // 模板在组合期解析(回调里不能取 stringResource);count 回调时才知道
+                    val partiallyLoadedPattern = stringResource(Res.string.partially_loaded)
                     val addToQueue = {
-                        viewModel.getFullTracks { track ->
+                        viewModel.getFullTracks { track, complete ->
+                            // 部分加载(云盘续页失败放弃):先告知缺页,再添加已加载部分
+                            if (!complete) {
+                                viewModel.makeToast(partiallyLoadedPattern.format(track.size))
+                            }
                             sharedViewModel.addListToQueue(
                                 track.toCollection(arrayListOf()),
                             )
