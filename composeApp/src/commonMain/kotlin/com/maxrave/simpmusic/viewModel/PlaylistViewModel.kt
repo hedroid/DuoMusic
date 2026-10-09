@@ -884,6 +884,8 @@ class PlaylistViewModel(
             getCloudDiskData(firstLoad = false)
             // 刷新落定后清场(含失败行——汇总 toast 已报数,新歌由列表刷新呈现)
             _cloudUploadQueue.value = emptyList()
+            // 库页入口原地刷新(第一首歌=封面、曲目数都可能变)
+            mutationBus.send(LibraryMutation.CloudDiskChanged)
             cloudUploadInFlight = false
         }
     }
@@ -916,6 +918,8 @@ class PlaylistViewModel(
             )
             delay(1200)
             getCloudDiskData(firstLoad = false)
+            // 库页入口原地刷新(第一首歌=封面、曲目数都可能变)
+            mutationBus.send(LibraryMutation.CloudDiskChanged)
         }
     }
 

@@ -50,6 +50,12 @@ sealed interface LibraryMutation {
 
     /** 网易收藏专辑已移除 */
     data class AlbumUnsubscribed(val albumId: String) : LibraryMutation
+
+    /**
+     * 云盘内容变化(单曲/批量删除、上传批次完成):第一首歌(=入口封面)与曲目数
+     * 都可能变——库页收到后重拉入口信息(limit=1 轻请求),返回库页即见新封面/数量。
+     */
+    data object CloudDiskChanged : LibraryMutation
 }
 
 /**
@@ -60,6 +66,7 @@ fun LibraryMutation.owner(): MusicSource =
     when (this) {
         is LibraryMutation.NeteaseHeartCountChanged,
         is LibraryMutation.NeteasePlaylistCreated,
+        LibraryMutation.CloudDiskChanged,
         -> MusicSource.NETEASE
 
         is LibraryMutation.YouTubePlaylistCreated -> MusicSource.YOUTUBE_MUSIC

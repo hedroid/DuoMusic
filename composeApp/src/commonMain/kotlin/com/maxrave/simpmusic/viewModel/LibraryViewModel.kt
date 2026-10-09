@@ -571,6 +571,17 @@ class LibraryViewModel(
     private fun applyMutation(mutation: LibraryMutation) {
         println("QQQ applyMutation: $mutation")
         when (mutation) {
+            LibraryMutation.CloudDiskChanged -> {
+                // 云盘删除/上传后第一首歌(封面)与数量都会变:像 MV 概要一样轻拉一次
+                // 入口信息原地更新(仅行已物化;从未加载过则留给首拉,免白请求)
+                if (_cloudDiskEntry.value != null) {
+                    viewModelScope.launch {
+                        runCatching { neteaseRepository.getCloudDiskEntryInfo() }
+                            .onSuccess { info -> if (info != null) _cloudDiskEntry.value = info }
+                    }
+                }
+            }
+
             is LibraryMutation.PlaylistRemoved -> {
                 // YT 歌单 id 的 VL 前缀在两处形状可能不同(库页 tile/详情页),归一化匹配
                 val removedId = mutation.playlistId.removePrefix("VL")
