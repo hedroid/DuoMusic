@@ -589,6 +589,11 @@
     <string name="favorite_mvs">お気に入りのMV</string>
     <string name="cloud_disk">クラウド</string>
     <string name="cloud_upload_progress_title">クラウドにアップロード中</string>
+    <string name="delete_from_cloud_disk">クラウドから削除</string>
+    <string name="delete_from_cloud_disk_title">%1$d 曲を削除しますか？</string>
+    <string name="delete_from_cloud_disk_message">選択した曲はクラウドから完全に削除され、元に戻せません。</string>
+    <string name="cloud_delete_done">%1$d 曲を削除しました</string>
+    <string name="cloud_delete_partial">%1$d 曲を削除、%2$d 曲失敗</string>
     <string name="cloud_upload_all_done">%1$d 曲をアップロードしました</string>
     <string name="cloud_upload_partial_done">%1$d 曲をアップロード、%2$d 曲失敗</string>
     <string name="cloud_upload_all_failed">アップロードに失敗しました</string>

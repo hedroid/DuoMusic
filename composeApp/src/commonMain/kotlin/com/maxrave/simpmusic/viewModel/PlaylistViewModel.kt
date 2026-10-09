@@ -67,6 +67,8 @@ import kotlinx.coroutines.launch
 import org.koin.core.component.inject
 import simpmusic.composeapp.generated.resources.Res
 import simpmusic.composeapp.generated.resources.auto_created_by_youtube_music
+import simpmusic.composeapp.generated.resources.cloud_delete_done
+import simpmusic.composeapp.generated.resources.cloud_delete_partial
 import simpmusic.composeapp.generated.resources.cloud_disk
 import simpmusic.composeapp.generated.resources.cloud_disk_capacity
 import simpmusic.composeapp.generated.resources.cloud_upload_all_done
@@ -831,6 +833,34 @@ class PlaylistViewModel(
 
     /** 兼容单参调用点(旧单文件路径) */
     fun uploadToCloudDisk(uri: String) = uploadToCloudDisk(listOf(uri))
+
+    /**
+     * 云盘批量删除(多选面板入口):逐首 cloud/del——行的 videoId(simpleSong.id)即
+     * 可删除 id(2026-10-09 探针验证,匹配后与条目 songId 同值);成功即移行,
+     * 全部处理完原地刷新(容量/计数回服务端权威值)。
+     */
+    fun deleteCloudDiskSongs(videoIds: List<String>) {
+        if (videoIds.isEmpty()) return
+        viewModelScope.launch {
+            var ok = 0
+            for (id in videoIds) {
+                val songId = id.toLongOrNull() ?: continue
+                if (neteaseRepository.deleteCloudDiskSong(songId).getOrDefault(false)) {
+                    ok++
+                    _tracks.value = _tracks.value.filterNot { it.videoId == id }
+                }
+            }
+            makeToast(
+                if (ok == videoIds.size) {
+                    getString(Res.string.cloud_delete_done, ok)
+                } else {
+                    getString(Res.string.cloud_delete_partial, ok, videoIds.size - ok)
+                },
+            )
+            delay(1200)
+            getCloudDiskData(firstLoad = false)
+        }
+    }
 
     fun getContinuationTrack(
         playlistId: String,

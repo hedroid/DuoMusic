@@ -204,6 +204,11 @@
     <string name="favorite_mvs">收藏的 MV</string>
     <string name="cloud_disk">雲盤</string>
     <string name="cloud_upload_progress_title">上傳到雲盤</string>
+    <string name="delete_from_cloud_disk">從雲盤中刪除</string>
+    <string name="delete_from_cloud_disk_title">刪除 %1$d 首歌曲？</string>
+    <string name="delete_from_cloud_disk_message">所選歌曲將從網易雲盤中永久刪除，不可復原。</string>
+    <string name="cloud_delete_done">已刪除 %1$d 首</string>
+    <string name="cloud_delete_partial">已刪除 %1$d 首，%2$d 首失敗</string>
     <string name="cloud_upload_all_done">已上傳 %1$d 首</string>
     <string name="cloud_upload_partial_done">已上傳 %1$d 首，%2$d 首失敗</string>
     <string name="cloud_upload_all_failed">上傳失敗</string>

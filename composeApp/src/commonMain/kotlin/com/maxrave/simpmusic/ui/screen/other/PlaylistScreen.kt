@@ -94,6 +94,7 @@ import com.kmpalette.rememberPaletteState
 import com.maxrave.simpmusic.extension.barBlurStyle
 import com.maxrave.simpmusic.ui.component.DownloadingIndicator
 import com.maxrave.simpmusic.ui.component.BatchDownloadConfirmDialog
+import com.maxrave.simpmusic.ui.component.selection.SongSelectionAction
 import com.maxrave.simpmusic.ui.component.rememberSurfaceDarkColors
 import com.maxrave.domain.data.entities.DownloadState
 import com.maxrave.common.NETEASE_MV_MEDIA_ID_PREFIX
@@ -132,6 +133,7 @@ import com.maxrave.simpmusic.ui.component.selection.rememberSongSelectionState
 import com.maxrave.simpmusic.ui.icon.ArrowBackIosNew
 import com.maxrave.simpmusic.ui.icon.Cloud
 import com.maxrave.simpmusic.ui.icon.CloudUpload
+import com.maxrave.simpmusic.ui.icon.Delete
 import com.maxrave.simpmusic.ui.icon.Close
 import com.maxrave.simpmusic.ui.icon.DownloadForOffline
 import com.maxrave.simpmusic.ui.icon.MoreVert
@@ -169,6 +171,11 @@ import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import simpmusic.composeapp.generated.resources.Res
 import simpmusic.composeapp.generated.resources.album_length
+import simpmusic.composeapp.generated.resources.delete
+import simpmusic.composeapp.generated.resources.delete_from_cloud_disk
+import simpmusic.composeapp.generated.resources.delete_from_cloud_disk_title
+import simpmusic.composeapp.generated.resources.delete_from_cloud_disk_message
+import simpmusic.composeapp.generated.resources.cancel
 import simpmusic.composeapp.generated.resources.cloud_upload_progress_title
 import simpmusic.composeapp.generated.resources.baseline_downloaded
 import simpmusic.composeapp.generated.resources.downloaded
@@ -228,6 +235,7 @@ fun PlaylistScreen(
     val selectionViewModel: SongSelectionViewModel = koinViewModel()
     var showSelectionSheet by rememberSaveable { mutableStateOf(false) }
     var showSelectionAddToPlaylist by rememberSaveable { mutableStateOf(false) }
+    var showCloudDeleteDialog by rememberSaveable { mutableStateOf(false) }
 
     val filteredTrack by remember {
         derivedStateOf {
@@ -1403,6 +1411,51 @@ fun PlaylistScreen(
                         onAddToFavorite = {
                             selectionViewModel.addToFavorite(selectedIds)
                             selectionState.exit()
+                        },
+                        // 云盘多选删除(2026-10-09):删除类用 error 色,确认弹窗兜底
+                        extraActions =
+                            if (isCloudDisk) {
+                                listOf(
+                                    SongSelectionAction(
+                                        icon = SimpIcons.Delete,
+                                        label = stringResource(Res.string.delete_from_cloud_disk),
+                                        tint = MaterialTheme.colorScheme.error,
+                                    ) { showCloudDeleteDialog = true },
+                                )
+                            } else {
+                                emptyList()
+                            },
+                    )
+                }
+                if (showCloudDeleteDialog) {
+                    val selectedIds = selectionState.selected.toList()
+                    AlertDialog(
+                        containerColor = rememberSurfaceDarkColors().container,
+                        onDismissRequest = { showCloudDeleteDialog = false },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    showCloudDeleteDialog = false
+                                    viewModel.deleteCloudDiskSongs(selectedIds)
+                                    selectionState.exit()
+                                },
+                            ) {
+                                Text(text = stringResource(Res.string.delete), style = typo().labelSmall)
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showCloudDeleteDialog = false }) {
+                                Text(text = stringResource(Res.string.cancel), style = typo().labelSmall)
+                            }
+                        },
+                        title = {
+                            Text(
+                                text = stringResource(Res.string.delete_from_cloud_disk_title, selectedIds.size),
+                                style = typo().labelSmall,
+                            )
+                        },
+                        text = {
+                            Text(text = stringResource(Res.string.delete_from_cloud_disk_message), style = typo().bodyMedium)
                         },
                     )
                 }
