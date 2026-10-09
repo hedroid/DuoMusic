@@ -1040,15 +1040,16 @@ fun NowPlayingContentSpotify(
                                                             .size(24.dp)
                                                             .aspectRatio(1f)
                                                             .clip(CircleShape),
-                                                    // 播客节目进不了歌曲歌单(/song/like 同源链路分离)——置灰禁用(槽位保留,UI 协调)
-                                                    enabled = state.likeEnabled && !state.isPodcastSong,
+                                                    // 播客节目进不了歌曲歌单(/song/like 同源链路分离)——置灰禁用(槽位保留,UI 协调);
+                                                    // 网易 MV 同款置灰(官方 MV 不进歌单,弹窗只会剩 YT 分区)
+                                                    enabled = state.likeEnabled && !state.isPodcastSong && !state.isNeteaseMv,
                                                     onClick = {
                                                         actions.onShowAddToPlaylist()
                                                     },
                                                 ) {
                                                     Icon(
                                                         imageVector = SimpIcons.PlaylistAdd,
-                                                        tint = if (state.likeEnabled && !state.isPodcastSong) Color.White else Color.White.copy(alpha = 0.38f),
+                                                        tint = if (state.likeEnabled && !state.isPodcastSong && !state.isNeteaseMv) Color.White else Color.White.copy(alpha = 0.38f),
                                                         contentDescription = "Add to Playlist",
                                                     )
                                                 }

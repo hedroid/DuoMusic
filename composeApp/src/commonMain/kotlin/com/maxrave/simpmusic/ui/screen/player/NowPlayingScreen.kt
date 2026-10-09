@@ -688,6 +688,7 @@ fun NowPlayingScreenContent(
                 com.maxrave.domain.data.player.ExplicitVideoPlayback.includes(nowPlayingVideoId),
             isNeteaseSong = nowPlayingVideoId?.toLongOrNull() != null || isNeteaseMv,
             isPodcastSong = isPodcastEpisode,
+            isNeteaseMv = isNeteaseMv,
             remoteLikeState = remoteLikeState,
             // 红心=云端态;未登录源置灰(点击提示登录);MV 红心=收藏,吃网易登录态
             likeEnabled =

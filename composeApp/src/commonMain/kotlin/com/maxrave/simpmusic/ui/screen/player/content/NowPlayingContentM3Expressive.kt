@@ -1059,14 +1059,15 @@ private fun ExpressiveConnectedGroup(
         }
         ExpressiveConnectedSlot(
             shape = middle,
-            // 播客节目进不了歌曲歌单(/song/like 同源链路分离)——置灰禁用(槽位保留,连体胶囊形状不破)
-            enabled = state.likeEnabled && !state.isPodcastSong,
+            // 播客节目进不了歌曲歌单(/song/like 同源链路分离)——置灰禁用(槽位保留,连体胶囊形状不破);
+            // 网易 MV 同款置灰(官方 MV 不进歌单,弹窗只会剩 YT 分区)
+            enabled = state.likeEnabled && !state.isPodcastSong && !state.isNeteaseMv,
             onClick = { actions.onShowAddToPlaylist() },
         ) {
             Icon(
                 imageVector = SimpIcons.PlaylistAdd,
                 contentDescription = "Add to Playlist",
-                tint = if (state.likeEnabled && !state.isPodcastSong) colorScheme.onSurfaceVariant else colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+                tint = if (state.likeEnabled && !state.isPodcastSong && !state.isNeteaseMv) colorScheme.onSurfaceVariant else colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
                 modifier = Modifier.size(22.dp),
             )
         }
