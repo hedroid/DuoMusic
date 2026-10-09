@@ -588,12 +588,13 @@
     <string name="need_login_toast">ログインすると利用できます</string>
     <string name="favorite_mvs">お気に入りのMV</string>
     <string name="cloud_disk">クラウド</string>
+    <string name="cloud_upload_progress_title">クラウドにアップロード中</string>
+    <string name="cloud_upload_all_done">%1$d 曲をアップロードしました</string>
+    <string name="cloud_upload_partial_done">%1$d 曲をアップロード、%2$d 曲失敗</string>
+    <string name="cloud_upload_all_failed">アップロードに失敗しました</string>
     <string name="cloud_disk_entry_hint">アップロードした音楽はここに保存されます</string>
     <string name="upload_to_cloud_disk">クラウドに楽曲をアップロード</string>
     <string name="cloud_disk_capacity">%1$s / %2$s 使用中</string>
-    <string name="uploading_to_cloud_disk">%1$s をアップロード中…</string>
-    <string name="uploaded_to_cloud_disk">%1$s をアップロードしました</string>
-    <string name="cloud_upload_failed">%1$s のアップロードに失敗：%2$s</string>
     <string name="cloud_upload_read_failed">選択したファイルを読み取れません</string>
     <string name="no_favorite_mvs">お気に入りのMVはまだありません</string>
     <string name="mv_saved_to_download">MVをDownloadに保存しました</string>

@@ -1012,12 +1012,13 @@
     <string name="mixed_source_selection">Mixes music sources — cannot add</string>
     <string name="favorite_mvs">Favorite MVs</string>
     <string name="cloud_disk">Cloud Disk</string>
+    <string name="cloud_upload_progress_title">Uploading to cloud disk</string>
+    <string name="cloud_upload_all_done">Uploaded %1$d songs</string>
+    <string name="cloud_upload_partial_done">Uploaded %1$d songs, %2$d failed</string>
+    <string name="cloud_upload_all_failed">Upload failed</string>
     <string name="cloud_disk_entry_hint">Your uploaded music lives here</string>
     <string name="upload_to_cloud_disk">Upload songs to cloud disk</string>
     <string name="cloud_disk_capacity">%1$s of %2$s used</string>
-    <string name="uploading_to_cloud_disk">Uploading %1$s…</string>
-    <string name="uploaded_to_cloud_disk">Uploaded %1$s</string>
-    <string name="cloud_upload_failed">Failed to upload %1$s: %2$s</string>
     <string name="cloud_upload_read_failed">Could not read the selected file</string>
     <string name="no_favorite_mvs">No favorite MVs yet</string>
     <string name="mv_saved_to_download">MV saved to Download</string>

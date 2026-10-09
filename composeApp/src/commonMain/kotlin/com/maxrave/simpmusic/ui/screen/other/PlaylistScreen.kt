@@ -40,10 +40,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.LocalTextStyle
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SearchBar
 import androidx.compose.material3.SearchBarDefaults
@@ -76,6 +78,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -91,6 +94,7 @@ import com.kmpalette.rememberPaletteState
 import com.maxrave.simpmusic.extension.barBlurStyle
 import com.maxrave.simpmusic.ui.component.DownloadingIndicator
 import com.maxrave.simpmusic.ui.component.BatchDownloadConfirmDialog
+import com.maxrave.simpmusic.ui.component.rememberSurfaceDarkColors
 import com.maxrave.domain.data.entities.DownloadState
 import com.maxrave.common.NETEASE_MV_MEDIA_ID_PREFIX
 import com.maxrave.domain.data.model.browse.album.Track
@@ -101,7 +105,7 @@ import com.maxrave.simpmusic.ui.component.SearchBarEnter
 import com.maxrave.simpmusic.ui.component.rememberHolderPainter
 import com.maxrave.simpmusic.ui.utils.toHiResArtworkUrl
 import com.maxrave.common.NETEASE_CLOUD_DISK_PLAYLIST_ID
-import com.maxrave.simpmusic.expect.ui.filePickerResult
+import com.maxrave.simpmusic.expect.ui.multiFilePickerResult
 import com.maxrave.simpmusic.expect.ui.layerBackdrop
 import com.maxrave.simpmusic.expect.ui.rememberBackdrop
 import com.maxrave.simpmusic.expect.ui.toImageBitmap
@@ -165,6 +169,7 @@ import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import simpmusic.composeapp.generated.resources.Res
 import simpmusic.composeapp.generated.resources.album_length
+import simpmusic.composeapp.generated.resources.cloud_upload_progress_title
 import simpmusic.composeapp.generated.resources.baseline_downloaded
 import simpmusic.composeapp.generated.resources.downloaded
 import simpmusic.composeapp.generated.resources.downloading
@@ -204,10 +209,10 @@ fun PlaylistScreen(
     var showSearchBar by rememberSaveable { mutableStateOf(false) }
     var searchBarHeightPx by remember { mutableStateOf(0) }
 
-    // 云盘上传:SAF 选音频(单笔),回调进 VM(读元数据+流式 md5+五步上传)
+    // 云盘批量上传:SAF 多选,回调进 VM 逐首串行(进度弹窗由 cloudUploadProgress 驱动)
     val uploadPicker =
-        filePickerResult(mimeType = "audio/*") { uri ->
-            if (uri != null) viewModel.uploadToCloudDisk(uri)
+        multiFilePickerResult(mimeType = "audio/*") { uris ->
+            if (uris.isNotEmpty()) viewModel.uploadToCloudDisk(uris)
         }
 
     val lazyState = rememberLazyListState()
@@ -1592,6 +1597,46 @@ fun PlaylistScreen(
                 viewModel.makeToast("Error: ${state.message}")
                 navController.navigateUp()
             }
+        }
+
+        // 云盘批量上传进度弹窗(模态:上传不可中断,无按钮)
+        val cloudUploadProgress by viewModel.cloudUploadProgress.collectAsStateWithLifecycle()
+        cloudUploadProgress?.let { p ->
+            val fileFraction =
+                if (p.bytesTotal > 0) (p.bytesSent.toFloat() / p.bytesTotal).coerceIn(0f, 1f) else 0f
+            val overall = ((p.index - 1) + fileFraction) / p.total.coerceAtLeast(1)
+            AlertDialog(
+                containerColor = rememberSurfaceDarkColors().container,
+                onDismissRequest = {},
+                confirmButton = {},
+                title = {
+                    Text(
+                        text = stringResource(Res.string.cloud_upload_progress_title),
+                        style = typo().labelSmall,
+                    )
+                },
+                text = {
+                    Column {
+                        Text(
+                            text = "${p.index}/${p.total}  ${p.fileName}",
+                            style = typo().bodyMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        LinearProgressIndicator(
+                            progress = { overall },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "${(overall * 100).toInt()}%",
+                            style = typo().bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                },
+            )
         }
 
         // 整歌单下载"跳过/覆盖/取消"三选弹窗(2026-10 二期)

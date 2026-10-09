@@ -69,10 +69,10 @@ import simpmusic.composeapp.generated.resources.Res
 import simpmusic.composeapp.generated.resources.auto_created_by_youtube_music
 import simpmusic.composeapp.generated.resources.cloud_disk
 import simpmusic.composeapp.generated.resources.cloud_disk_capacity
-import simpmusic.composeapp.generated.resources.cloud_upload_failed
+import simpmusic.composeapp.generated.resources.cloud_upload_all_done
+import simpmusic.composeapp.generated.resources.cloud_upload_all_failed
+import simpmusic.composeapp.generated.resources.cloud_upload_partial_done
 import simpmusic.composeapp.generated.resources.cloud_upload_read_failed
-import simpmusic.composeapp.generated.resources.uploaded_to_cloud_disk
-import simpmusic.composeapp.generated.resources.uploading_to_cloud_disk
 import simpmusic.composeapp.generated.resources.download_no_space
 import simpmusic.composeapp.generated.resources.downloaded
 import simpmusic.composeapp.generated.resources.downloading
@@ -734,66 +734,101 @@ class PlaylistViewModel(
             String.format(java.util.Locale.ROOT, "%.1f MB", bytes / 1048576.0)
         }
 
-    /** 上传在飞标志:同一时间只跑一笔,再点直接忽略 */
+    /** 上传在飞标志:同一时间只跑一批,再点直接忽略 */
     private var cloudUploadInFlight = false
 
+    /** 批量上传进度(弹窗消费);null=不在上传 */
+    data class CloudUploadProgress(
+        val index: Int,
+        val total: Int,
+        val fileName: String,
+        val bytesSent: Long,
+        val bytesTotal: Long,
+    )
+
+    private val _cloudUploadProgress = MutableStateFlow<CloudUploadProgress?>(null)
+    val cloudUploadProgress: StateFlow<CloudUploadProgress?> = _cloudUploadProgress.asStateFlow()
+
     /**
-     * 上传歌曲到云盘(SAF 选择回调进来):平台层读元数据+流式 md5 → 端点五步上传 →
-     * 成功原地刷新列表。元数据从文件名"艺人-标题"启发式解析,只作匹配失败的显示
-     * 兜底——服务端转码后按音频指纹匹配曲库并覆盖(探针实证)。
+     * 批量上传歌曲到云盘(SAF 多选回调进来):逐首串行(读元数据+流式 md5 → 端点五步
+     * 上传,nos 直传带字节进度),全部完成后汇总 toast+原地刷新列表。元数据从文件名
+     * "艺人-标题"启发式解析,只作匹配失败的显示兜底——服务端转码后按音频指纹匹配
+     * 曲库并覆盖(探针实证)。
      */
-    fun uploadToCloudDisk(uri: String) {
-        if (cloudUploadInFlight) return
+    fun uploadToCloudDisk(uris: List<String>) {
+        if (cloudUploadInFlight || uris.isEmpty()) return
         cloudUploadInFlight = true
         viewModelScope.launch {
-            val meta = withContext(Dispatchers.IO) { readCloudUploadFile(uri) }
-            val bodyFactory = cloudUploadBodyFactory(uri)
-            if (meta == null || bodyFactory == null) {
-                makeToast(getString(Res.string.cloud_upload_read_failed))
-                cloudUploadInFlight = false
-                return@launch
-            }
-            makeToast(getString(Res.string.uploading_to_cloud_disk, meta.fileName))
-            val displayName = meta.fileName.substringBeforeLast('.')
-            val parsedArtist = displayName.substringBefore('-', "").trim()
-            val parsedSong = displayName.substringAfter('-', "").trim()
-            val (song, artist) =
-                if (parsedArtist.isNotEmpty() && parsedSong.isNotEmpty()) {
-                    parsedSong to parsedArtist
-                } else {
-                    displayName to ""
+            var ok = 0
+            var fail = 0
+            for ((i, uri) in uris.withIndex()) {
+                val meta = withContext(Dispatchers.IO) { readCloudUploadFile(uri) }
+                val bodyFactory = cloudUploadBodyFactory(uri)
+                if (meta == null || bodyFactory == null) {
+                    fail++
+                    continue
                 }
-            neteaseRepository
-                .uploadToCloudDisk(
-                    fileName = meta.fileName,
-                    ext = meta.fileName.substringAfterLast('.', "mp3"),
-                    sizeBytes = meta.sizeBytes,
-                    md5 = meta.md5,
-                    song = song,
-                    album = "",
-                    artist = artist,
-                    contentType = meta.mimeType,
-                    openBody = bodyFactory,
-                ).fold(
-                    onSuccess = {
-                        makeToast(getString(Res.string.uploaded_to_cloud_disk, meta.fileName))
-                        // 服务端发布+转码是异步的,稍等再刷(窗口期会 500,刷新内部还会再重试一次)
-                        delay(2500)
-                        getCloudDiskData(firstLoad = false)
-                    },
-                    onFailure = { e ->
-                        makeToast(
-                            getString(
-                                Res.string.cloud_upload_failed,
-                                meta.fileName,
-                                e.message ?: e::class.simpleName.orEmpty(),
-                            ),
-                        )
-                    },
-                )
+                _cloudUploadProgress.value =
+                    CloudUploadProgress(i + 1, uris.size, meta.fileName, 0, meta.sizeBytes)
+                val displayName = meta.fileName.substringBeforeLast('.')
+                val parsedArtist = displayName.substringBefore('-', "").trim()
+                val parsedSong = displayName.substringAfter('-', "").trim()
+                val (song, artist) =
+                    if (parsedArtist.isNotEmpty() && parsedSong.isNotEmpty()) {
+                        parsedSong to parsedArtist
+                    } else {
+                        displayName to ""
+                    }
+                // 上传回调在 IO 线程高频触发,按 1% 步进节流再进 StateFlow
+                var lastReported = -1L
+                neteaseRepository
+                    .uploadToCloudDisk(
+                        fileName = meta.fileName,
+                        ext = meta.fileName.substringAfterLast('.', "mp3"),
+                        sizeBytes = meta.sizeBytes,
+                        md5 = meta.md5,
+                        song = song,
+                        album = "",
+                        artist = artist,
+                        contentType = meta.mimeType,
+                        openBody = bodyFactory,
+                        onUpload = { sent, _ ->
+                            val pct =
+                                if (meta.sizeBytes > 0) (sent * 100 / meta.sizeBytes) else 100
+                            if (pct != lastReported) {
+                                lastReported = pct
+                                _cloudUploadProgress.value =
+                                    _cloudUploadProgress.value?.copy(bytesSent = sent)
+                            }
+                        },
+                    ).fold(
+                        onSuccess = { ok++ },
+                        onFailure = { e ->
+                            fail++
+                            Logger.w(
+                                tag,
+                                "cloud upload failed: ${meta.fileName} ${e.message}",
+                            )
+                        },
+                    )
+            }
+            _cloudUploadProgress.value = null
+            makeToast(
+                when {
+                    fail == 0 -> getString(Res.string.cloud_upload_all_done, ok)
+                    ok == 0 -> getString(Res.string.cloud_upload_all_failed)
+                    else -> getString(Res.string.cloud_upload_partial_done, ok, fail)
+                },
+            )
+            // 服务端发布+转码是异步的,稍等再刷(窗口期会 500,刷新内部还会再重试一次)
+            delay(2500)
+            getCloudDiskData(firstLoad = false)
             cloudUploadInFlight = false
         }
     }
+
+    /** 兼容单参调用点(旧单文件路径) */
+    fun uploadToCloudDisk(uri: String) = uploadToCloudDisk(listOf(uri))
 
     fun getContinuationTrack(
         playlistId: String,

@@ -16,6 +16,18 @@ actual fun filePickerResult(
     }
 
 @Composable
+actual fun multiFilePickerResult(
+    mimeType: String,
+    onResultUris: (List<String>) -> Unit,
+): FilePickerLauncher =
+    // 桌面无 SAF,单选 picker 本就是 no-op——多选同样空回(上传入口实际到不了)
+    object : FilePickerLauncher {
+        override fun launch() {
+            onResultUris(emptyList())
+        }
+    }
+
+@Composable
 actual fun fileSaverResult(
     fileName: String,
     mimeType: String,

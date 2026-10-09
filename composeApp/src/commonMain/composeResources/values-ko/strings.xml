@@ -689,12 +689,13 @@
     <string name="need_login_toast">로그인 후 이용할 수 있습니다</string>
     <string name="favorite_mvs">즐겨찾기 MV</string>
     <string name="cloud_disk">클라우드</string>
+    <string name="cloud_upload_progress_title">클라우드에 업로드 중</string>
+    <string name="cloud_upload_all_done">%1$d곡 업로드 완료</string>
+    <string name="cloud_upload_partial_done">%1$d곡 업로드, %2$d곡 실패</string>
+    <string name="cloud_upload_all_failed">업로드 실패</string>
     <string name="cloud_disk_entry_hint">업로드한 음악이 여기에 보관됩니다</string>
     <string name="upload_to_cloud_disk">클라우드에 음악 업로드</string>
     <string name="cloud_disk_capacity">%2$s 중 %1$s 사용</string>
-    <string name="uploading_to_cloud_disk">%1$s 업로드 중…</string>
-    <string name="uploaded_to_cloud_disk">%1$s 업로드 완료</string>
-    <string name="cloud_upload_failed">%1$s 업로드 실패: %2$s</string>
     <string name="cloud_upload_read_failed">선택한 파일을 읽을 수 없습니다</string>
     <string name="no_favorite_mvs">아직 즐겨찾기한 MV가 없습니다</string>
     <string name="mv_saved_to_download">MV가 Download에 저장되었습니다</string>

@@ -25,6 +25,24 @@ actual fun filePickerResult(
 }
 
 @Composable
+actual fun multiFilePickerResult(
+    mimeType: String,
+    onResultUris: (List<String>) -> Unit,
+): FilePickerLauncher {
+    val launcher =
+        rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+            if (uris.isNotEmpty()) {
+                onResultUris(uris.map { it.toString() })
+            }
+        }
+    return object : FilePickerLauncher {
+        override fun launch() {
+            launcher.launch(arrayOf(mimeType))
+        }
+    }
+}
+
+@Composable
 actual fun fileSaverResult(
     fileName: String,
     mimeType: String,
