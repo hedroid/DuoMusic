@@ -161,6 +161,7 @@ fun MvListScreen(
     sharedViewModel: SharedViewModel = koinInject(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val accountName by viewModel.accountName.collectAsStateWithLifecycle()
     val hazeState = rememberHazeState()
     val listState = rememberLazyListState()
     // 正在播放判定双源(track 在队列 rebuild 窗口恒 null,songEntity 兜底——九轮铁律)
@@ -290,6 +291,7 @@ fun MvListScreen(
                             item(contentType = "header") {
                                 ImmersiveMvHeader(
                                     coverUrl = headerCover,
+                                    authorName = accountName,
                                     paletteBg = mutedPaletteBg,
                                     onBack = navController::navigateUp,
                                     onSearch = { showSearchBar = !showSearchBar },
@@ -694,6 +696,7 @@ fun MvListScreen(
 @Composable
 private fun ImmersiveMvHeader(
     coverUrl: String?,
+    authorName: String,
     paletteBg: Color,
     onBack: () -> Unit,
     onSearch: () -> Unit,
@@ -776,6 +779,19 @@ private fun ImmersiveMvHeader(
                     maxLines = 2,
                     textAlign = TextAlign.Center,
                 )
+                // 作者行(红心歌单"收藏者"行同款视觉:titleSmall/白/居中):收藏 MV 的
+                // 收藏者是账号本人,非艺人不可跳转——红心歌单里那行实际点击也无
+                // 反应(author.id 跳艺人页无语义),这里直接做成纯文本;昵称空则隐藏
+                if (authorName.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = authorName,
+                        style = typo().titleSmall,
+                        color = Color.White,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                    )
+                }
             }
         }
         // 顶栏:返回(左)+液态玻璃药丸[搜索][更多](右)——歌单页同款(收藏心对 MV 合集

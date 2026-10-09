@@ -9,9 +9,11 @@ import com.maxrave.domain.mediaservice.handler.QueueData
 import com.maxrave.domain.repository.SongRepository
 import com.maxrave.simpmusic.viewModel.base.BaseViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -47,6 +49,12 @@ class MvListViewModel(
 ) : BaseViewModel() {
     private val _uiState = MutableStateFlow<MvListUIState>(MvListUIState.Loading)
     val uiState: StateFlow<MvListUIState> get() = _uiState.asStateFlow()
+
+    /** 当前网易账号昵称(登录时与头像同链路写 DataStore):头部作者行用,
+     *  对齐红心歌单头部的"收藏者"行;空(键未写/未登录)时 UI 隐藏行 */
+    val accountName: StateFlow<String> =
+        neteaseRepository.accountName
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
 
     private var inFlight = false
 
