@@ -142,7 +142,7 @@ import com.maxrave.simpmusic.ui.icon.Shuffle
 import com.maxrave.simpmusic.ui.icon.SimpIcons
 import com.maxrave.simpmusic.ui.navigation.destination.list.ArtistDestination
 import com.maxrave.simpmusic.ui.utils.CloudDiskArt
-import com.maxrave.simpmusic.ui.utils.cloudCoverPainter
+import com.maxrave.simpmusic.ui.utils.cloudCoverSubduedPainter
 import com.maxrave.simpmusic.ui.theme.LocalIsDarkTheme
 import com.maxrave.simpmusic.ui.theme.seed
 import com.maxrave.simpmusic.ui.theme.typo
@@ -430,8 +430,9 @@ fun PlaylistScreen(
                 val authorClickable = data.id.toLongOrNull() == null
                 // 云盘伪歌单:顶栏露上传按钮,藏收藏心;整单下载按钮保留(VM 侧云盘分支不落 Room)
                 val isCloudDisk = data.id == NETEASE_CLOUD_DISK_PLAYLIST_ID
-                // 无封面曲目行(未匹配歌 thumbnails 空)的兜底:蓝底白云位图,不落黑块
-                val cloudCoverFallback = if (isCloudDisk) remember { cloudCoverPainter() } else null
+                // 无封面曲目行(未匹配歌 thumbnails 空)/头图兜底:安静版深灰+半透明云
+                // (行内兜底成排重复,高饱和蓝会扎眼——业界通用=中性低饱和底+小图标)
+                val cloudCoverFallback = if (isCloudDisk) remember { cloudCoverSubduedPainter() } else null
                 val hazeState =
                     rememberHazeState()
                 LazyColumn(
