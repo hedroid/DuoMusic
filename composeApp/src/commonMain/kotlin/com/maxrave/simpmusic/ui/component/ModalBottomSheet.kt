@@ -269,6 +269,7 @@ import simpmusic.composeapp.generated.resources.reply_hint
 import simpmusic.composeapp.generated.resources.retry
 import simpmusic.composeapp.generated.resources.send
 import simpmusic.composeapp.generated.resources.delete
+import simpmusic.composeapp.generated.resources.delete_from_cloud_disk
 import simpmusic.composeapp.generated.resources.delete_playlist
 import simpmusic.composeapp.generated.resources.delete_song_from_playlist
 import simpmusic.composeapp.generated.resources.description
@@ -1849,6 +1850,8 @@ fun NowPlayingBottomSheet(
     onLibraryDelete: (() -> Unit)? = null,
     // 歌单页内打开且该歌单可移除歌曲(网易自建歌单)时传入;播放页等其它场景不传不显示
     onRemoveFromPlaylist: (() -> Unit)? = null,
+    // 云盘页单曲菜单传入:从云盘删除(不可逆,调用方负责确认弹窗);其它场景不传不显示
+    onDeleteFromCloudDisk: (() -> Unit)? = null,
     // 需要让宿主页面立即响应点赞状态变化时传入(例如红心歌单取消红心后剔除歌曲)
     onLikeChanged: ((Boolean) -> Unit)? = null,
     dataStoreManager: DataStoreManager = koinInject<DataStoreManager>(),
@@ -2438,6 +2441,18 @@ fun NowPlayingBottomSheet(
                             ) {
                                 hideModalBottomSheet()
                                 onRemoveFromPlaylist?.invoke()
+                            }
+                        }
+                    }
+                    // 云盘页单曲菜单的"从云盘中删除"(不可逆,调用方弹确认;垃圾桶=真删)
+                    Crossfade(targetState = onDeleteFromCloudDisk != null) {
+                        if (it) {
+                            ActionButton(
+                                icon = SimpIcons.Delete,
+                                text = Res.string.delete_from_cloud_disk,
+                            ) {
+                                hideModalBottomSheet()
+                                onDeleteFromCloudDisk?.invoke()
                             }
                         }
                     }

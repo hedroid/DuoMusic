@@ -97,6 +97,7 @@ import com.maxrave.simpmusic.ui.component.BatchDownloadConfirmDialog
 import com.maxrave.simpmusic.ui.component.selection.SongSelectionAction
 import com.maxrave.simpmusic.ui.component.rememberSurfaceDarkColors
 import com.maxrave.domain.data.entities.DownloadState
+import com.maxrave.domain.data.entities.SongEntity
 import com.maxrave.common.NETEASE_MV_MEDIA_ID_PREFIX
 import com.maxrave.domain.data.model.browse.album.Track
 import com.maxrave.domain.utils.toSongEntity
@@ -236,6 +237,8 @@ fun PlaylistScreen(
     var showSelectionSheet by rememberSaveable { mutableStateOf(false) }
     var showSelectionAddToPlaylist by rememberSaveable { mutableStateOf(false) }
     var showCloudDeleteDialog by rememberSaveable { mutableStateOf(false) }
+    // 单曲三点菜单的云盘删除目标(SongEntity 形状,带歌名)
+    var pendingCloudDeleteSong by remember { mutableStateOf<SongEntity?>(null) }
 
     val filteredTrack by remember {
         derivedStateOf {
@@ -1427,6 +1430,39 @@ fun PlaylistScreen(
                             },
                     )
                 }
+                pendingCloudDeleteSong?.let { song ->
+                    AlertDialog(
+                        containerColor = rememberSurfaceDarkColors().container,
+                        onDismissRequest = { pendingCloudDeleteSong = null },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    viewModel.deleteCloudDiskSongs(listOf(song.videoId))
+                                    pendingCloudDeleteSong = null
+                                },
+                            ) {
+                                Text(text = stringResource(Res.string.delete), style = typo().labelSmall)
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { pendingCloudDeleteSong = null }) {
+                                Text(text = stringResource(Res.string.cancel), style = typo().labelSmall)
+                            }
+                        },
+                        title = {
+                            Text(
+                                text = stringResource(Res.string.delete_from_cloud_disk_title, 1),
+                                style = typo().labelSmall,
+                            )
+                        },
+                        text = {
+                            Text(
+                                text = stringResource(Res.string.delete_from_cloud_disk_message),
+                                style = typo().bodyMedium,
+                            )
+                        },
+                    )
+                }
                 if (showCloudDeleteDialog) {
                     val selectedIds = selectionState.selected.toList()
                     AlertDialog(
@@ -1506,6 +1542,12 @@ fun PlaylistScreen(
                         // 与 MV 收藏页 pendingUnlikeId 同款模式。
                         onLikeChanged = { liked ->
                             if (!liked) pendingUnlikeId = track.videoId
+                        },
+                        // 云盘单曲删除:登记目标,确认弹窗(不可逆)落定再调 VM
+                        onDeleteFromCloudDisk = if (isCloudDisk) {
+                            { pendingCloudDeleteSong = track }
+                        } else {
+                            null
                         },
                     )
                 }
