@@ -405,6 +405,9 @@ fun PlaylistScreen(
                 val data = state.data
                 Logger.d(tag, "data: $data")
                 if (data == null) return@Crossfade
+                // 网易歌单(红心/自建/收藏)的作者=用户 id,跳艺人页无语义(点击实际
+                // 无反应/空页)——作者行做纯文本;YT 歌单作者=艺人频道 id,保留可点
+                val authorClickable = data.id.toLongOrNull() == null
                 val hazeState =
                     rememberHazeState()
                 LazyColumn(
@@ -500,32 +503,43 @@ fun PlaylistScreen(
                                                             textAlign = TextAlign.Center,
                                                         )
                                                         Spacer(modifier = Modifier.height(4.dp))
-                                                        CompositionLocalProvider(
-                                                            LocalMinimumInteractiveComponentSize provides Dp.Unspecified,
-                                                        ) {
-                                                            TextButton(
-                                                                modifier =
-                                                                    Modifier
-                                                                        .wrapContentHeight()
-                                                                        .defaultMinSize(minHeight = 1.dp, minWidth = 1.dp),
-                                                                contentPadding = PaddingValues(vertical = 1.dp),
-                                                                onClick = {
-                                                                    if (data.author.id.isNotEmpty()) {
-                                                                        navController.navigate(
-                                                                            ArtistDestination(
-                                                                                data.author.id,
-                                                                            ),
-                                                                        )
-                                                                    }
-                                                                },
+                                                        if (authorClickable) {
+                                                            CompositionLocalProvider(
+                                                                LocalMinimumInteractiveComponentSize provides Dp.Unspecified,
                                                             ) {
-                                                                Text(
-                                                                    text = data.author.name,
-                                                                    style = typo().titleSmall,
-                                                                    color = Color.White,
-                                                                    textAlign = TextAlign.Center,
-                                                                )
+                                                                TextButton(
+                                                                    modifier =
+                                                                        Modifier
+                                                                            .wrapContentHeight()
+                                                                            .defaultMinSize(minHeight = 1.dp, minWidth = 1.dp),
+                                                                    contentPadding = PaddingValues(vertical = 1.dp),
+                                                                    onClick = {
+                                                                        if (data.author.id.isNotEmpty()) {
+                                                                            navController.navigate(
+                                                                                ArtistDestination(
+                                                                                    data.author.id,
+                                                                                ),
+                                                                            )
+                                                                        }
+                                                                    },
+                                                                ) {
+                                                                    Text(
+                                                                        text = data.author.name,
+                                                                        style = typo().titleSmall,
+                                                                        color = Color.White,
+                                                                        textAlign = TextAlign.Center,
+                                                                    )
+                                                                }
                                                             }
+                                                        } else {
+                                                            // 网易歌单(红心/自建/收藏):作者行纯文本(2026-10-09
+                                                            // 用户定案)——样式与可点版一致,仅去掉无效跳转
+                                                            Text(
+                                                                text = data.author.name,
+                                                                style = typo().titleSmall,
+                                                                color = Color.White,
+                                                                textAlign = TextAlign.Center,
+                                                            )
                                                         }
                                                         Spacer(modifier = Modifier.height(2.dp))
                                                         Text(
@@ -671,14 +685,19 @@ fun PlaylistScreen(
                                                                 // Apple uses on this line.
                                                                 color = seed,
                                                                 modifier =
-                                                                    Modifier.clickable {
-                                                                        if (data.author.id.isNotEmpty()) {
-                                                                            navController.navigate(
-                                                                                ArtistDestination(
-                                                                                    data.author.id,
-                                                                                ),
-                                                                            )
+                                                                    // 网易歌单作者行不可点(与竖屏分支同判定)
+                                                                    if (authorClickable) {
+                                                                        Modifier.clickable {
+                                                                            if (data.author.id.isNotEmpty()) {
+                                                                                navController.navigate(
+                                                                                    ArtistDestination(
+                                                                                        data.author.id,
+                                                                                    ),
+                                                                                )
+                                                                            }
                                                                         }
+                                                                    } else {
+                                                                        Modifier
                                                                     },
                                                             )
                                                             Spacer(modifier = Modifier.height(6.dp))
