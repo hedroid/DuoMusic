@@ -50,6 +50,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -130,6 +131,8 @@ fun SongFullWidthItems(
     isSelected: Boolean = false,
     onLongClick: ((videoId: String) -> Unit)? = null,
     onSelectToggle: ((videoId: String) -> Unit)? = null,
+    /** 封面缺失时的兜底 painter(null=默认音符占位);云盘页传蓝底白云,未匹配歌不落黑块 */
+    coverFallbackPainter: Painter? = null,
     modifier: Modifier,
     rightView: @Composable (() -> Unit)? = null,
     forceDark: Boolean = LocalForceDarkText.current,
@@ -304,8 +307,8 @@ fun SongFullWidthItems(
                                         .diskCacheKey(thumb)
                                         .crossfade(true)
                                         .build(),
-                                placeholder = rememberHolderPainter(),
-                                error = rememberHolderPainter(),
+                                placeholder = coverFallbackPainter ?: rememberHolderPainter(),
+                                error = coverFallbackPainter ?: rememberHolderPainter(),
                                 contentDescription = null,
                                 contentScale = ContentScale.FillWidth,
                                 alpha = if (unavailable) 0.4f else 1f,

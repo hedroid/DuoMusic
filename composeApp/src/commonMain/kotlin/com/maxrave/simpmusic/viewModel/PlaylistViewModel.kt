@@ -1163,7 +1163,13 @@ class PlaylistViewModel(
 
     fun downloadFullPlaylist() {
         viewModelScope.launch {
-            val id = playlistEntity.value?.id ?: return@launch
+            // 云盘伪歌单没有 Room 歌单行:哨兵 id 顶上,仅用于批量下载流转;
+            // 整单下载态回写(STATE_DOWNLOADING/NOT_DOWNLOADED)对云盘跳过,
+            // 不往 playlist 表塞哨兵行(库页/Room 兜底分支会读到幽灵行)
+            val isCloudDisk = uiState.value.data?.id == NETEASE_CLOUD_DISK_PLAYLIST_ID
+            val id =
+                playlistEntity.value?.id
+                    ?: if (isCloudDisk) NETEASE_CLOUD_DISK_PLAYLIST_ID else return@launch
             getFullTracks { tracks ->
                 viewModelScope.launch {
                     // 三选分类(2026-09-30 定稿):在途跳过;文件式已下载→弹窗;其余直接入队
@@ -1194,8 +1200,8 @@ class PlaylistViewModel(
                     }
                     if (downloaded.isEmpty()) {
                         if (notDownloaded.isNotEmpty()) {
-                            updatePlaylistDownloadState(id, STATE_DOWNLOADING)
-                            if (!queueBatchDownload(notDownloaded)) {
+                            if (!isCloudDisk) updatePlaylistDownloadState(id, STATE_DOWNLOADING)
+                            if (!queueBatchDownload(notDownloaded) && !isCloudDisk) {
                                 updatePlaylistDownloadState(id, STATE_NOT_DOWNLOADED)
                             }
                         } else {

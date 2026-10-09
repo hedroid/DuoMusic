@@ -4030,6 +4030,8 @@ fun PlaylistBottomSheet(
     playlistName: String,
     isAlbum: Boolean = false,
     isYourYouTubePlaylist: Boolean,
+    /** 分享行开关:云盘伪歌单没有可分享的落地页,隐藏(其余场景恒 true) */
+    showShare: Boolean = true,
     onEditTitle: (newTitle: String) -> Unit = {},
     onAddToQueue: (() -> Unit)? = null,
     // 网易收藏歌单/专辑详情页"更多"菜单露出:取消收藏(云端 subscribe t=0)。调用方负责二次确认。
@@ -4174,10 +4176,12 @@ fun PlaylistBottomSheet(
                         showEditTitle = true
                     }
                 }
-                val shareTitle = stringResource(Res.string.share)
-                ActionButton(icon = SimpIcons.Share, text = Res.string.share) {
-                    val url = if (isAlbum) albumShareLink(playlistId) else playlistShareLink(playlistId)
-                    shareUrl(shareTitle, url)
+                if (showShare) {
+                    val shareTitle = stringResource(Res.string.share)
+                    ActionButton(icon = SimpIcons.Share, text = Res.string.share) {
+                        val url = if (isAlbum) albumShareLink(playlistId) else playlistShareLink(playlistId)
+                        shareUrl(shareTitle, url)
+                    }
                 }
                 EndOfModalBottomSheet()
             }

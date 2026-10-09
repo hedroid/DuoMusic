@@ -137,6 +137,8 @@ import com.maxrave.simpmusic.ui.icon.Search
 import com.maxrave.simpmusic.ui.icon.Shuffle
 import com.maxrave.simpmusic.ui.icon.SimpIcons
 import com.maxrave.simpmusic.ui.navigation.destination.list.ArtistDestination
+import com.maxrave.simpmusic.ui.utils.CloudDiskArt
+import com.maxrave.simpmusic.ui.utils.cloudCoverPainter
 import com.maxrave.simpmusic.ui.theme.LocalIsDarkTheme
 import com.maxrave.simpmusic.ui.theme.seed
 import com.maxrave.simpmusic.ui.theme.typo
@@ -421,8 +423,10 @@ fun PlaylistScreen(
                 // 网易歌单(红心/自建/收藏)的作者=用户 id,跳艺人页无语义(点击实际
                 // 无反应/空页)——作者行做纯文本;YT 歌单作者=艺人频道 id,保留可点
                 val authorClickable = data.id.toLongOrNull() == null
-                // 云盘伪歌单:顶栏露上传按钮,藏收藏心/更多菜单/整单下载
+                // 云盘伪歌单:顶栏露上传按钮,藏收藏心;整单下载按钮保留(VM 侧云盘分支不落 Room)
                 val isCloudDisk = data.id == NETEASE_CLOUD_DISK_PLAYLIST_ID
+                // 无封面曲目行(未匹配歌 thumbnails 空)的兜底:蓝底白云位图,不落黑块
+                val cloudCoverFallback = if (isCloudDisk) remember { cloudCoverPainter() } else null
                 val hazeState =
                     rememberHazeState()
                 LazyColumn(
@@ -479,8 +483,8 @@ fun PlaylistScreen(
                                                                     .background(
                                                                         Brush.linearGradient(
                                                                             listOf(
-                                                                                MaterialTheme.colorScheme.primaryContainer,
-                                                                                MaterialTheme.colorScheme.tertiaryContainer,
+                                                                                CloudDiskArt.gradientTop,
+                                                                                CloudDiskArt.gradientBottom,
                                                                             ),
                                                                         ),
                                                                     ),
@@ -489,7 +493,7 @@ fun PlaylistScreen(
                                                             Icon(
                                                                 imageVector = SimpIcons.Cloud,
                                                                 contentDescription = null,
-                                                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                                tint = CloudDiskArt.cloudTint,
                                                                 modifier = Modifier.size(140.dp),
                                                             )
                                                         }
@@ -583,18 +587,21 @@ fun PlaylistScreen(
                                                             )
                                                         }
                                                         Spacer(modifier = Modifier.height(2.dp))
-                                                        Text(
-                                                            text = "${
-                                                                if (data.isRadio) {
-                                                                    stringResource(Res.string.radio)
-                                                                } else {
-                                                                    stringResource(Res.string.playlist)
-                                                                }
-                                                            } • ${data.year}",
-                                                            style = typo().bodyMedium,
-                                                            color = Color(0xC4FFFFFF),
-                                                            textAlign = TextAlign.Center,
-                                                        )
+                                                        // 云盘不是歌单,"歌单/电台 • 年份"行不渲染(2026-10-09 用户反馈)
+                                                        if (!isCloudDisk) {
+                                                            Text(
+                                                                text = "${
+                                                                    if (data.isRadio) {
+                                                                        stringResource(Res.string.radio)
+                                                                    } else {
+                                                                        stringResource(Res.string.playlist)
+                                                                    }
+                                                                } • ${data.year}",
+                                                                style = typo().bodyMedium,
+                                                                color = Color(0xC4FFFFFF),
+                                                                textAlign = TextAlign.Center,
+                                                            )
+                                                        }
                                                     }
                                                 }
                                                 // Back + Heart + Search button overlays on artwork top — liquid glass
@@ -658,16 +665,14 @@ fun PlaylistScreen(
                                                                 )
                                                             }
                                                         }
-                                                        if (!isCloudDisk) {
-                                                            IconButton(
-                                                                onClick = onPlaylistMoreClick,
-                                                            ) {
-                                                                Icon(
-                                                                    imageVector = SimpIcons.MoreVert,
-                                                                    contentDescription = "More",
-                                                                    tint = Color.White,
-                                                                )
-                                                            }
+                                                        IconButton(
+                                                            onClick = onPlaylistMoreClick,
+                                                        ) {
+                                                            Icon(
+                                                                imageVector = SimpIcons.MoreVert,
+                                                                contentDescription = "More",
+                                                                tint = Color.White,
+                                                            )
                                                         }
                                                     }
                                                 }
@@ -711,8 +716,8 @@ fun PlaylistScreen(
                                                                         .background(
                                                                             Brush.linearGradient(
                                                                                 listOf(
-                                                                                    MaterialTheme.colorScheme.primaryContainer,
-                                                                                    MaterialTheme.colorScheme.tertiaryContainer,
+                                                                                    CloudDiskArt.gradientTop,
+                                                                                    CloudDiskArt.gradientBottom,
                                                                                 ),
                                                                             ),
                                                                         ),
@@ -721,7 +726,7 @@ fun PlaylistScreen(
                                                                 Icon(
                                                                     imageVector = SimpIcons.Cloud,
                                                                     contentDescription = null,
-                                                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                                    tint = CloudDiskArt.cloudTint,
                                                                     modifier = Modifier.size(120.dp),
                                                                 )
                                                             }
@@ -858,7 +863,7 @@ fun PlaylistScreen(
                                                                         )
                                                                     }
                                                                 }
-                                                                if (!data.isRadio && !isCloudDisk) {
+                                                                if (!data.isRadio) {
                                                                     Box(
                                                                         modifier =
                                                                             Modifier
@@ -1003,16 +1008,14 @@ fun PlaylistScreen(
                                                             )
                                                         }
                                                     }
-                                                    if (!isCloudDisk) {
-                                                        IconButton(
-                                                            onClick = onPlaylistMoreClick,
-                                                        ) {
-                                                            Icon(
-                                                                imageVector = SimpIcons.MoreVert,
-                                                                contentDescription = "More",
-                                                                tint = Color.White,
-                                                            )
-                                                        }
+                                                    IconButton(
+                                                        onClick = onPlaylistMoreClick,
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = SimpIcons.MoreVert,
+                                                            contentDescription = "More",
+                                                            tint = Color.White,
+                                                        )
                                                     }
                                                 }
                                             }
@@ -1088,7 +1091,7 @@ fun PlaylistScreen(
                                                                 )
                                                             }
                                                         }
-                                                        if (!data.isRadio && !isCloudDisk) {
+                                                        if (!data.isRadio) {
                                                             Box(
                                                                 modifier =
                                                                     Modifier
@@ -1241,6 +1244,7 @@ fun PlaylistScreen(
                                         isSelected = selectionState.isSelected(item.videoId),
                                         onLongClick = { selectionState.start(it) },
                                         onSelectToggle = { selectionState.toggle(it) },
+                                        coverFallbackPainter = cloudCoverFallback,
                                         modifier = Modifier,
                                     )
                                 } else {
@@ -1262,6 +1266,7 @@ fun PlaylistScreen(
                                         isSelected = selectionState.isSelected(item.videoId),
                                         onLongClick = { selectionState.start(it) },
                                         onSelectToggle = { selectionState.toggle(it) },
+                                        coverFallbackPainter = cloudCoverFallback,
                                         modifier = Modifier,
                                     )
                                 }
@@ -1508,6 +1513,7 @@ fun PlaylistScreen(
                         playlistId = data.id,
                         playlistName = data.title,
                         isYourYouTubePlaylist = isYourYouTubePlaylist && !data.isRadio,
+                        showShare = !isCloudDisk,
                         onEditTitle = { newTitle ->
                             viewModel.updatePlaylistTitle(newTitle, data.id)
                         },

@@ -65,6 +65,7 @@ import com.maxrave.simpmusic.ui.navigation.destination.list.PlaylistDestination
 import com.maxrave.simpmusic.ui.screen.home.NeteaseAlbumRow
 import com.maxrave.simpmusic.ui.screen.home.NeteaseArtistRow
 import com.maxrave.simpmusic.ui.theme.LibraryGridDefaults
+import com.maxrave.simpmusic.ui.utils.CloudDiskArt
 import com.maxrave.simpmusic.ui.theme.typo
 import com.maxrave.logger.Logger
 import org.jetbrains.compose.resources.stringResource
@@ -208,6 +209,14 @@ internal fun LibraryNeteaseTab(
                     contentPadding = gridContentPadding,
                     state = state,
                 ) {
+                    // 云盘入口(2026-10-09 二轮:红心行上方,云朵封面),点击进云盘伪歌单页
+                    item(span = { GridItemSpan(maxLineSpan) }, key = "netease_cloud_disk_row") {
+                        CloudDiskRow(
+                            onClick = {
+                                navController.navigate(PlaylistDestination(NETEASE_CLOUD_DISK_PLAYLIST_ID))
+                            },
+                        )
+                    }
                     if (heartPlaylist != null) {
                         item(span = { GridItemSpan(maxLineSpan) }, key = "netease_heart_row") {
                             HeartPlaylistRow(
@@ -217,15 +226,6 @@ internal fun LibraryNeteaseTab(
                                 },
                             )
                         }
-                    }
-                    // 云盘入口(2026-10-09):红心行正下方,云朵图标封面,点击进云盘伪歌单页
-                    // (复用红心歌单详情页,数据源 /v1/cloud/get,顶栏带上传按钮)
-                    item(span = { GridItemSpan(maxLineSpan) }, key = "netease_cloud_disk_row") {
-                        CloudDiskRow(
-                            onClick = {
-                                navController.navigate(PlaylistDestination(NETEASE_CLOUD_DISK_PLAYLIST_ID))
-                            },
-                        )
                     }
                     // 收藏的 MV(用户 2026-10-07 定案):红心行下,同款满行横卡,点击进 MV 列表页
                     if (subscribedMv != null) {
@@ -478,8 +478,8 @@ private fun CloudDiskRow(onClick: () -> Unit) {
                     .background(
                         Brush.linearGradient(
                             listOf(
-                                MaterialTheme.colorScheme.primaryContainer,
-                                MaterialTheme.colorScheme.tertiaryContainer,
+                                CloudDiskArt.gradientTop,
+                                CloudDiskArt.gradientBottom,
                             ),
                         ),
                     ),
@@ -488,7 +488,7 @@ private fun CloudDiskRow(onClick: () -> Unit) {
             Icon(
                 imageVector = SimpIcons.Cloud,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                tint = CloudDiskArt.cloudTint,
                 modifier = Modifier.size(48.dp),
             )
         }
