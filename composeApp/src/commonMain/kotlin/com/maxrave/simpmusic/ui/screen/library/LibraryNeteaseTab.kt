@@ -1,5 +1,6 @@
 package com.maxrave.simpmusic.ui.screen.library
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,6 +21,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -35,6 +37,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.style.TextOverflow
@@ -45,6 +48,7 @@ import coil3.compose.LocalPlatformContext
 import coil3.request.CachePolicy
 import coil3.request.ImageRequest
 import coil3.request.crossfade
+import com.maxrave.common.NETEASE_CLOUD_DISK_PLAYLIST_ID
 import com.maxrave.domain.data.entities.PlaylistEntity
 import com.maxrave.domain.data.model.searchResult.albums.AlbumsResult
 import com.maxrave.domain.data.model.searchResult.artists.ArtistsResult
@@ -54,6 +58,8 @@ import com.maxrave.simpmusic.ui.component.CenterLoadingBox
 import com.maxrave.simpmusic.ui.component.EndOfPage
 import com.maxrave.simpmusic.ui.component.HomeItemContentPlaylist
 import com.maxrave.simpmusic.ui.component.rememberHolderPainter
+import com.maxrave.simpmusic.ui.icon.Cloud
+import com.maxrave.simpmusic.ui.icon.SimpIcons
 import com.maxrave.simpmusic.ui.navigation.destination.list.MvListDestination
 import com.maxrave.simpmusic.ui.navigation.destination.list.PlaylistDestination
 import com.maxrave.simpmusic.ui.screen.home.NeteaseAlbumRow
@@ -64,6 +70,8 @@ import com.maxrave.logger.Logger
 import org.jetbrains.compose.resources.stringResource
 import simpmusic.composeapp.generated.resources.Res
 import simpmusic.composeapp.generated.resources.confirm
+import simpmusic.composeapp.generated.resources.cloud_disk
+import simpmusic.composeapp.generated.resources.cloud_disk_entry_hint
 import simpmusic.composeapp.generated.resources.delete_playlist_message
 import simpmusic.composeapp.generated.resources.delete_playlist_title
 import simpmusic.composeapp.generated.resources.favorite_mvs
@@ -209,6 +217,15 @@ internal fun LibraryNeteaseTab(
                                 },
                             )
                         }
+                    }
+                    // 云盘入口(2026-10-09):红心行正下方,云朵图标封面,点击进云盘伪歌单页
+                    // (复用红心歌单详情页,数据源 /v1/cloud/get,顶栏带上传按钮)
+                    item(span = { GridItemSpan(maxLineSpan) }, key = "netease_cloud_disk_row") {
+                        CloudDiskRow(
+                            onClick = {
+                                navController.navigate(PlaylistDestination(NETEASE_CLOUD_DISK_PLAYLIST_ID))
+                            },
+                        )
                     }
                     // 收藏的 MV(用户 2026-10-07 定案):红心行下,同款满行横卡,点击进 MV 列表页
                     if (subscribedMv != null) {
@@ -435,6 +452,65 @@ private fun SubscribedMvRow(
                     maxLines = 1,
                 )
             }
+        }
+    }
+}
+
+/**
+ * 云盘入口满行横卡:HeartPlaylistRow 同款视觉,封面槽换成主题渐变底+云朵图标
+ * (云盘无网络封面);副标题是固定引导文案(不拉云盘列表,数量进详情页才知道)。
+ */
+@Composable
+private fun CloudDiskRow(onClick: () -> Unit) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
+                .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(112.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(
+                        Brush.linearGradient(
+                            listOf(
+                                MaterialTheme.colorScheme.primaryContainer,
+                                MaterialTheme.colorScheme.tertiaryContainer,
+                            ),
+                        ),
+                    ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = SimpIcons.Cloud,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier.size(48.dp),
+            )
+        }
+        Column(
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .padding(start = 12.dp),
+        ) {
+            Text(
+                text = stringResource(Res.string.cloud_disk),
+                style = typo().titleMedium,
+                color = MaterialTheme.colorScheme.onBackground,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = stringResource(Res.string.cloud_disk_entry_hint),
+                style = typo().bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
         }
     }
 }

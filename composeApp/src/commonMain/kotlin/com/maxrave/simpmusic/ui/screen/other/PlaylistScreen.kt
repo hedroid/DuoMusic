@@ -44,6 +44,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.LocalTextStyle
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SearchBar
 import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.Text
@@ -65,6 +66,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -98,6 +100,8 @@ import com.maxrave.simpmusic.ui.component.SearchBarExit
 import com.maxrave.simpmusic.ui.component.SearchBarEnter
 import com.maxrave.simpmusic.ui.component.rememberHolderPainter
 import com.maxrave.simpmusic.ui.utils.toHiResArtworkUrl
+import com.maxrave.common.NETEASE_CLOUD_DISK_PLAYLIST_ID
+import com.maxrave.simpmusic.expect.ui.filePickerResult
 import com.maxrave.simpmusic.expect.ui.layerBackdrop
 import com.maxrave.simpmusic.expect.ui.rememberBackdrop
 import com.maxrave.simpmusic.expect.ui.toImageBitmap
@@ -122,6 +126,8 @@ import com.maxrave.simpmusic.ui.component.selection.SelectedSongsBottomSheet
 import com.maxrave.simpmusic.ui.component.selection.SongSelectionTopAppBar
 import com.maxrave.simpmusic.ui.component.selection.rememberSongSelectionState
 import com.maxrave.simpmusic.ui.icon.ArrowBackIosNew
+import com.maxrave.simpmusic.ui.icon.Cloud
+import com.maxrave.simpmusic.ui.icon.CloudUpload
 import com.maxrave.simpmusic.ui.icon.Close
 import com.maxrave.simpmusic.ui.icon.DownloadForOffline
 import com.maxrave.simpmusic.ui.icon.MoreVert
@@ -165,6 +171,7 @@ import simpmusic.composeapp.generated.resources.playlist
 import simpmusic.composeapp.generated.resources.radio
 import simpmusic.composeapp.generated.resources.search
 import simpmusic.composeapp.generated.resources.unlimited
+import simpmusic.composeapp.generated.resources.upload_to_cloud_disk
 
 @OptIn(ExperimentalCoroutinesApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -194,6 +201,12 @@ fun PlaylistScreen(
 
     var showSearchBar by rememberSaveable { mutableStateOf(false) }
     var searchBarHeightPx by remember { mutableStateOf(0) }
+
+    // 云盘上传:SAF 选音频(单笔),回调进 VM(读元数据+流式 md5+五步上传)
+    val uploadPicker =
+        filePickerResult(mimeType = "audio/*") { uri ->
+            if (uri != null) viewModel.uploadToCloudDisk(uri)
+        }
 
     val lazyState = rememberLazyListState()
     val firstItemVisible by remember {
@@ -408,6 +421,8 @@ fun PlaylistScreen(
                 // 网易歌单(红心/自建/收藏)的作者=用户 id,跳艺人页无语义(点击实际
                 // 无反应/空页)——作者行做纯文本;YT 歌单作者=艺人频道 id,保留可点
                 val authorClickable = data.id.toLongOrNull() == null
+                // 云盘伪歌单:顶栏露上传按钮,藏收藏心/更多菜单/整单下载
+                val isCloudDisk = data.id == NETEASE_CLOUD_DISK_PLAYLIST_ID
                 val hazeState =
                     rememberHazeState()
                 LazyColumn(
@@ -454,26 +469,52 @@ fun PlaylistScreen(
                                                 Box(modifier = Modifier.fillMaxSize().layerBackdrop(artworkBackdrop)) {
                                                     // 头图全屏宽展示,数据侧 URL 只有 544/500 —— 请求侧升 1080
                                                     val hiResThumb = data.thumbnail.toHiResArtworkUrl()
-                                                    AsyncImage(
-                                                        model =
-                                                            ImageRequest
-                                                                .Builder(LocalPlatformContext.current)
-                                                                .data(hiResThumb)
-                                                                .diskCachePolicy(CachePolicy.ENABLED)
-                                                                .memoryCachePolicy(CachePolicy.ENABLED)
-                                                                .diskCacheKey(hiResThumb)
-                                                                .memoryCacheKey(hiResThumb)
-                                                                .crossfade(false)
-                                                                .build(),
-                                                        placeholder = rememberHolderPainter(),
-                                                        error = rememberHolderPainter(),
-                                                        contentDescription = null,
-                                                        contentScale = ContentScale.Crop,
-                                                        onSuccess = {
-                                                            bitmap = it.result.image.toImageBitmap()
-                                                        },
-                                                        modifier = Modifier.fillMaxSize(),
-                                                    )
+                                                    if (isCloudDisk) {
+                                                        // 云盘无封面:主题渐变+大云朵(库页入口行同款视觉),
+                                                        // 不落 holder 音乐占位图
+                                                        Box(
+                                                            modifier =
+                                                                Modifier
+                                                                    .fillMaxSize()
+                                                                    .background(
+                                                                        Brush.linearGradient(
+                                                                            listOf(
+                                                                                MaterialTheme.colorScheme.primaryContainer,
+                                                                                MaterialTheme.colorScheme.tertiaryContainer,
+                                                                            ),
+                                                                        ),
+                                                                    ),
+                                                            contentAlignment = Alignment.Center,
+                                                        ) {
+                                                            Icon(
+                                                                imageVector = SimpIcons.Cloud,
+                                                                contentDescription = null,
+                                                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                                modifier = Modifier.size(140.dp),
+                                                            )
+                                                        }
+                                                    } else {
+                                                        AsyncImage(
+                                                            model =
+                                                                ImageRequest
+                                                                    .Builder(LocalPlatformContext.current)
+                                                                    .data(hiResThumb)
+                                                                    .diskCachePolicy(CachePolicy.ENABLED)
+                                                                    .memoryCachePolicy(CachePolicy.ENABLED)
+                                                                    .diskCacheKey(hiResThumb)
+                                                                    .memoryCacheKey(hiResThumb)
+                                                                    .crossfade(false)
+                                                                    .build(),
+                                                            placeholder = rememberHolderPainter(),
+                                                            error = rememberHolderPainter(),
+                                                            contentDescription = null,
+                                                            contentScale = ContentScale.Crop,
+                                                            onSuccess = {
+                                                                bitmap = it.result.image.toImageBitmap()
+                                                            },
+                                                            modifier = Modifier.fillMaxSize(),
+                                                        )
+                                                    }
                                                     // Scrim spans 70% of the artwork (not a fixed 200dp): the
                                                     // shorter the ramp, the steeper the alpha, and a steep ramp
                                                     // is what makes the fade read as an edge. See
@@ -604,14 +645,29 @@ fun PlaylistScreen(
                                                         ) {
                                                             Icon(SimpIcons.Search, null, tint = Color.White)
                                                         }
-                                                        IconButton(
-                                                            onClick = onPlaylistMoreClick,
-                                                        ) {
-                                                            Icon(
-                                                                imageVector = SimpIcons.MoreVert,
-                                                                contentDescription = "More",
-                                                                tint = Color.White,
-                                                            )
+                                                        if (isCloudDisk) {
+                                                            IconButton(
+                                                                onClick = { uploadPicker.launch() },
+                                                            ) {
+                                                                Icon(
+                                                                    imageVector = SimpIcons.CloudUpload,
+                                                                    contentDescription = stringResource(
+                                                                        Res.string.upload_to_cloud_disk,
+                                                                    ),
+                                                                    tint = Color.White,
+                                                                )
+                                                            }
+                                                        }
+                                                        if (!isCloudDisk) {
+                                                            IconButton(
+                                                                onClick = onPlaylistMoreClick,
+                                                            ) {
+                                                                Icon(
+                                                                    imageVector = SimpIcons.MoreVert,
+                                                                    contentDescription = "More",
+                                                                    tint = Color.White,
+                                                                )
+                                                            }
                                                         }
                                                     }
                                                 }
@@ -645,29 +701,55 @@ fun PlaylistScreen(
                                                     ) {
                                                         // 280dp≈735px 槽位,同样请求侧升 1080(与竖屏头图同源同缓存)
                                                         val landscapeThumb = data.thumbnail.toHiResArtworkUrl()
-                                                        AsyncImage(
-                                                            model =
-                                                                ImageRequest
-                                                                    .Builder(LocalPlatformContext.current)
-                                                                    .data(landscapeThumb)
-                                                                    .diskCachePolicy(CachePolicy.ENABLED)
-                                                                    .memoryCachePolicy(CachePolicy.ENABLED)
-                                                                    .diskCacheKey(landscapeThumb)
-                                                                    .memoryCacheKey(landscapeThumb)
-                                                                    .crossfade(false)
-                                                                    .build(),
-                                                            placeholder = rememberHolderPainter(),
-                                                            error = rememberHolderPainter(),
-                                                            contentDescription = null,
-                                                            contentScale = ContentScale.Crop,
-                                                            onSuccess = {
-                                                                bitmap = it.result.image.toImageBitmap()
-                                                            },
-                                                            modifier =
-                                                                Modifier
-                                                                    .size(280.dp)
-                                                                    .clip(RoundedCornerShape(8.dp)),
-                                                        )
+                                                        if (isCloudDisk) {
+                                                            // 云盘无封面:渐变+云朵,与竖屏头图/库页入口同款视觉
+                                                            Box(
+                                                                modifier =
+                                                                    Modifier
+                                                                        .size(280.dp)
+                                                                        .clip(RoundedCornerShape(8.dp))
+                                                                        .background(
+                                                                            Brush.linearGradient(
+                                                                                listOf(
+                                                                                    MaterialTheme.colorScheme.primaryContainer,
+                                                                                    MaterialTheme.colorScheme.tertiaryContainer,
+                                                                                ),
+                                                                            ),
+                                                                        ),
+                                                                contentAlignment = Alignment.Center,
+                                                            ) {
+                                                                Icon(
+                                                                    imageVector = SimpIcons.Cloud,
+                                                                    contentDescription = null,
+                                                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                                    modifier = Modifier.size(120.dp),
+                                                                )
+                                                            }
+                                                        } else {
+                                                            AsyncImage(
+                                                                model =
+                                                                    ImageRequest
+                                                                        .Builder(LocalPlatformContext.current)
+                                                                        .data(landscapeThumb)
+                                                                        .diskCachePolicy(CachePolicy.ENABLED)
+                                                                        .memoryCachePolicy(CachePolicy.ENABLED)
+                                                                        .diskCacheKey(landscapeThumb)
+                                                                        .memoryCacheKey(landscapeThumb)
+                                                                        .crossfade(false)
+                                                                        .build(),
+                                                                placeholder = rememberHolderPainter(),
+                                                                error = rememberHolderPainter(),
+                                                                contentDescription = null,
+                                                                contentScale = ContentScale.Crop,
+                                                                onSuccess = {
+                                                                    bitmap = it.result.image.toImageBitmap()
+                                                                },
+                                                                modifier =
+                                                                    Modifier
+                                                                        .size(280.dp)
+                                                                        .clip(RoundedCornerShape(8.dp)),
+                                                            )
+                                                        }
                                                         Column(
                                                             modifier = Modifier.weight(1f),
                                                         ) {
@@ -776,7 +858,7 @@ fun PlaylistScreen(
                                                                         )
                                                                     }
                                                                 }
-                                                                if (!data.isRadio) {
+                                                                if (!data.isRadio && !isCloudDisk) {
                                                                     Box(
                                                                         modifier =
                                                                             Modifier
@@ -908,14 +990,29 @@ fun PlaylistScreen(
                                                     ) {
                                                         Icon(SimpIcons.Search, null, tint = Color.White)
                                                     }
-                                                    IconButton(
-                                                        onClick = onPlaylistMoreClick,
-                                                    ) {
-                                                        Icon(
-                                                            imageVector = SimpIcons.MoreVert,
-                                                            contentDescription = "More",
-                                                            tint = Color.White,
-                                                        )
+                                                    if (isCloudDisk) {
+                                                        IconButton(
+                                                            onClick = { uploadPicker.launch() },
+                                                        ) {
+                                                            Icon(
+                                                                imageVector = SimpIcons.CloudUpload,
+                                                                contentDescription = stringResource(
+                                                                    Res.string.upload_to_cloud_disk,
+                                                                ),
+                                                                tint = Color.White,
+                                                            )
+                                                        }
+                                                    }
+                                                    if (!isCloudDisk) {
+                                                        IconButton(
+                                                            onClick = onPlaylistMoreClick,
+                                                        ) {
+                                                            Icon(
+                                                                imageVector = SimpIcons.MoreVert,
+                                                                contentDescription = "More",
+                                                                tint = Color.White,
+                                                            )
+                                                        }
                                                     }
                                                 }
                                             }
@@ -991,7 +1088,7 @@ fun PlaylistScreen(
                                                                 )
                                                             }
                                                         }
-                                                        if (!data.isRadio) {
+                                                        if (!data.isRadio && !isCloudDisk) {
                                                             Box(
                                                                 modifier =
                                                                     Modifier

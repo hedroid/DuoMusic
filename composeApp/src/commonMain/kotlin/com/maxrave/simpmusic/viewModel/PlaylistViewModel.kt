@@ -5,6 +5,8 @@ package com.maxrave.simpmusic.viewModel
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.viewModelScope
 import com.maxrave.common.Config
+import com.maxrave.common.NETEASE_CLOUD_DISK_PAGE_PREFIX
+import com.maxrave.common.NETEASE_CLOUD_DISK_PLAYLIST_ID
 import com.maxrave.data.repository.NeteaseRepositoryImpl
 import com.maxrave.domain.manager.DataStoreManager
 import com.maxrave.domain.data.entities.DownloadState.STATE_DOWNLOADED
@@ -16,6 +18,8 @@ import com.maxrave.domain.data.model.browse.album.Track
 import com.maxrave.domain.data.model.browse.playlist.Author
 import com.maxrave.domain.data.model.browse.playlist.PlaylistBrowse
 import com.maxrave.domain.data.model.browse.playlist.PlaylistState
+import com.maxrave.simpmusic.expect.cloudUploadBodyFactory
+import com.maxrave.simpmusic.expect.readCloudUploadFile
 import com.maxrave.domain.extension.now
 import com.maxrave.domain.mediaservice.handler.DownloadHandler
 import com.maxrave.domain.mediaservice.handler.PlaylistType
@@ -45,6 +49,7 @@ import com.maxrave.simpmusic.viewModel.base.removeExclusiveTrackDownloads
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.SharingStarted.Companion.WhileSubscribed
@@ -62,6 +67,12 @@ import kotlinx.coroutines.launch
 import org.koin.core.component.inject
 import simpmusic.composeapp.generated.resources.Res
 import simpmusic.composeapp.generated.resources.auto_created_by_youtube_music
+import simpmusic.composeapp.generated.resources.cloud_disk
+import simpmusic.composeapp.generated.resources.cloud_disk_capacity
+import simpmusic.composeapp.generated.resources.cloud_upload_failed
+import simpmusic.composeapp.generated.resources.cloud_upload_read_failed
+import simpmusic.composeapp.generated.resources.uploaded_to_cloud_disk
+import simpmusic.composeapp.generated.resources.uploading_to_cloud_disk
 import simpmusic.composeapp.generated.resources.download_no_space
 import simpmusic.composeapp.generated.resources.downloaded
 import simpmusic.composeapp.generated.resources.downloading
@@ -567,6 +578,12 @@ class PlaylistViewModel(
         this.ownYouTubeNavHint = ownYouTubeNavHint
         resetData()
         viewModelScope.launch {
+            // 云盘伪歌单(NETEASE_CLOUD_DISK 哨兵):页面完全复用红心歌单详情页,数据源
+            // 换成 /v1/cloud/get 分页;不是真歌单,Room/收藏心/远端收藏态全不参与
+            if (id == NETEASE_CLOUD_DISK_PLAYLIST_ID) {
+                getCloudDiskData(firstLoad = true)
+                return@launch
+            }
             // Check radio
             if (id.isRadioPlaylistId()) {
                 playlistRepository
@@ -652,6 +669,129 @@ class PlaylistViewModel(
                         }
                     }
             }
+        }
+    }
+
+    /**
+     * 云盘详情页数据(首页/上传后原地刷新共用):伪歌单 PlaylistState+曲目+分页令牌。
+     * 作者行=当前账号昵称(红心歌单同款纯文本语义);描述行放云盘容量。
+     * firstLoad=true 时从 Loading 起步(整页 spinner),false 保持已显示内容原地替换。
+     */
+    private fun getCloudDiskData(firstLoad: Boolean) {
+        if (firstLoad) _uiState.value = Loading
+        viewModelScope.launch {
+            // 发布后服务端有短暂不一致窗口(code=500,实测 1.5s 内必现):非首载刷新
+            // 失败时 3s 后重拉一次,仍失败保持旧列表不动(别拿空结果覆盖已显示内容)
+            var browse = neteaseRepository.getCloudDiskPage(0).getOrNull()
+            if (browse == null && !firstLoad) {
+                delay(3000)
+                browse = neteaseRepository.getCloudDiskPage(0).getOrNull()
+            }
+            if (browse == null) {
+                if (firstLoad) _uiState.value = Error("cloud disk load failed")
+                return@launch
+            }
+            val nickname =
+                neteaseRepository.getNeteaseAccounts().firstOrNull()
+                    ?.firstOrNull { it.isUsed }?.nickname
+            _uiState.value =
+                Success(
+                    data =
+                        PlaylistState(
+                            id = NETEASE_CLOUD_DISK_PLAYLIST_ID,
+                            title = getString(Res.string.cloud_disk),
+                            isRadio = false,
+                            author = Author(id = "", name = nickname ?: "NetEase Cloud"),
+                            thumbnail = null,
+                            description = cloudDiskCapacityText(browse),
+                            trackCount = browse.totalCount,
+                            year = "",
+                        ),
+                )
+            _tracks.value = browse.tracks
+            _continuation.value = browse.nextOffset?.let { "$NETEASE_CLOUD_DISK_PAGE_PREFIX$it" }
+            if (_continuation.value == null) _tracksListState.value = ListState.PAGINATION_EXHAUST
+            // 云盘没有"收藏歌单"语义,顶栏心恒藏
+            _favoriteAvailable.value = false
+        }
+    }
+
+    /** 容量描述("已用 X / 共 Y"),缺字段时退化为只显示已用,全缺给空 */
+    private fun cloudDiskCapacityText(browse: com.maxrave.data.repository.NeteaseCloudDiskBrowse): String? {
+        val used = browse.usedSizeBytes?.let(::formatCloudDiskSize) ?: return null
+        val max = browse.maxSizeBytes?.let(::formatCloudDiskSize)
+        return getString(
+            Res.string.cloud_disk_capacity,
+            used,
+            max ?: "—",
+        )
+    }
+
+    private fun formatCloudDiskSize(bytes: Long): String =
+        if (bytes >= 1L shl 30) {
+            String.format(java.util.Locale.ROOT, "%.1f GB", bytes / 1073741824.0)
+        } else {
+            String.format(java.util.Locale.ROOT, "%.1f MB", bytes / 1048576.0)
+        }
+
+    /** 上传在飞标志:同一时间只跑一笔,再点直接忽略 */
+    private var cloudUploadInFlight = false
+
+    /**
+     * 上传歌曲到云盘(SAF 选择回调进来):平台层读元数据+流式 md5 → 端点五步上传 →
+     * 成功原地刷新列表。元数据从文件名"艺人-标题"启发式解析,只作匹配失败的显示
+     * 兜底——服务端转码后按音频指纹匹配曲库并覆盖(探针实证)。
+     */
+    fun uploadToCloudDisk(uri: String) {
+        if (cloudUploadInFlight) return
+        cloudUploadInFlight = true
+        viewModelScope.launch {
+            val meta = withContext(Dispatchers.IO) { readCloudUploadFile(uri) }
+            val bodyFactory = cloudUploadBodyFactory(uri)
+            if (meta == null || bodyFactory == null) {
+                makeToast(getString(Res.string.cloud_upload_read_failed))
+                cloudUploadInFlight = false
+                return@launch
+            }
+            makeToast(getString(Res.string.uploading_to_cloud_disk, meta.fileName))
+            val displayName = meta.fileName.substringBeforeLast('.')
+            val parsedArtist = displayName.substringBefore('-', "").trim()
+            val parsedSong = displayName.substringAfter('-', "").trim()
+            val (song, artist) =
+                if (parsedArtist.isNotEmpty() && parsedSong.isNotEmpty()) {
+                    parsedSong to parsedArtist
+                } else {
+                    displayName to ""
+                }
+            neteaseRepository
+                .uploadToCloudDisk(
+                    fileName = meta.fileName,
+                    ext = meta.fileName.substringAfterLast('.', "mp3"),
+                    sizeBytes = meta.sizeBytes,
+                    md5 = meta.md5,
+                    song = song,
+                    album = "",
+                    artist = artist,
+                    contentType = meta.mimeType,
+                    openBody = bodyFactory,
+                ).fold(
+                    onSuccess = {
+                        makeToast(getString(Res.string.uploaded_to_cloud_disk, meta.fileName))
+                        // 服务端发布+转码是异步的,稍等再刷(窗口期会 500,刷新内部还会再重试一次)
+                        delay(2500)
+                        getCloudDiskData(firstLoad = false)
+                    },
+                    onFailure = { e ->
+                        makeToast(
+                            getString(
+                                Res.string.cloud_upload_failed,
+                                meta.fileName,
+                                e.message ?: e::class.simpleName.orEmpty(),
+                            ),
+                        )
+                    },
+                )
+            cloudUploadInFlight = false
         }
     }
 
@@ -873,10 +1013,12 @@ class PlaylistViewModel(
 
             PlaylistUIEvent.Shuffle -> {
                 val shuffleEndpoint = data.shuffleEndpoint
-                if (shuffleEndpoint == null && data.id.toLongOrNull() != null) {
-                    // 网易歌单没有 YT 的 shuffleEndpoint:本地洗牌已加载曲目直接起播
-                    // (与艺人页随机播放同款,35c997bd);分页未拉完先洗已加载部分,
-                    // 后续仍走队列 continuation 续拉
+                // 网易歌单/云盘没有 YT 的 shuffleEndpoint:本地洗牌已加载曲目直接起播
+                // (与艺人页随机播放同款,35c997bd);分页未拉完先洗已加载部分,
+                // 后续仍走队列 continuation 续拉
+                if (shuffleEndpoint == null &&
+                    (data.id.toLongOrNull() != null || data.id == NETEASE_CLOUD_DISK_PLAYLIST_ID)
+                ) {
                     val loaded = tracks.value
                     if (loaded.isEmpty()) {
                         makeToast(getString(Res.string.playlist_is_empty))

@@ -20,6 +20,7 @@ import com.maxrave.data.di.loader.loadAllModules
 import com.maxrave.domain.manager.DataStoreManager
 import com.maxrave.logger.Logger
 import com.maxrave.simpmusic.di.viewModelModule
+import com.maxrave.simpmusic.expect.CloudUploadStore
 import com.maxrave.simpmusic.expect.HapticFeedback
 import com.maxrave.simpmusic.service.backup.AutoBackupScheduler
 import kotlinx.coroutines.CoroutineScope
@@ -83,6 +84,9 @@ class SimpMusicApplication :
 
         // 触感反馈:订阅设置档位(播放控件振动),系统层未初始化前调用安全空跑
         HapticFeedback.initialize(this, dataStoreManager, applicationScope)
+
+        // 云盘上传的 SAF URI 读取(非 Composable 上下文用,读文件/md5/开上传流)
+        CloudUploadStore.appContext = this
 
         CaocConfig.Builder
             .create()
