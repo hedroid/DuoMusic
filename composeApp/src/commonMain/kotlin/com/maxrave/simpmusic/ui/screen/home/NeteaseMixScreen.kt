@@ -524,13 +524,16 @@ private fun HeartRadioCard(
             )
         }
         Spacer(Modifier.width(8.dp))
-        if (loading) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(22.dp),
-                strokeWidth = 2.dp,
-            )
-        } else {
-            IconButton(onClick = if (isHeartActive) onToggle else onClick) {
+        // 尾部槽位必须恒为 IconButton(48dp 触摸目标):loading 时裸换 22dp 转圈会把本行
+        // 高度压掉 4dp,卡以下全部分区随 loading 起止上下跳一下(实测 10px)。转圈画在按钮
+        // 内保持行高;loading 中的重复点击由 VM 的 heartLoading 守卫挡掉。
+        IconButton(onClick = if (isHeartActive) onToggle else onClick) {
+            if (loading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(22.dp),
+                    strokeWidth = 2.dp,
+                )
+            } else {
                 com.maxrave.simpmusic.ui.component.PlayBadgeIcon(
                     if (isHeartActive && isPlaying) SimpIcons.Pause else SimpIcons.PlayArrow,
                 )
