@@ -289,9 +289,6 @@ fun MvListScreen(
                             item(contentType = "header") {
                                 ImmersiveMvHeader(
                                     coverUrl = headerCover,
-                                    // 计数=服务端收藏总数(mv/sublist count),翻完页前
-                                    // 大于已加载条数;未知(0)回落已加载数
-                                    count = state.totalCount.takeIf { it > 0 } ?: mvs.size,
                                     paletteBg = mutedPaletteBg,
                                     onBack = navController::navigateUp,
                                     onSearch = { showSearchBar = !showSearchBar },
@@ -300,6 +297,9 @@ fun MvListScreen(
                                 )
                             }
                             item(contentType = "actions") {
+                                // 歌单详情页同构:按钮行+数量行包在 32dp 缩进 Column 里,
+                                // 数量"N 个 MV"与歌单页"N 音轨"同位(按钮行下、左对齐)
+                                Column(Modifier.padding(horizontal = 32.dp)) {
                                 // [随机][播放/暂停][下载] 与歌单详情页按钮行同构(居中 48dp 档)
                                 val isThisPlaying = isPlaying && playingThisList
                                 Row(
@@ -377,6 +377,19 @@ fun MvListScreen(
                                         )
                                     }
                                 }
+                                // 数量行(歌单页"N 音轨"同位同款:bodyMedium/白/左对齐/
+                                // vertical 8dp);计数=服务端收藏总数(mv/sublist count),
+                                // 翻完页前大于已加载数;未知(0)回落已加载数
+                                Text(
+                                    text =
+                                        stringResource(
+                                            Res.string.mv_count_short,
+                                            (state.totalCount.takeIf { it > 0 } ?: mvs.size).toString(),
+                                        ),
+                                    color = Color.White,
+                                    style = typo().bodyMedium,
+                                    modifier = Modifier.padding(vertical = 8.dp),
+                                )
                                 if (mvs.isEmpty()) {
                                     Box(
                                         modifier =
@@ -391,6 +404,7 @@ fun MvListScreen(
                                             color = Color.White.copy(alpha = 0.7f),
                                         )
                                     }
+                                }
                                 }
                             }
                         } else {
@@ -669,11 +683,16 @@ fun MvListScreen(
     }
 }
 
-/** 沉浸式半屏头图(PlaylistScreen 竖屏分支同构):封面+底部渐隐+标题/计数+液态玻璃顶栏 */
+/**
+ * 沉浸式头图(PlaylistScreen 竖屏分支同构):封面+底部渐隐+标题+液态玻璃顶栏。
+ * 高度按 16:9 封面比例(wDP*9/16)而非半屏——歌曲头图是方形图 Crop 铺满半屏,
+ * MV 封面是 16:9 宽幅,半屏区域前景只占中段、顶栏浮在空白上失去沉浸感;
+ * 缩到 16:9 后封面铺满头部,返回/搜索按钮压在封面上(与歌曲页同感受)。
+ * 双层保留:同图 Crop+blur 垫底,前景 Fit(非 16:9 原图如 1.91:1 也完整)。
+ */
 @Composable
 private fun ImmersiveMvHeader(
     coverUrl: String?,
-    count: Int,
     paletteBg: Color,
     onBack: () -> Unit,
     onSearch: () -> Unit,
@@ -682,17 +701,14 @@ private fun ImmersiveMvHeader(
 ) {
     val screenInfo = getScreenSizeInfo()
     val artworkBackdrop = rememberBackdrop(Color.Black)
+    val headerHeight = screenInfo.wDP * 9 / 16
     Box(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .height((screenInfo.hDP / 2).dp),
+                .height(headerHeight.dp),
     ) {
         Box(modifier = Modifier.fillMaxSize().layerBackdrop(artworkBackdrop)) {
-            // MV 封面是 16:9 宽幅,和歌曲头图(方形专辑图)不同——半屏竖版区域直接
-            // Crop 会裁掉左右各一半(封面"显示不全")。双层法(AM 播放页磨砂同款):
-            // 同图放大 Crop+blur 垫底当氛围层,前景 16:9 Fit 完整显示居中;两张图
-            // 同 URL 共享 coil 缓存,不重复下载
             AsyncImage(
                 model =
                     ImageRequest
@@ -725,7 +741,7 @@ private fun ImmersiveMvHeader(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .height((screenInfo.hDP * 0.35f).dp)
+                        .height((headerHeight * 0.35f).dp)
                         .align(Alignment.BottomCenter)
                         .background(artworkScrimBrush(paletteBg)),
             )
@@ -743,13 +759,6 @@ private fun ImmersiveMvHeader(
                     style = typo().titleLarge,
                     color = Color.White,
                     maxLines = 2,
-                    textAlign = TextAlign.Center,
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = stringResource(Res.string.mv_count_short, count.toString()),
-                    style = typo().titleSmall,
-                    color = Color(0xC4FFFFFF),
                     textAlign = TextAlign.Center,
                 )
             }
