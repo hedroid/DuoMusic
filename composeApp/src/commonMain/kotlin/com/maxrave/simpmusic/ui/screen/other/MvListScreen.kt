@@ -72,6 +72,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -709,39 +710,53 @@ private fun ImmersiveMvHeader(
                 .height(headerHeight.dp),
     ) {
         Box(modifier = Modifier.fillMaxSize().layerBackdrop(artworkBackdrop)) {
-            AsyncImage(
-                model =
-                    ImageRequest
-                        .Builder(LocalPlatformContext.current)
-                        .data(coverUrl)
-                        .diskCachePolicy(CachePolicy.ENABLED)
-                        .memoryCachePolicy(CachePolicy.ENABLED)
-                        .diskCacheKey(coverUrl)
-                        .crossfade(false)
-                        .build(),
-                placeholder = rememberHolderPainter(isVideo = true),
-                error = rememberHolderPainter(isVideo = true),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                onSuccess = { onBitmap(it.result.image.toImageBitmap()) },
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .blur(80.dp, BlurredEdgeTreatment.Unbounded),
-            )
+            // blur 垫底必须包在 clipToBounds 的 Box 里:Unbounded 模糊的辉光外扩
+            // 约一个半径(~210px),修饰链上挂 clipToBounds 会被相邻 graphicsLayer
+            // 合并掉裁不动(A/B 实测),漏进下方列表区形成亮带+头部底边水平分界线
+            // (封面与按钮行"泾渭分明"的真身);嵌套 Box 是硬边界,稳裁
+            Box(Modifier.fillMaxSize().clipToBounds()) {
+                AsyncImage(
+                    model =
+                        ImageRequest
+                            .Builder(LocalPlatformContext.current)
+                            .data(coverUrl)
+                            .diskCachePolicy(CachePolicy.ENABLED)
+                            .memoryCachePolicy(CachePolicy.ENABLED)
+                            .diskCacheKey(coverUrl)
+                            .crossfade(false)
+                            .build(),
+                    placeholder = rememberHolderPainter(isVideo = true),
+                    error = rememberHolderPainter(isVideo = true),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    onSuccess = { onBitmap(it.result.image.toImageBitmap()) },
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .blur(80.dp, BlurredEdgeTreatment.Unbounded),
+                )
+            }
             AsyncImage(
                 model = coverUrl,
                 contentDescription = null,
                 contentScale = ContentScale.Fit,
                 placeholder = rememberHolderPainter(isVideo = true),
                 error = rememberHolderPainter(isVideo = true),
-                modifier = Modifier.fillMaxSize(),
+                // 贴底不居中:图下缘=头部底缘,直接伸进 scrim 渐变带(歌曲页封面同构),
+                // 封面原色平滑渐隐进列表背景——居中的话超宽图下缘悬在半空,与按钮
+                // 区之间隔一条"图→模糊带→渐变带"的断层(用户实测"泾渭分明")
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .align(Alignment.BottomCenter),
             )
             Box(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .height((headerHeight * 0.35f).dp)
+                        // 渐变带加长(0.35f→0.5f,81→115dp):头部比歌曲页矮一半,
+                        // 同比例的渐变带太短,封面色到 palette 背景的过渡仓促
+                        .height((headerHeight * 0.5f).dp)
                         .align(Alignment.BottomCenter)
                         .background(artworkScrimBrush(paletteBg)),
             )

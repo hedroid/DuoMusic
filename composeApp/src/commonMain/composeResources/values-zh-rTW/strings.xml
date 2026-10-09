@@ -204,7 +204,7 @@
     <string name="favorite_mvs">收藏的 MV</string>
     <string name="no_favorite_mvs">還沒有收藏的 MV</string>
     <string name="mv_saved_to_download">MV 已儲存到 Download</string>
-    <string name="mv_count_short">%1$s 個 MV</string>
+    <string name="mv_count_short">%1$s 部影片</string>
     <string name="mv_partial_loaded">已載入 %1$s 個 MV,其餘未能載入,將使用已載入部分</string>
     <string name="liked_toast">已喜歡</string>
     <string name="mv_subscribed">已收藏 MV</string>
