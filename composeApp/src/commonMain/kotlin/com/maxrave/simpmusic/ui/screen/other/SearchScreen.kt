@@ -289,29 +289,16 @@ fun SearchScreen(
     val videoString = stringResource(Res.string.videos).lowercase()
     val podcastString = stringResource(Res.string.podcasts).lowercase()
 
-    // Animated Placeholder
+    // Animated Placeholder——双源 tab 集已对齐(网易视频/播客/专辑搜索均接入),占位词同单
     val placeholderTexts =
-        remember(isNeteaseSource) {
-            if (isNeteaseSource) {
-                // 网易源无专辑占位词(YT 同款收敛);视频/播客 tab 已接入保留
-                listOf(
-                    "$searchForString $songString...",
-                    "$searchForString $artistString...",
-                    "$searchForString $playlistString...",
-                    "$searchForString $videoString...",
-                    "$searchForString $podcastString...",
-                )
-            } else {
-                listOf(
-                    "$searchForString $songString...",
-                    "$searchForString $artistString...",
-                    "$searchForString $albumString...",
-                    "$searchForString $playlistString...",
-                    "$searchForString $videoString...",
-                    "$searchForString $podcastString...",
-                )
-            }
-        }
+        listOf(
+            "$searchForString $songString...",
+            "$searchForString $artistString...",
+            "$searchForString $albumString...",
+            "$searchForString $playlistString...",
+            "$searchForString $videoString...",
+            "$searchForString $podcastString...",
+        )
 
     var currentPlaceholderIndex by remember { mutableIntStateOf(0) }
 
