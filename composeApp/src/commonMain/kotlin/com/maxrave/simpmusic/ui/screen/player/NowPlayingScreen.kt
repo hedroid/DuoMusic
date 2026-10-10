@@ -364,16 +364,19 @@ fun NowPlayingScreenContent(
     // 标记随 Track.copy 存活重建、随序列化存活持久化。null 还有第三种来源:旧
     // 持久化队列(升级前保存)或后来插入队列的普通歌曲——后者本就不属云盘。
     val cloudDiskMountFlag = currentCloudQueueRow?.neteaseCloudDiskMounted
-    // 队列的云盘标记纪元(core 在 setQueueData 时定型,续批/移除不翻动,见字段注释):
-    // true=标记纪元队列——无标记的行=后来插入的普通歌;false=升级前保存的旧快照,
-    // 整队列按云盘歌对待。不能在 UI 侧按当前曲目现算 any{标记}:旧快照经分页续批
-    // 追加带标记的云盘行后 any 翻 true,旧云盘行会被误判成插入的普通歌(私人文件
-    // 门控整组失效);云盘歌被移光只剩普通歌时 any 翻 false 又把普通歌误判成云盘歌。
-    // 三点菜单的"是云盘歌"信号按纪元区分——旧快照虽然隐藏删除入口(身份未确认),
-    // 但 电台/相似/看MV/分享/点赞/加歌单 的云盘门控必须照常生效
+    // 队列的云盘标记纪元(core 在 setQueueData 时定型、恢复时按持久值还原,续批/移除
+    // 不翻动,见字段注释):true=标记纪元队列;false=升级前保存的旧快照。旧快照的
+    // null 行没有可靠逐行归属,但"恢复后新插入"可精确区分——null 行判定三段:
+    // 纪元队列=插入普通歌;非纪元且在恢复原始行注册表=原始行按云盘歌对待(①②
+    // 菜单门控/形状启发式保守判私人);非纪元且不在注册表=恢复后插入的普通歌
     val cloudQueueIsFlagEra = queueDataState?.data?.cloudDiskFlagEra == true
+    val cloudRestoredOriginalIds = queueDataState?.data?.cloudDiskRestoredOriginalIds ?: emptySet()
     val isCloudDiskSongForMenu =
-        isCloudDiskQueue && (cloudDiskMountFlag != null || !cloudQueueIsFlagEra)
+        isCloudDiskQueue &&
+            (
+                cloudDiskMountFlag != null ||
+                    (!cloudQueueIsFlagEra && nowPlayingVideoId in cloudRestoredOriginalIds)
+            )
     // 标记缺席时的私人文件形状补判——只在**非纪元队列**(旧快照,null 行=大概率
     // 云盘歌)生效:纪元队列(页面装载/恢复回填)的 null 行=后来插入的普通歌或归属
     // 未知的原始行,按形状断私人会把元数据残缺的普通歌错锁出写入口。私人文件
@@ -383,8 +386,9 @@ fun NowPlayingScreenContent(
     val cloudLegacyPrivateShape =
         currentCloudQueueRow != null &&
             (currentCloudQueueRow.durationSeconds == 0 || currentCloudQueueRow.artists.isNullOrEmpty())
-    // 私人文件:标记 false 直判;标记缺席且非纪元队列才走形状补判+songEntity
-    // 艺人空兜底——与三点菜单的"加歌单"门控保持同源
+    // 私人文件:标记 false 直判;标记缺席的形状补判只对**旧快照的原始行**(非纪元
+    // 且在恢复注册表)生效——纪元队列的 null 行=插入普通歌,恢复后插入的普通歌
+    // 也不在注册表,都不吃形状断言(元数据残缺的普通歌不该被锁出写入口)
     val cloudPrivateFileNow =
         isCloudDiskQueue &&
             (
@@ -392,6 +396,7 @@ fun NowPlayingScreenContent(
                     (
                         cloudDiskMountFlag == null &&
                             !cloudQueueIsFlagEra &&
+                            nowPlayingVideoId in cloudRestoredOriginalIds &&
                             (cloudLegacyPrivateShape || nowPlayingState?.songEntity?.artistName.isNullOrEmpty())
                     )
             )

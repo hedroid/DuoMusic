@@ -308,12 +308,11 @@ class NowPlayingBottomSheetViewModel(
             ?: nowPlaying.track?.takeIf { it.videoId == songOrNowPlaying.videoId }?.neteaseProgramId
         // 云盘私人文件判定(写入口门控)从队列行按 videoId 取——覆盖当前曲与队列
         // sheet 的非播放行;云盘页列表行通常不在队列=查不到(null),菜单退 listArtists
-        // 形状兜底(列表行数据 pristine,不受 catalog 重建污染)。解析优先级:显式挂载
-        // 标记 > 纪元语义——标记纪元队列(页面装载/恢复回填)的无标记行=插入普通歌
-        // 或归属未知的原始行,**按形状断私人会把元数据残缺的普通歌错锁出写入口**;
-        // 只有非纪元队列(旧快照,null 行=大概率云盘歌)才吃 durationSeconds==0/
-        // 空 artists 的形状启发式(③恒零;时长不像 artists 会被 catalog 重建回填
-        // "Various Artists"污染)
+        // 形状兜底(列表行数据 pristine,不受 catalog 重建污染)。null 行判定三段
+        // (与壳层同源):标记纪元队列=插入普通歌;旧快照(非纪元)的原始行(在恢复
+        // 注册表)吃 durationSeconds==0/空艺人的形状启发式(③恒零;时长不像 artists
+        // 会被 catalog 重建回填"Various Artists"污染);旧快照里恢复后插入的普通歌
+        // (不在注册表)不吃形状断言——元数据残缺也不该被锁出写入口
         val queueDataSnapshot = mediaPlayerHandler.queueData.value?.data
         val cloudQueueRow =
             queueDataSnapshot?.listTracks?.firstOrNull { it.videoId == songOrNowPlaying.videoId }
@@ -324,6 +323,7 @@ class NowPlayingBottomSheetViewModel(
                 cloudQueueRow.neteaseCloudDiskMounted != null ->
                     cloudQueueRow.neteaseCloudDiskMounted == false
                 cloudQueueIsFlagEra -> false
+                songOrNowPlaying.videoId !in (queueDataSnapshot?.cloudDiskRestoredOriginalIds ?: emptySet()) -> false
                 else ->
                     cloudQueueRow.durationSeconds == 0 || cloudQueueRow.artists.isNullOrEmpty()
             }
