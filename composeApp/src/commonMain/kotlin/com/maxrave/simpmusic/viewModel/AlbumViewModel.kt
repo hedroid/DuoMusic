@@ -179,15 +179,28 @@ class AlbumViewModel(
                                         year = albumEntity.year
                                             ?.takeIf { it.isNotBlank() && it != "null" }
                                             ?: now().year.toString(),
-                                        trackCount = albumEntity.trackCount,
-                                        description = albumEntity.description,
-                                        length = albumEntity.duration ?: "",
-                                        listTrack =
-                                            (
-                                                songRepository
-                                                    .getSongsByListVideoId(albumEntity.tracks ?: emptyList())
-                                                    .singleOrNull() ?: emptyList()
-                                            ).toArrayListTrack(),
+                        trackCount = albumEntity.trackCount,
+                        description = albumEntity.description,
+                        length = albumEntity.duration ?: "",
+                        listTrack =
+                            run {
+                                val tracks =
+                                    (
+                                        songRepository
+                                            .getSongsByListVideoId(albumEntity.tracks ?: emptyList())
+                                            .singleOrNull() ?: emptyList()
+                                    ).toArrayListTrack()
+                                // 置灰是网易版权态的专属概念;YT 专辑走 Room 兜底时不吃 DB 冻结的
+                                // isAvailable=0(M9 迁移时代的旧值,在线解析路径恒 true),一律可点
+                                if (browseId.toLongOrNull() == null) {
+                                    for (i in tracks.indices) {
+                                        if (!tracks[i].isAvailable) {
+                                            tracks[i] = tracks[i].copy(isAvailable = true)
+                                        }
+                                    }
+                                }
+                                tracks
+                            },
                                         loadState = LocalPlaylistState.PlaylistLoadState.Success,
                                     )
                                 }
