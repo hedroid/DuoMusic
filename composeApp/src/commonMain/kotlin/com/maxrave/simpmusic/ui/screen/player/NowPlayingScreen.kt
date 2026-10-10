@@ -126,6 +126,18 @@ import kotlinx.coroutines.launch
 import kotlin.time.TimeSource
 import kotlin.time.Duration.Companion.milliseconds
 import org.koin.compose.koinInject
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.Text
+import com.maxrave.simpmusic.ui.component.rememberSurfaceDarkColors
+import com.maxrave.simpmusic.ui.theme.typo
+import com.maxrave.simpmusic.viewModel.LibraryMutation
+import com.maxrave.simpmusic.viewModel.LibraryMutationBus
+import simpmusic.composeapp.generated.resources.cancel
+import simpmusic.composeapp.generated.resources.cloud_delete_done
+import simpmusic.composeapp.generated.resources.delete
+import simpmusic.composeapp.generated.resources.delete_from_cloud_disk_title
+import simpmusic.composeapp.generated.resources.delete_from_cloud_disk_message
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.math.abs
 
@@ -309,6 +321,7 @@ fun NowPlayingScreenContent(
     // Artwork Pager state — Spotify-style horizontal swipe between queue tracks.
     // The pager wraps the Canvas + Thumbnail layers. Controller layout below stays fixed.
     val nowPlayingState by sharedViewModel.nowPlayingState.collectAsStateWithLifecycle()
+    val cloudMutationBus: LibraryMutationBus = koinInject()
     val queueDataState by sharedViewModel.getQueueDataState().collectAsStateWithLifecycle()
     // 云盘评论拦截提示(组合期解析,回调里不能取 stringResource)
     val cloudCommentsUnavailableHint = stringResource(Res.string.cloud_comments_unavailable)
@@ -336,6 +349,17 @@ fun NowPlayingScreenContent(
     // 当前曲是网易 MV(队列/媒体 id 带 NETEASE_MV_ 哨兵):强制渲染视频 + 评论走 R_MV_5_ 线程
     val isNeteaseMv = nowPlayingVideoId?.startsWith(NETEASE_MV_MEDIA_ID_PREFIX) == true
     val isCloudDiskQueue = queueDataState?.data?.playlistId == NETEASE_CLOUD_DISK_PLAYLIST_ID
+    // 完整挂载=当前曲带真实艺人 id(云盘三形状的①);非完整挂载/播客:歌词+一起听
+    // 不可用(2026-10-10 用户定:置灰且不可点,上滑手势静默拦截)
+    val cloudFullyMounted =
+        isCloudDiskQueue &&
+            queueDataState?.data?.listTracks
+                ?.firstOrNull { it.videoId == nowPlayingVideoId }
+                ?.artists
+                ?.any { (it.id?.toLongOrNull() ?: 0L) > 0L } == true
+    // 播客队列的早期判定(isPodcastEpisode 在后面才算,这里手势/按钮拦截先用队列指纹)
+    val podcastQueueNow = mediaPlayerHandler.queueData.value?.data?.isNeteasePodcastQueue == true
+    val cloudFeaturesBlocked = (isCloudDiskQueue && !cloudFullyMounted) || podcastQueueNow
     // currentOrderIndex() is a plain getter over the player, NOT Compose state, so it is read
     // inside this remember block — whose keys (the queue, and the track now playing) are exactly
     // the two things that can move the player's position. nowPlayingState is published FROM the
@@ -438,14 +462,16 @@ fun NowPlayingScreenContent(
     var showSheet by rememberSaveable {
         mutableStateOf(false)
     }
+    // 云盘当前曲删除确认目标(播放页三点;不可逆)
+    var pendingCloudDeleteId by remember { mutableStateOf<String?>(null) }
 
     var showFullscreenLyrics by rememberSaveable {
         mutableStateOf(false)
     }
     val fullscreenLyricsRequested by sharedViewModel.fullscreenLyricsRequest.collectAsStateWithLifecycle()
-    LaunchedEffect(fullscreenLyricsRequested) {
+    LaunchedEffect(fullscreenLyricsRequested, cloudFeaturesBlocked) {
         if (fullscreenLyricsRequested) {
-            showFullscreenLyrics = true
+            if (!cloudFeaturesBlocked) showFullscreenLyrics = true
             sharedViewModel.consumeFullscreenLyricsRequest()
         }
     }
@@ -697,6 +723,7 @@ fun NowPlayingScreenContent(
             isPodcastSong = isPodcastEpisode,
             isNeteaseMv = isNeteaseMv,
             isCloudDiskQueue = isCloudDiskQueue,
+            cloudFeaturesBlocked = cloudFeaturesBlocked || isPodcastEpisode,
             remoteLikeState = remoteLikeState,
             // 红心=云端态;未登录源置灰(点击提示登录);MV 红心=收藏,吃网易登录态
             likeEnabled =
@@ -788,8 +815,11 @@ fun NowPlayingScreenContent(
                 }
             },
            onOpenListenTogether = {
-                onDismiss()
-                navController.navigate(ListenTogetherDestination)
+                // 非完整挂载云盘歌/播客:一起听不可用(按钮置灰,此处兜底拦其它入口)
+                if (!cloudFeaturesBlocked) {
+                    onDismiss()
+                    navController.navigate(ListenTogetherDestination)
+                }
             },
          onShowMoreSheet = { showSheet = true },
             onShowQueue = { showQueueBottomSheet = true },
@@ -797,7 +827,10 @@ fun NowPlayingScreenContent(
             onShowAddToPlaylist = { showAddToPlaylistDirectly = true },
             onSetRemoteLiked = sharedViewModel::setRemoteSongLiked,
             onLoginRequired = sharedViewModel::notifyFavoriteNeedsLogin,
-            onShowFullscreenLyrics = { showFullscreenLyrics = true },
+            onShowFullscreenLyrics = {
+                // 非完整挂载云盘歌/播客:无歌词,按钮置灰,此处兜底拦(无动作无提示)
+                if (!cloudFeaturesBlocked) showFullscreenLyrics = true
+            },
             onShowVoteDialog = { showVoteDialog = true },
             onEnterFullscreenVideo = {
                 onDismiss()
@@ -917,6 +950,49 @@ fun NowPlayingScreenContent(
             song = null, // Auto set now playing
             setSleepTimerEnable = true,
             changeMainLyricsProviderEnable = true,
+            // 云盘当前曲删除入口(列表菜单同款行;确认弹窗在壳层,不可逆)
+            onDeleteFromCloudDisk =
+                if (isCloudDiskQueue) {
+                    { pendingCloudDeleteId = nowPlayingVideoId }
+                } else {
+                    null
+                },
+        )
+    }
+
+    // 云盘当前曲删除确认(列表页同款文案;不可逆)
+    pendingCloudDeleteId?.let { vid ->
+        AlertDialog(
+            containerColor = rememberSurfaceDarkColors().container,
+            onDismissRequest = { pendingCloudDeleteId = null },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        sharedViewModel.deleteCloudDiskSong(vid)
+                        cloudMutationBus.send(LibraryMutation.CloudDiskChanged)
+                        pendingCloudDeleteId = null
+                    },
+                ) {
+                    Text(text = stringResource(Res.string.delete), style = typo().labelSmall)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingCloudDeleteId = null }) {
+                    Text(text = stringResource(Res.string.cancel), style = typo().labelSmall)
+                }
+            },
+            title = {
+                Text(
+                    text = stringResource(Res.string.delete_from_cloud_disk_title, 1),
+                    style = typo().labelSmall,
+                )
+            },
+            text = {
+                Text(
+                    text = stringResource(Res.string.delete_from_cloud_disk_message),
+                    style = typo().bodyMedium,
+                )
+            },
         )
     }
 

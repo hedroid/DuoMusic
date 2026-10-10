@@ -909,6 +909,8 @@ internal fun AppleMusicActionRow(
     activeContentColor: Color,
     onOpenOutput: () -> Unit,
     onOpenListenTogether: () -> Unit,
+    /** 一起听段可用性(非完整挂载云盘歌/播客置灰不可点) */
+    listenTogetherEnabled: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     // Straight off the repository, like ListenTogetherIconButton: one boolean off a StateFlow is all
@@ -964,6 +966,7 @@ internal fun AppleMusicActionRow(
                     iconSize = 24.dp,
                     highlighted = room.inRoom,
                     onClick = onOpenListenTogether,
+                    enabled = listenTogetherEnabled,
                 )
             }
             AppleMusicDockButton(
@@ -991,6 +994,8 @@ private fun AppleMusicCapsuleSegment(
     iconSize: Dp,
     highlighted: Boolean,
     onClick: () -> Unit,
+    /** 置灰即不可点(无涟漪无按压动画) */
+    enabled: Boolean = true,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
@@ -1010,13 +1015,26 @@ private fun AppleMusicCapsuleSegment(
                 .width(CAPSULE_SEGMENT_WIDTH)
                 .fillMaxHeight()
                 .background(background)
-                .clickable(interactionSource = interactionSource, indication = LocalIndication.current, onClick = onClick),
+                .then(
+                    if (enabled) {
+                        Modifier.clickable(interactionSource = interactionSource, indication = LocalIndication.current, onClick = onClick)
+                    } else {
+                        Modifier
+                    },
+                ),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = if (highlighted) Color.White else Color.White.copy(alpha = 0.85f),
+            tint =
+                if (!enabled) {
+                    Color.White.copy(alpha = 0.4f)
+                } else if (highlighted) {
+                    Color.White
+                } else {
+                    Color.White.copy(alpha = 0.85f)
+                },
             modifier =
                 Modifier
                     .graphicsLayer {
@@ -1151,12 +1169,14 @@ internal fun AppleMusicBottomCluster(
         AppleMusicActionRow(
             viewState = viewState,
             onSelectView = onSelectView,
-            // 播客节目拿不到歌词(stale 词也会残留窗口)——dock 歌词钮恒不可用
-            lyricsAvailable = state.screenData.lyricsData != null && !state.isPodcastSong,
+            // 播客节目拿不到歌词(stale 词也会残留窗口)——dock 歌词钮恒不可用;
+            // 非完整挂载云盘歌同样置灰(2026-10-10 用户定,置灰即不可点)
+            lyricsAvailable = state.screenData.lyricsData != null && !state.isPodcastSong && !state.cloudFeaturesBlocked,
             activeColor = activePillContainer,
             activeContentColor = activePillContent,
             onOpenOutput = onOpenOutput,
-            onOpenListenTogether = actions.onOpenListenTogether,        )
+            onOpenListenTogether = actions.onOpenListenTogether,
+            listenTogetherEnabled = !state.cloudFeaturesBlocked,        )
         Spacer(modifier = Modifier.height(14.dp))
         // Crossfaded, since it changes on its own — a headset connecting renames the line under the
         // user's thumb. Tappable like BitChord's: it names the output, so it opens the output sheet.

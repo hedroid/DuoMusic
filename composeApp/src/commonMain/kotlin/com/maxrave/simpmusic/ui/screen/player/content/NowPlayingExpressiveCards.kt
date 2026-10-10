@@ -627,11 +627,14 @@ internal fun ExpressiveBelowTheFold(
                                 onClick = {
                                     actions.onShowFullscreenLyrics()
                                 },
+                                // 非完整挂载云盘歌/播客:置灰不可点无涟漪
+                                enabled = !state.cloudFeaturesBlocked,
                                 contentPadding = PaddingValues(0.dp),
                                 modifier =
                                     Modifier
                                         .height(20.dp)
-                                        .wrapContentWidth(),
+                                        .wrapContentWidth()
+                                        .alpha(if (state.cloudFeaturesBlocked) 0.4f else 1f),
                             ) {
                                 Text(text = stringResource(Res.string.show), color = Color.White)
                             }

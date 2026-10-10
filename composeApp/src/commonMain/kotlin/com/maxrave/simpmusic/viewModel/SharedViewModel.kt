@@ -114,6 +114,8 @@ import org.jetbrains.compose.resources.getString
 import org.koin.core.component.inject
 import org.simpmusic.lastfm.completeLogin
 import simpmusic.composeapp.generated.resources.mv_subscribed
+import simpmusic.composeapp.generated.resources.cloud_delete_done
+import simpmusic.composeapp.generated.resources.error_occurred
 import simpmusic.composeapp.generated.resources.mv_saved_to_download
 import simpmusic.composeapp.generated.resources.mv_unsubscribed
 import simpmusic.composeapp.generated.resources.watch_mv
@@ -302,6 +304,24 @@ class SharedViewModel(
     // full-screen lyrics. The panel consumes it once shown.
     private val _fullscreenLyricsRequest = MutableStateFlow(false)
     val fullscreenLyricsRequest: StateFlow<Boolean> = _fullscreenLyricsRequest
+
+    /**
+     * 播放页三点删除云盘当前曲(不可逆,调用方负责确认弹窗):删除+toast;
+     * 库页入口的 CloudDiskChanged 回写事件由调用方发(SharedViewModel 不持事件总线)。
+     */
+    fun deleteCloudDiskSong(videoId: String) {
+        viewModelScope.launch {
+            val id = videoId.toLongOrNull()
+            val ok = id != null && neteaseRepository.deleteCloudDiskSong(id).getOrDefault(false)
+            makeToast(
+                if (ok) {
+                    getString(Res.string.cloud_delete_done, 1)
+                } else {
+                    getString(Res.string.error_occurred)
+                },
+            )
+        }
+    }
 
     fun requestFullscreenLyrics() {
         _fullscreenLyricsRequest.value = true

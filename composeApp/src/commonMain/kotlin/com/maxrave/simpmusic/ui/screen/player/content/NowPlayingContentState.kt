@@ -243,6 +243,9 @@ class NowPlayingContentState(
     /** 云盘队列(NETEASE_CLOUD_DISK 哨兵):评论端点对云盘 id 无效(与相似/歌词同族),
      *  三主题评论入口置灰,点击 toast"无法评论云盘歌曲"(壳层 onShowNeteaseComments 拦) */
     val isCloudDiskQueue: Boolean = false,
+    /** 非完整挂载云盘歌/播客:歌词与一起听不可用——按钮置灰不可点,壳层拦手势
+     *  (onShowFullscreenLyrics/全局歌词请求都过 cloudFeaturesBlocked 门) */
+    val cloudFeaturesBlocked: Boolean = false,
     /** 红心=云端账号状态;该源未登录时置灰(onLoginRequired 提示) */
     val likeEnabled: Boolean = true,
     val remoteLikeState: RemoteSongLikeState,

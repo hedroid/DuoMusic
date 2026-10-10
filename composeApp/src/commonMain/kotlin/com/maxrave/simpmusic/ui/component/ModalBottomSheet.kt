@@ -2463,6 +2463,19 @@ fun NowPlayingBottomSheet(
                     val cloudAlbumNavAvailable =
                         !isCloudDiskPage ||
                             ((uiState.songUIState.album?.id?.toLongOrNull() ?: 0L) > 0L)
+                    // 播放页三点(song=null 自动指向当前曲,2026-10-10 用户定):曲库类行
+                    // (艺人/专辑/电台/相似/看MV/分享)**置灰不隐藏**——云盘歌按挂载程度
+                    // (完整挂载=艺人带真实 id)、播客恒灰、普通歌不变;置灰即不可点无
+                    // 点击效果。列表菜单(song!=null)维持既有"无目标就隐藏"策略。
+                    val fromPlayerMenu = song == null
+                    val cloudFullyMounted =
+                        uiState.songUIState.listArtists.any { (it.id?.toLongOrNull() ?: 0L) > 0L }
+                    val libraryRowsEnabled =
+                        when {
+                            !isCloudDiskPage && !isPodcastQueue -> true
+                            isCloudDiskPage -> cloudFullyMounted
+                            else -> false
+                        }
                     if (!isCloudPrivateFile) {
                         CheckBoxActionButton(
                             // 云端态优先(登录时拉取,~几百 ms 到):本地 Room 的 liked 可能过期
@@ -2683,10 +2696,12 @@ fun NowPlayingBottomSheet(
                             viewModel.onUIEvent(NowPlayingBottomSheetUIEvent.AddToQueue)
                         }
                     }
-                    // 云盘条目无有效歌手 id(未匹配,或匹配但服务端只回显 id=0)→导航行隐藏
-                    if (!isPodcastQueue && cloudArtistNavAvailable) ActionButton(
+                    // 云盘条目无有效歌手 id(未匹配,或匹配但服务端只回显 id=0)→导航行隐藏;
+                    // 播放页三点则置灰呈现(云盘未完整挂载/播客,enable=false 无点击效果)
+                    if (fromPlayerMenu || (!isPodcastQueue && cloudArtistNavAvailable)) ActionButton(
                         icon = SimpIcons.PeopleAlt,
                         text = Res.string.artists,
+                        enable = libraryRowsEnabled,
                     ) {
                         val artists = uiState.songUIState.listArtists
                         val onlyArtist = artists.singleOrNull()
@@ -2699,7 +2714,7 @@ fun NowPlayingBottomSheet(
                             artist = true
                         }
                     }
-                    if (!isPodcastQueue && !isNeteaseMvSong && cloudAlbumNavAvailable) ActionButton(
+                    if (fromPlayerMenu || (!isPodcastQueue && !isNeteaseMvSong && cloudAlbumNavAvailable)) ActionButton(
                         icon = SimpIcons.Album,
                         // Three states, not two. A track can carry an album ID with no title: the
                         // row it was parsed from links an album but never spells its name out.
@@ -2720,18 +2735,24 @@ fun NowPlayingBottomSheet(
                             uiState.songUIState.album
                                 ?.name
                                 ?.takeIf { it.isNotBlank() },
-                        enable = uiState.songUIState.album != null,
+                        enable =
+                            if (isCloudDiskPage || isPodcastQueue) {
+                                libraryRowsEnabled
+                            } else {
+                                uiState.songUIState.album != null
+                            },
                     ) {
                         uiState.songUIState.album?.id?.let { id ->
                             onNavigateToOtherScreen()
                             navController.navigate(AlbumDestination(browseId = id))
                         }
                     }
-                    // 云盘歌曲整组隐藏(2026-10-10 探针+用户实测:simiSong 对云盘 id 恒空,
-                    // 电台起播即空转;id 能查详情但电台/相似体验=无效)
-                    if (!isPodcastQueue && !isNeteaseMvSong && !isCloudDiskPage) ActionButton(
+                    // 云盘歌曲列表菜单整组隐藏(simiSong 对云盘 id 恒空);播放页三点
+                    // 置灰呈现(完整挂载的可用),播客恒灰
+                    if (fromPlayerMenu || (!isPodcastQueue && !isNeteaseMvSong && !isCloudDiskPage)) ActionButton(
                         icon = SimpIcons.Sensors,
                         text = Res.string.start_radio,
+                        enable = libraryRowsEnabled,
                     ) {
                         viewModel.onUIEvent(
                             NowPlayingBottomSheetUIEvent.StartRadio(
@@ -2743,10 +2764,11 @@ fun NowPlayingBottomSheet(
                     }
                     // 网易歌独有:simiSong 相似歌曲列表页(2026-09-25 落地);YT 歌的相似=
                     // 电台,无列表形态;云盘歌曲 simiSong 恒空(探针实证)不开放
-                    if (uiState.songUIState.videoId.toLongOrNull() != null && !isPodcastQueue && !isCloudDiskPage) {
+                    if (fromPlayerMenu || (uiState.songUIState.videoId.toLongOrNull() != null && !isPodcastQueue && !isCloudDiskPage)) {
                         ActionButton(
                             icon = SimpIcons.LibraryMusic,
                             text = Res.string.similar_songs,
+                            enable = libraryRowsEnabled,
                         ) {
                             onNavigateToOtherScreen()
                             navController.navigate(
@@ -2778,10 +2800,11 @@ fun NowPlayingBottomSheet(
                         }
                     }
                     // 网易歌独有:看 MV(歌曲→mv 字段解析);云盘歌曲查不到曲库 mv,不开放
-                    if (uiState.songUIState.videoId.toLongOrNull() != null && !isPodcastQueue && !isCloudDiskPage) {
+                    if (fromPlayerMenu || (uiState.songUIState.videoId.toLongOrNull() != null && !isPodcastQueue && !isCloudDiskPage)) {
                         ActionButton(
                             icon = SimpIcons.Movie,
                             text = Res.string.watch_mv,
+                            enable = libraryRowsEnabled,
                         ) {
                             viewModel.onUIEvent(
                                 NowPlayingBottomSheetUIEvent.WatchMv(
@@ -2858,12 +2881,12 @@ fun NowPlayingBottomSheet(
                             }
                         }
                     }
-                    // 云盘歌曲:不开放分享(2026-10-10 用户定案——id 虽能查详情,
-                    // 但按无效处理与电台/相似/看MV 一并隐藏)
-                    if (!isCloudDiskPage) {
+                    // 云盘歌曲列表菜单不开放分享;播放页三点置灰呈现,播客恒灰
+                    if (fromPlayerMenu || !isCloudDiskPage) {
                         ActionButton(
                             icon = SimpIcons.Share,
                             text = Res.string.share,
+                            enable = libraryRowsEnabled,
                         ) {
                             viewModel.onUIEvent(NowPlayingBottomSheetUIEvent.Share)
                         }
