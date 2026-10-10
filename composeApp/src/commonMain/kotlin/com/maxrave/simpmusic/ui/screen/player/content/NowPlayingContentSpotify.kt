@@ -908,8 +908,11 @@ fun NowPlayingContentSpotify(
                                         inlineLyrics.syncType != "UNSYNCED" &&
                                         inlineLyrics.lines != null
                                 // Canvas mode has its own subtitle overlay — never show both.
+                                // 非完整挂载云盘歌:词卡/歌词钮已按同一信号关掉,这行内嵌
+                                // 当前词也一并置空(2026-10-10,与 below-fold 卡片口径一致)
                                 val currentLyricLineText =
                                     if (!hasSyncedLyrics ||
+                                        state.cloudLyricsBlocked ||
                                         state.screenData.canvasData != null ||
                                         state.currentLyricLineIndex < 0
                                     ) {
@@ -1199,8 +1202,9 @@ fun NowPlayingContentSpotify(
                     Column(Modifier.padding(horizontal = 20.dp)) {
                         // Lyrics Layout
                         AnimatedVisibility(
-                            // 播客节目拿不到歌词(stale 词也会残留窗口)——整卡不展示
-                            visible = state.screenData.lyricsData != null && !state.isPodcastSong,
+                            // 播客节目拿不到歌词(stale 词也会残留窗口)——整卡不展示;
+                            // 非完整挂载云盘歌词=「暂无歌词」占位(非 null),同样塌缩
+                            visible = state.screenData.lyricsData != null && !state.isPodcastSong && !state.cloudLyricsBlocked,
                             modifier = Modifier.padding(top = 10.dp),
                         ) {
                             ElevatedCard(
@@ -1359,7 +1363,7 @@ fun NowPlayingContentSpotify(
                         // 艺人卡按源取数:网易歌来自 neteaseSongData(头像/粉丝数),YT 歌来自 songInfoData
                         val neteaseMeta = state.screenData.neteaseSongData
                         // 播客节目无艺人数据(详情卡端点对 mainSong 只回部分字段,卡会空壳)——不展示
-                        AnimatedVisibility(visible = (state.screenData.songInfoData != null || neteaseMeta != null) && !state.isPodcastSong) {
+                        AnimatedVisibility(visible = (state.screenData.songInfoData != null || neteaseMeta != null) && !state.isPodcastSong && !state.cloudLyricsBlocked) {
                             ElevatedCard(
                                 onClick = {
                                     actions.onNavigateToArtist()
@@ -1452,7 +1456,7 @@ fun NowPlayingContentSpotify(
                         }
                         Spacer(modifier = Modifier.height(10.dp))
                         // 说明卡同艺人卡:播客节目端点字段全空/零值,展示只会剩空壳——不展示
-                        AnimatedVisibility(visible = (state.screenData.songInfoData != null || neteaseMeta != null || state.screenData.neteaseMvData != null) && !state.isPodcastSong) {
+                        AnimatedVisibility(visible = (state.screenData.songInfoData != null || neteaseMeta != null || state.screenData.neteaseMvData != null) && !state.isPodcastSong && !state.cloudLyricsBlocked) {
                             ElevatedCard(
                                 onClick = {},
                                 shape = RoundedCornerShape(8.dp),

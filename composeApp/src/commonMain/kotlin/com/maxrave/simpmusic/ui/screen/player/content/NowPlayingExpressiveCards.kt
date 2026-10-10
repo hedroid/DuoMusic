@@ -569,7 +569,7 @@ internal fun ExpressiveBelowTheFold(
         // Lyrics card
         AnimatedVisibility(
             // 播客节目拿不到歌词(stale 词也会残留窗口)——整卡不展示
-            visible = state.screenData.lyricsData != null && !state.isPodcastSong,
+            visible = state.screenData.lyricsData != null && !state.isPodcastSong && !state.cloudLyricsBlocked,
             modifier = Modifier.padding(top = 10.dp),
         ) {
             Surface(
@@ -723,7 +723,7 @@ internal fun ExpressiveBelowTheFold(
         val neteaseMeta = state.screenData.neteaseSongData
         // Artist card
         // 播客节目无艺人数据(详情卡端点对 mainSong 只回部分字段,卡会空壳)——不展示
-        AnimatedVisibility(visible = (state.screenData.songInfoData != null || neteaseMeta != null) && !state.isPodcastSong) {
+        AnimatedVisibility(visible = (state.screenData.songInfoData != null || neteaseMeta != null) && !state.isPodcastSong && !state.cloudLyricsBlocked) {
             Surface(
                 onClick = {
                     actions.onNavigateToArtist()
@@ -807,7 +807,7 @@ internal fun ExpressiveBelowTheFold(
         Spacer(modifier = Modifier.height(10.dp))
         // Description card
         // 说明卡同艺人卡:播客节目端点字段全空/零值,展示只会剩空壳——不展示
-        AnimatedVisibility(visible = (state.screenData.songInfoData != null || neteaseMeta != null || state.screenData.neteaseMvData != null) && !state.isPodcastSong) {
+        AnimatedVisibility(visible = (state.screenData.songInfoData != null || neteaseMeta != null || state.screenData.neteaseMvData != null) && !state.isPodcastSong && !state.cloudLyricsBlocked) {
             Surface(
                 shape = ExpressiveCardShape,
                 color = colorScheme.surfaceContainer,

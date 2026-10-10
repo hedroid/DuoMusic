@@ -725,6 +725,7 @@ fun NowPlayingScreenContent(
             isCloudDiskQueue = isCloudDiskQueue,
             cloudFeaturesBlocked = cloudFeaturesBlocked || isPodcastEpisode,
             cloudFullyMounted = cloudFullyMounted,
+            cloudLyricsBlocked = isCloudDiskQueue && !cloudFullyMounted,
             remoteLikeState = remoteLikeState,
             // 红心=云端态;未登录源置灰(点击提示登录);MV 红心=收藏,吃网易登录态
             likeEnabled =
