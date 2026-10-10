@@ -801,17 +801,20 @@ fun NowPlayingScreenContent(
                 }
             },
             onNavigateToArtist = {
+                // 非完整挂载云盘歌/播客:艺人页无目标,播放页艺人名点击不跳转
                 val song = sharedViewModel.nowPlayingState.value?.songEntity
-                (
-                    song?.artistId?.firstOrNull()?.takeIf { it.isNotEmpty() }
-                        ?: screenDataState.songInfoData?.authorId
-                )?.let { channelId ->
-                    onDismiss()
-                    navController.navigate(
-                        ArtistDestination(
-                            channelId = channelId,
-                        ),
-                    )
+                if (!cloudFeaturesBlocked) {
+                    (
+                        song?.artistId?.firstOrNull()?.takeIf { it.isNotEmpty() }
+                            ?: screenDataState.songInfoData?.authorId
+                        )?.let { channelId ->
+                            onDismiss()
+                            navController.navigate(
+                                ArtistDestination(
+                                    channelId = channelId,
+                                ),
+                            )
+                    }
                 }
             },
            onOpenListenTogether = {

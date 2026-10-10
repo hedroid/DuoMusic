@@ -321,7 +321,12 @@ private fun fadeEdgeStops(
  * and nothing here consumes events, so clicks and slider drags still land.
  */
 @Composable
-internal fun Modifier.appleMusicPressInflate(pressedScale: Float = 1.35f): Modifier {
+internal fun Modifier.appleMusicPressInflate(
+    pressedScale: Float = 1.35f,
+    /** 置灰时禁用按压膨胀动画(自带的 pointerInput 不看 clickable 的 enabled,
+     *  会"点了没反应但有动画"——2026-10-10 用户反馈的"还有点击效果"即此) */
+    enabled: Boolean = true,
+): Modifier {
     var pressed by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
         targetValue = if (pressed) pressedScale else 1f,
@@ -332,14 +337,21 @@ internal fun Modifier.appleMusicPressInflate(pressedScale: Float = 1.35f): Modif
         .graphicsLayer {
             scaleX = scale
             scaleY = scale
-        }.pointerInput(Unit) {
-            awaitEachGesture {
-                awaitFirstDown(requireUnconsumed = false)
-                pressed = true
-                waitForUpOrCancellation()
-                pressed = false
-            }
-        }
+        }.then(
+            // disabled 时不挂手势检测:触摸零反馈
+            if (enabled) {
+                Modifier.pointerInput(Unit) {
+                    awaitEachGesture {
+                        awaitFirstDown(requireUnconsumed = false)
+                        pressed = true
+                        waitForUpOrCancellation()
+                        pressed = false
+                    }
+                }
+            } else {
+                Modifier
+            },
+        )
 }
 
 /**
@@ -359,7 +371,7 @@ internal fun AppleMusicGlyphButton(
 ) {
     IconButton(
         onClick = onClick,
-        modifier = modifier.appleMusicPressInflate().size(size).clip(CircleShape),
+        modifier = modifier.appleMusicPressInflate(enabled = !dimmed).size(size).clip(CircleShape),
     ) {
         Icon(imageVector = icon, contentDescription = "", tint = if (dimmed) tint.copy(alpha = 0.4f) else tint)
     }
@@ -872,7 +884,7 @@ internal fun AppleMusicDockButton(
     Box(
         modifier =
             modifier
-                .appleMusicPressInflate()
+                .appleMusicPressInflate(enabled = enabled)
                 .size(40.dp)
                 .clip(CircleShape)
                 .background(if (active) activeColor else Color.Transparent)

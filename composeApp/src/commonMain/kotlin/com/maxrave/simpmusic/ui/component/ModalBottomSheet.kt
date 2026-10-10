@@ -2747,9 +2747,9 @@ fun NowPlayingBottomSheet(
                             navController.navigate(AlbumDestination(browseId = id))
                         }
                     }
-                    // 云盘歌曲列表菜单整组隐藏(simiSong 对云盘 id 恒空);播放页三点
-                    // 置灰呈现(完整挂载的可用),播客恒灰
-                    if (fromPlayerMenu || (!isPodcastQueue && !isNeteaseMvSong && !isCloudDiskPage)) ActionButton(
+                    // 云盘歌曲:非完整挂载列表菜单整组隐藏(simiSong 对其 id 恒空),
+                    // 完整挂载(真实曲库 id)放开(2026-10-10 用户定);播放页三点置灰呈现
+                    if (fromPlayerMenu || (!isPodcastQueue && !isNeteaseMvSong && (!isCloudDiskPage || cloudFullyMounted))) ActionButton(
                         icon = SimpIcons.Sensors,
                         text = Res.string.start_radio,
                         enable = libraryRowsEnabled,
@@ -2764,7 +2764,7 @@ fun NowPlayingBottomSheet(
                     }
                     // 网易歌独有:simiSong 相似歌曲列表页(2026-09-25 落地);YT 歌的相似=
                     // 电台,无列表形态;云盘歌曲 simiSong 恒空(探针实证)不开放
-                    if (fromPlayerMenu || (uiState.songUIState.videoId.toLongOrNull() != null && !isPodcastQueue && !isCloudDiskPage)) {
+                    if (fromPlayerMenu || (uiState.songUIState.videoId.toLongOrNull() != null && !isPodcastQueue && (!isCloudDiskPage || cloudFullyMounted))) {
                         ActionButton(
                             icon = SimpIcons.LibraryMusic,
                             text = Res.string.similar_songs,
@@ -2800,7 +2800,7 @@ fun NowPlayingBottomSheet(
                         }
                     }
                     // 网易歌独有:看 MV(歌曲→mv 字段解析);云盘歌曲查不到曲库 mv,不开放
-                    if (fromPlayerMenu || (uiState.songUIState.videoId.toLongOrNull() != null && !isPodcastQueue && !isCloudDiskPage)) {
+                    if (fromPlayerMenu || (uiState.songUIState.videoId.toLongOrNull() != null && !isPodcastQueue && (!isCloudDiskPage || cloudFullyMounted))) {
                         ActionButton(
                             icon = SimpIcons.Movie,
                             text = Res.string.watch_mv,
@@ -2881,8 +2881,8 @@ fun NowPlayingBottomSheet(
                             }
                         }
                     }
-                    // 云盘歌曲列表菜单不开放分享;播放页三点置灰呈现,播客恒灰
-                    if (fromPlayerMenu || !isCloudDiskPage) {
+                    // 云盘歌曲:非完整挂载列表菜单不开放分享,完整挂载放开;播放页三点置灰呈现
+                    if (fromPlayerMenu || !isCloudDiskPage || cloudFullyMounted) {
                         ActionButton(
                             icon = SimpIcons.Share,
                             text = Res.string.share,
