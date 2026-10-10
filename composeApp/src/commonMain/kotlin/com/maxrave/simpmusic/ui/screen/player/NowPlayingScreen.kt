@@ -1005,10 +1005,17 @@ fun NowPlayingScreenContent(
             // 会把后来插入的普通歌曲误露(拿普通歌曲 id 调 /cloud/del 语义未验证且
             // 可能误删同 id 的云盘条目);元数据形状(duration==0/空 artists)只证明
             // "私人文件形状"不证明"属云盘"——插入云盘队列的普通歌也可能缺时长/艺人,
-            // 且重建窗口查不到队列行时形状读数是 null-true 假象。旧队列快照(标记
-            // 缺席)与身份未知的当前曲一律隐藏,宁可漏出;重新进云盘页起播即带标记。
+            // 且重建窗口查不到队列行时形状读数是 null-true 假象。**恢复回填的标记
+            // 同样不证明逐行归属**(回填只证明"这是云盘队列的保存",升级前保存可能
+            // 混着插入的普通歌)——cloudDiskRestoreBackfilled 队列上一律抑制,从云盘
+            // 页重新起播(真页面出处)才恢复。旧队列快照与身份未知的当前曲一律隐藏,
+            // 宁可漏出。
             onDeleteFromCloudDisk =
-                if (isCloudDiskQueue && currentCloudQueueRow != null && cloudDiskMountFlag != null) {
+                if (isCloudDiskQueue &&
+                    currentCloudQueueRow != null &&
+                    cloudDiskMountFlag != null &&
+                    queueDataState?.data?.cloudDiskRestoreBackfilled != true
+                ) {
                     { pendingCloudDeleteId = nowPlayingVideoId }
                 } else {
                     null
