@@ -724,6 +724,7 @@ fun NowPlayingScreenContent(
             isNeteaseMv = isNeteaseMv,
             isCloudDiskQueue = isCloudDiskQueue,
             cloudFeaturesBlocked = cloudFeaturesBlocked || isPodcastEpisode,
+            cloudFullyMounted = cloudFullyMounted,
             remoteLikeState = remoteLikeState,
             // 红心=云端态;未登录源置灰(点击提示登录);MV 红心=收藏,吃网易登录态
             likeEnabled =
@@ -794,7 +795,9 @@ fun NowPlayingScreenContent(
             // 云盘队列:评论端点对云盘 id 无效(探针同族结论),拦在壳层统一提示,
             // 三主题入口只负责置灰外观——点击都会走到这里
             onShowNeteaseComments = {
-                if (isCloudDiskQueue) {
+                // 非完整挂载云盘歌才拦(完整挂载=真实曲库 id,评论区可用);
+                // 播客评论走 A_DJ_1_ 线程本就支持,不拦
+                if (isCloudDiskQueue && !cloudFullyMounted) {
                     sharedViewModel.makeToast(cloudCommentsUnavailableHint)
                 } else {
                     showNeteaseComments = true

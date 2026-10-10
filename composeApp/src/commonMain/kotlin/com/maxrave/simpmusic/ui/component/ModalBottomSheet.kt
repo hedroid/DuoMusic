@@ -2456,13 +2456,6 @@ fun NowPlayingBottomSheet(
                     val isCloudDiskPage = onDeleteFromCloudDisk != null
                     val isCloudPrivateFile =
                         isCloudDiskPage && uiState.songUIState.listArtists.isEmpty()
-                    // 无有效目标 id(②的 ar/al id=0)的歌手/专辑导航行也隐藏,防点后跳空 id
-                    val cloudArtistNavAvailable =
-                        !isCloudDiskPage ||
-                            uiState.songUIState.listArtists.any { (it.id?.toLongOrNull() ?: 0L) > 0L }
-                    val cloudAlbumNavAvailable =
-                        !isCloudDiskPage ||
-                            ((uiState.songUIState.album?.id?.toLongOrNull() ?: 0L) > 0L)
                     // 播放页三点(song=null 自动指向当前曲,2026-10-10 用户定):曲库类行
                     // (艺人/专辑/电台/相似/看MV/分享)**置灰不隐藏**——云盘歌按挂载程度
                     // (完整挂载=艺人带真实 id)、播客恒灰、普通歌不变;置灰即不可点无
@@ -2476,22 +2469,21 @@ fun NowPlayingBottomSheet(
                             isCloudDiskPage -> cloudFullyMounted
                             else -> false
                         }
-                    if (!isCloudPrivateFile) {
-                        CheckBoxActionButton(
-                            // 云端态优先(登录时拉取,~几百 ms 到):本地 Room 的 liked 可能过期
-                            // (YT 红心歌单里本地未赞、云端已赞,读作"状态不对");云端未到/未登录
-                            // 退回本地值。checkbox 以 defaultChecked 为 key,云端晚到会重置显示
-                            defaultChecked = cloudLikedForGate ?: uiState.songUIState.liked,
-                            isHeartIcon = true,
-                            enable = cloudLikedForGate != null && !programLikePending &&
-                                (if (isNeteaseMvSong || isPodcastEpisode) neteaseLoggedIn else true),
-                            optimistic = !isNeteaseMvSong && !isPodcastEpisode,
-                            onChangeListener = { liked ->
-                                viewModel.onUIEvent(NowPlayingBottomSheetUIEvent.ToggleLike)
-                                if (!isPodcastEpisode) onLikeChanged?.invoke(liked)
-                            },
-                        )
-                    }
+                    // 私人文件(未匹配)恒可见但置灰不可点(2026-10-10:隐藏改置灰)
+                    CheckBoxActionButton(
+                        // 云端态优先(登录时拉取,~几百 ms 到):本地 Room 的 liked 可能过期
+                        // (YT 红心歌单里本地未赞、云端已赞,读作"状态不对");云端未到/未登录
+                        // 退回本地值。checkbox 以 defaultChecked 为 key,云端晚到会重置显示
+                        defaultChecked = cloudLikedForGate ?: uiState.songUIState.liked,
+                        isHeartIcon = true,
+                        enable = cloudLikedForGate != null && !programLikePending && !isCloudPrivateFile &&
+                            (if (isNeteaseMvSong || isPodcastEpisode) neteaseLoggedIn else true),
+                        optimistic = !isNeteaseMvSong && !isPodcastEpisode,
+                        onChangeListener = { liked ->
+                            viewModel.onUIEvent(NowPlayingBottomSheetUIEvent.ToggleLike)
+                            if (!isPodcastEpisode) onLikeChanged?.invoke(liked)
+                        },
+                    )
 
                     // 播客节目不提供下载(2026-10-01 用户定):"下载/删除下载"两行隐藏。
                     // 只按行自身 neteaseProgramId 判定——不能用队列哨兵:播客队列播放期间
@@ -2670,11 +2662,11 @@ fun NowPlayingBottomSheet(
                         }
                     }
                     // 播客节目不进歌单(剧集不是歌)——隐藏(2026-09-29 用户定);
-                    // 云盘私人文件加网易歌单行为未实测,同样不开放
-                    if (!isPodcastQueue && !isNeteaseMvSong && !isCloudPrivateFile) ActionButton(
+                    // 云盘私人文件置灰不可点(写类语义未实测)
+                    if (!isPodcastQueue && !isNeteaseMvSong) ActionButton(
                         icon = SimpIcons.PlaylistAdd,
                         text = Res.string.add_to_a_playlist,
-                        enable = cloudLikedForGate != null,
+                        enable = cloudLikedForGate != null && !isCloudPrivateFile,
                     ) {
                         viewModel.resetPlaylists()
                         addToAPlaylist = true
@@ -2696,9 +2688,9 @@ fun NowPlayingBottomSheet(
                             viewModel.onUIEvent(NowPlayingBottomSheetUIEvent.AddToQueue)
                         }
                     }
-                    // 云盘条目无有效歌手 id(未匹配,或匹配但服务端只回显 id=0)→导航行隐藏;
-                    // 播放页三点则置灰呈现(云盘未完整挂载/播客,enable=false 无点击效果)
-                    if (fromPlayerMenu || (!isPodcastQueue && cloudArtistNavAvailable)) ActionButton(
+                    // 云盘条目恒可见:非完整挂载置灰不可点(2026-10-10 用户定,列表
+                    // 菜单与播放页统一呈现);播客列表态维持隐藏,播放页置灰
+                    if (!isPodcastQueue || fromPlayerMenu) ActionButton(
                         icon = SimpIcons.PeopleAlt,
                         text = Res.string.artists,
                         enable = libraryRowsEnabled,
@@ -2714,7 +2706,7 @@ fun NowPlayingBottomSheet(
                             artist = true
                         }
                     }
-                    if (fromPlayerMenu || (!isPodcastQueue && !isNeteaseMvSong && cloudAlbumNavAvailable)) ActionButton(
+                    if (!isPodcastQueue && !isNeteaseMvSong || fromPlayerMenu) ActionButton(
                         icon = SimpIcons.Album,
                         // Three states, not two. A track can carry an album ID with no title: the
                         // row it was parsed from links an album but never spells its name out.
@@ -2747,9 +2739,9 @@ fun NowPlayingBottomSheet(
                             navController.navigate(AlbumDestination(browseId = id))
                         }
                     }
-                    // 云盘歌曲:非完整挂载列表菜单整组隐藏(simiSong 对其 id 恒空),
-                    // 完整挂载(真实曲库 id)放开(2026-10-10 用户定);播放页三点置灰呈现
-                    if (fromPlayerMenu || (!isPodcastQueue && !isNeteaseMvSong && (!isCloudDiskPage || cloudFullyMounted))) ActionButton(
+                    // 云盘歌曲:非完整挂载置灰不可点(simiSong 对其 id 恒空),完整挂载
+                    // (真实曲库 id)开放;列表/播放页菜单统一呈现(2026-10-10 用户定)
+                    if (!isPodcastQueue && !isNeteaseMvSong || fromPlayerMenu) ActionButton(
                         icon = SimpIcons.Sensors,
                         text = Res.string.start_radio,
                         enable = libraryRowsEnabled,
@@ -2762,9 +2754,9 @@ fun NowPlayingBottomSheet(
                         )
                         hideModalBottomSheet()
                     }
-                    // 网易歌独有:simiSong 相似歌曲列表页(2026-09-25 落地);YT 歌的相似=
-                    // 电台,无列表形态;云盘歌曲 simiSong 恒空(探针实证)不开放
-                    if (fromPlayerMenu || (uiState.songUIState.videoId.toLongOrNull() != null && !isPodcastQueue && (!isCloudDiskPage || cloudFullyMounted))) {
+                    // 网易歌独有:simiSong 相似歌曲列表页;云盘非完整挂载置灰(探针实证
+                    // simiSong 对其 id 恒空),完整挂载开放
+                    if (uiState.songUIState.videoId.toLongOrNull() != null && (!isPodcastQueue || fromPlayerMenu)) {
                         ActionButton(
                             icon = SimpIcons.LibraryMusic,
                             text = Res.string.similar_songs,
@@ -2799,8 +2791,8 @@ fun NowPlayingBottomSheet(
                             }
                         }
                     }
-                    // 网易歌独有:看 MV(歌曲→mv 字段解析);云盘歌曲查不到曲库 mv,不开放
-                    if (fromPlayerMenu || (uiState.songUIState.videoId.toLongOrNull() != null && !isPodcastQueue && (!isCloudDiskPage || cloudFullyMounted))) {
+                    // 网易歌独有:看 MV;云盘非完整挂载置灰,完整挂载开放
+                    if (uiState.songUIState.videoId.toLongOrNull() != null && (!isPodcastQueue || fromPlayerMenu)) {
                         ActionButton(
                             icon = SimpIcons.Movie,
                             text = Res.string.watch_mv,
@@ -2881,8 +2873,8 @@ fun NowPlayingBottomSheet(
                             }
                         }
                     }
-                    // 云盘歌曲:非完整挂载列表菜单不开放分享,完整挂载放开;播放页三点置灰呈现
-                    if (fromPlayerMenu || !isCloudDiskPage || cloudFullyMounted) {
+                    // 云盘歌曲:非完整挂载置灰,完整挂载开放(恒可见)
+                    run {
                         ActionButton(
                             icon = SimpIcons.Share,
                             text = Res.string.share,

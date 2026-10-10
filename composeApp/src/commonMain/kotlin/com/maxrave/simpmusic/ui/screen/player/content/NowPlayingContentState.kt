@@ -246,6 +246,9 @@ class NowPlayingContentState(
     /** 非完整挂载云盘歌/播客:歌词与一起听不可用——按钮置灰不可点,壳层拦手势
      *  (onShowFullscreenLyrics/全局歌词请求都过 cloudFeaturesBlocked 门) */
     val cloudFeaturesBlocked: Boolean = false,
+    /** 云盘歌完整挂载(真实艺人 id):评论区对其开放(2026-10-10 用户定)——
+     *  非完整挂载仍置灰+toast */
+    val cloudFullyMounted: Boolean = true,
     /** 红心=云端账号状态;该源未登录时置灰(onLoginRequired 提示) */
     val likeEnabled: Boolean = true,
     val remoteLikeState: RemoteSongLikeState,

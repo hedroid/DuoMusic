@@ -423,11 +423,11 @@ internal fun AppleMusicHeaderActions(
         // 网易歌:评论入口(收藏心右边),打开 NeteaseCommentsSheet;与 dock 版互斥——2026-10-02
         // 用户定案从 dock 第四钮移到这里,更贴近"对这首歌"的语义。
         if (state.isNeteaseSong) {
-            // 云盘队列:评论区无效置灰(点击由壳层 toast 提示)
+            // 非完整挂载云盘歌:评论区无效置灰(点击由壳层 toast);完整挂载开放
             AppleMusicGlyphButton(
                 icon = SimpIcons.Comment,
                 onClick = { actions.onShowNeteaseComments() },
-                dimmed = state.isCloudDiskQueue,
+                dimmed = state.isCloudDiskQueue && !state.cloudFullyMounted,
             )
         }
         AppleMusicGlyphButton(icon = SimpIcons.MoreVert, onClick = { actions.onShowMoreSheet() })

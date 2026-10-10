@@ -799,8 +799,8 @@ internal fun ExpressiveTrackInfoRow(
                 onClick = { actions.onShowNeteaseComments() },
                 shape = CircleShape,
                 color = colorScheme.surfaceContainerHigh,
-                // 云盘队列:评论区无效置灰(点击由壳层 toast 提示)
-                modifier = Modifier.size(48.dp).alpha(if (state.isCloudDiskQueue) 0.4f else 1f),
+                // 非完整挂载云盘歌:评论区无效置灰(点击由壳层 toast);完整挂载开放
+                modifier = Modifier.size(48.dp).alpha(if (state.isCloudDiskQueue && !state.cloudFullyMounted) 0.4f else 1f),
             ) {
                 Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                     Icon(

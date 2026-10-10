@@ -1905,8 +1905,8 @@ internal fun NowPlayingTrackInfoRow(
             }
             if (state.isNeteaseSong) {
                 IconButton(
-                    // 云盘队列:评论区无效置灰(点击由壳层 toast 提示)
-                    modifier = Modifier.size(36.dp).alpha(if (state.isCloudDiskQueue) 0.4f else 1f).clip(CircleShape),
+                    // 非完整挂载云盘歌:评论区无效置灰;完整挂载开放
+                    modifier = Modifier.size(36.dp).alpha(if (state.isCloudDiskQueue && !state.cloudFullyMounted) 0.4f else 1f).clip(CircleShape),
                     onClick = { actions.onShowNeteaseComments() },
                 ) {
                     Icon(
