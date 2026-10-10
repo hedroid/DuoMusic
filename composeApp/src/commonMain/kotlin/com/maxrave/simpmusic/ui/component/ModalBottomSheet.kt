@@ -1850,8 +1850,15 @@ fun NowPlayingBottomSheet(
     onLibraryDelete: (() -> Unit)? = null,
     // 歌单页内打开且该歌单可移除歌曲(网易自建歌单)时传入;播放页等其它场景不传不显示
     onRemoveFromPlaylist: (() -> Unit)? = null,
-    // 云盘页单曲菜单传入:从云盘删除(不可逆,调用方负责确认弹窗);其它场景不传不显示
+    // 云盘页单曲菜单传入:从云盘删除(不可逆,调用方负责确认弹窗);其它场景不传不显示。
+    // 播放页的旧队列快照(升级前保存,无挂载标记)不传删除(身份未确认不可逆操作
+    // 隐藏)——但当前曲仍是云盘歌,曲库门控必须照常生效,所以另有 isCloudDiskSong
+    // 独立承载"是云盘歌"信号,两者不再互为代理
     onDeleteFromCloudDisk: (() -> Unit)? = null,
+    // 播放页传入:当前曲确属云盘(新队列=挂载标记非空;旧快照=队列里没有任何标记,
+    // 整队列按云盘歌对待;标记纪元队列里无标记的行=后来插入的普通歌,传 false)。
+    // 云盘页/队列页等列表菜单不传(默认 false,列表行自身就是云盘数据源)
+    isCloudDiskSong: Boolean = false,
     // 需要让宿主页面立即响应点赞状态变化时传入(例如红心歌单取消红心后剔除歌曲)
     onLikeChanged: ((Boolean) -> Unit)? = null,
     dataStoreManager: DataStoreManager = koinInject<DataStoreManager>(),
@@ -2453,7 +2460,10 @@ fun NowPlayingBottomSheet(
                     // ③=私人文件,连点赞/加歌单也不开放(写类语义未实测);
                     // ①②已匹配,点赞(写入往返探针实证有效)/加歌单照常。
                     // 电台/相似/看MV/分享对全部云盘歌曲隐藏(见各条目注释)。
-                    val isCloudDiskPage = onDeleteFromCloudDisk != null
+                    // isCloudDiskSong(播放页传入)与删除回调分开:旧队列快照隐藏删除
+                    // 入口(身份未确认)不代表当前曲不是云盘歌——电台/相似/看MV/分享/
+                    // 点赞/加歌单的门控要照常吃"云盘歌"信号,不能跟着删除回调走
+                    val isCloudDiskPage = onDeleteFromCloudDisk != null || isCloudDiskSong
                     // 私人文件判定优先吃 VM 从队列行解析的信号(显式挂载标记;标记缺席
                     // 的旧队列快照按 durationSeconds==0/原始空 artists 补判,见 VM 注释):
                     // songEntity 的艺人形状在"切歌推进到的私人文件"上已被 catalog 重建
