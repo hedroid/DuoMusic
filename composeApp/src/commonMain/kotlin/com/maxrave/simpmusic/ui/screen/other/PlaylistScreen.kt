@@ -1449,14 +1449,14 @@ fun PlaylistScreen(
                             selectionViewModel.addToFavorite(selectedIds)
                             selectionState.exit()
                         },
-                        // 云盘多选删除(2026-10-09):删除类用 error 色,确认弹窗兜底
+                        // 云盘多选删除(2026-10-09;2026-10-10 用户定:与其它动作同色,
+                        // error 红撤销),确认弹窗兜底
                         extraActions =
                             if (isCloudDisk) {
                                 listOf(
                                     SongSelectionAction(
                                         icon = SimpIcons.Delete,
                                         label = stringResource(Res.string.delete_from_cloud_disk),
-                                        tint = MaterialTheme.colorScheme.error,
                                     ) { showCloudDeleteDialog = true },
                                 )
                             } else {

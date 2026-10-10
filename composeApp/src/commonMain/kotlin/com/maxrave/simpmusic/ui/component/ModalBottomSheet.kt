@@ -2659,15 +2659,14 @@ fun NowPlayingBottomSheet(
                             }
                         }
                     }
-                    // 云盘页单曲菜单的"从云盘中删除"(2026-10-09 用户定:位置统一在下载组
-                    // 之下、警示红;不可逆,调用方弹确认;垃圾桶=真删)
+                    // 云盘页单曲菜单的"从云盘中删除"(位置统一在下载组之下;不可逆,
+                    // 调用方弹确认;垃圾桶=真删。2026-10-10 用户定:图标/文字与其它行
+                    // 同尺寸同色,警示红撤销)
                     Crossfade(targetState = onDeleteFromCloudDisk != null) {
                         if (it) {
                             ActionButton(
                                 icon = SimpIcons.Delete,
                                 text = Res.string.delete_from_cloud_disk,
-                                iconColor = MaterialTheme.colorScheme.error,
-                                textColor = MaterialTheme.colorScheme.error,
                             ) {
                                 // 先等本 sheet 完全收起再触发回调(确认弹窗)——同
                                 // PlaylistBottomSheet 删歌单入口:hide() 未完成就置弹窗态,
