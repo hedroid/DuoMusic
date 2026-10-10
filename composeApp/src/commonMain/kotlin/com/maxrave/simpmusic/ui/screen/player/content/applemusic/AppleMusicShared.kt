@@ -945,7 +945,9 @@ internal fun AppleMusicActionRow(
                 active = viewState == AppleMusicView.LYRICS,
                 activeColor = activeColor,
                 activeContentColor = activeContentColor,
-                enabled = lyricsAvailable,
+                // 已在歌词页时恒可点:这个钮是歌词页的返回口,置灰它=把用户锁在
+                // 歌词页(切歌竞态窗口的兜底;正常路径由壳层 auto-exit 处理)
+                enabled = lyricsAvailable || viewState == AppleMusicView.LYRICS,
                 onClick = {
                     onSelectView(if (viewState == AppleMusicView.LYRICS) AppleMusicView.MAIN else AppleMusicView.LYRICS)
                 },

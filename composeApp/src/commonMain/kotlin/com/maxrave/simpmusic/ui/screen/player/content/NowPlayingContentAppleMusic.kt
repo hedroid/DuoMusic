@@ -156,8 +156,15 @@ fun NowPlayingContentAppleMusic(
     // when the incoming track had lyrics arriving a moment later. Lyrics landing restarts this
     // effect and cancels the wait, so the fallback only ever fires for a track that really has
     // none.
-    LaunchedEffect(state.screenData.lyricsData, viewState) {
-        if (viewState != AppleMusicView.LYRICS || state.screenData.lyricsData != null) return@LaunchedEffect
+    LaunchedEffect(state.screenData.lyricsData, viewState, state.cloudFeaturesBlocked) {
+        if (viewState != AppleMusicView.LYRICS) return@LaunchedEffect
+        // 切到不能挂载歌词的歌(非完整挂载云盘歌/播客):立即退回主视图——歌词钮
+        // 是歌词页的唯一返回口,置灰它会把人锁在歌词页里(2026-10-10 用户 bug)
+        if (state.cloudFeaturesBlocked) {
+            viewState = AppleMusicView.MAIN
+            return@LaunchedEffect
+        }
+        if (state.screenData.lyricsData != null) return@LaunchedEffect
         delay(LYRICS_ABSENCE_GRACE_MS)
         viewState = AppleMusicView.MAIN
     }
