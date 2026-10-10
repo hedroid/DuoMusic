@@ -2454,16 +2454,17 @@ fun NowPlayingBottomSheet(
                     // ①②已匹配,点赞(写入往返探针实证有效)/加歌单照常。
                     // 电台/相似/看MV/分享对全部云盘歌曲隐藏(见各条目注释)。
                     val isCloudDiskPage = onDeleteFromCloudDisk != null
-                    // 私人文件判定优先吃 core 的显式挂载标记(仅目标曲=当前播放曲时
-                    // 队列行里有):切歌推进到的私人文件,其队列行 artists 已被 catalog
-                    // 重建回填"Various Artists"、songEntity 随之被污染,listArtists
-                    // 形状判据会漏;标记缺席(列表菜单的非播放行/旧队列)退回艺人空
-                    val cloudMountFlag = uiState.songUIState.neteaseCloudDiskMounted
+                    // 私人文件判定优先吃 VM 从队列行解析的信号(显式挂载标记;标记缺席
+                    // 的旧队列快照按 durationSeconds==0/原始空 artists 补判,见 VM 注释):
+                    // songEntity 的艺人形状在"切歌推进到的私人文件"上已被 catalog 重建
+                    // 回填"Various Artists"污染,listArtists 判据会漏;null=队列里没有
+                    // 该行(列表菜单非播放行)才退 listArtists 形状(列表行 pristine)
+                    val cloudPrivateResolved = uiState.songUIState.neteaseCloudDiskPrivate
                     val isCloudPrivateFile =
                         isCloudDiskPage &&
                             (
-                                cloudMountFlag == false ||
-                                    (cloudMountFlag == null && uiState.songUIState.listArtists.isEmpty())
+                                cloudPrivateResolved == true ||
+                                    (cloudPrivateResolved == null && uiState.songUIState.listArtists.isEmpty())
                             )
                     // 播放页三点(song=null 自动指向当前曲,2026-10-10 用户定):曲库类行
                     // (艺人/专辑/电台/相似/看MV/分享)**置灰不隐藏**——云盘歌按挂载程度

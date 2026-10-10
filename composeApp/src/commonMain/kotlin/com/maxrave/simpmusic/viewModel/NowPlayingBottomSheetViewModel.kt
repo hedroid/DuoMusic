@@ -306,12 +306,25 @@ class NowPlayingBottomSheetViewModel(
         } ?: return)
         val programId = songOrNowPlaying.neteaseProgramId
             ?: nowPlaying.track?.takeIf { it.videoId == songOrNowPlaying.videoId }?.neteaseProgramId
-        // 云盘挂载标记只在"目标曲=当前播放曲"时队列行里有(与 programId 同款取法);
-        // 列表菜单的非播放行靠 songEntity 艺人形状(行数据未被 catalog 重建污染)
-        val cloudDiskMounted =
-            nowPlaying.track
-                ?.takeIf { it.videoId == songOrNowPlaying.videoId }
-                ?.neteaseCloudDiskMounted
+        // 云盘私人文件判定(写入口门控)从队列行按 videoId 取——覆盖当前曲与队列
+        // sheet 的非播放行;云盘页列表行通常不在队列=查不到(null),菜单退 listArtists
+        // 形状兜底(列表行数据 pristine,不受 catalog 重建污染)。解析优先级:显式挂载
+        // 标记(core 剥 id 前按原始形状打) > 旧队列形状补判(升级前保存的快照/恢复路径
+        // SongEntity.toTrack() 重建的当前曲,标记缺席)——补判用 durationSeconds==0
+        // (③ dt=0/兜底构造 0 恒零,①②与插入的普通歌都有真实时长)与 artists 原始为
+        // 空;artists 会被 catalog 重建回填"Various Artists"污染,时长不会
+        val cloudQueueRow =
+            mediaPlayerHandler.queueData.value?.data?.listTracks
+                ?.firstOrNull { it.videoId == songOrNowPlaying.videoId }
+        val cloudDiskPrivate: Boolean? =
+            when {
+                cloudQueueRow == null -> null
+                cloudQueueRow.neteaseCloudDiskMounted != null ->
+                    cloudQueueRow.neteaseCloudDiskMounted == false
+                cloudQueueRow.durationSeconds == 0 -> true
+                cloudQueueRow.artists.isNullOrEmpty() -> true
+                else -> false
+            }
         loadNeteasePlaylists(songOrNowPlaying.videoId.toLongOrNull() != null)
         if (songOrNowPlaying.videoId.startsWith(NETEASE_MV_MEDIA_ID_PREFIX)) {
             // MV 不属于歌曲库:菜单使用队列实体，已有下载行只读观察，绝不插入 song 表。
@@ -343,7 +356,7 @@ class NowPlayingBottomSheetViewModel(
             it.copy(
                 songUIState =
                     songOrNowPlaying.toSheetSongState()
-                        .copy(neteaseProgramId = programId, neteaseCloudDiskMounted = cloudDiskMounted),
+                        .copy(neteaseProgramId = programId, neteaseCloudDiskPrivate = cloudDiskPrivate),
             )
         }
         viewModelScope.launch {
@@ -460,9 +473,9 @@ class NowPlayingBottomSheetViewModel(
                                             },
                                         videoType = song.videoType,
                                         neteaseProgramId = song.neteaseProgramId ?: programId,
-                                        // Room 重读整体重建 songUIState,队列行来的挂载标记
-                                        // 不能丢(私人文件门控优先吃它)
-                                        neteaseCloudDiskMounted = state.songUIState.neteaseCloudDiskMounted,
+                                        // Room 重读整体重建 songUIState,队列行来的私人文件
+                                        // 判定不能丢(写入口门控优先吃它)
+                                        neteaseCloudDiskPrivate = state.songUIState.neteaseCloudDiskPrivate,
                                         downloadedVideoFilePath = song.downloadedVideoFilePath,
                                     ),
                             )
@@ -940,11 +953,12 @@ data class NowPlayingBottomSheetUIState(
         val videoType: String = "",
         /** 播客节目行(网易电台剧集):非空=下载入口整组隐藏(2026-10-01 用户定,播客不提供下载) */
         val neteaseProgramId: Long? = null,
-        /** 云盘挂载显式标记(仅目标曲=当前播放曲时从队列行读到,列表菜单/其它场景 null):
-         *  false=私人文件。songEntity 的艺人形状在"切歌推进到的私人文件"上已被
-         *  catalog 重建回填污染("Various Artists"),listArtists.isEmpty() 会漏判,
-         *  私人文件门控必须优先吃这个标记 */
-        val neteaseCloudDiskMounted: Boolean? = null,
+        /** 云盘私人文件判定(写入口门控):true=私人文件(未匹配,点赞/加歌单置灰),
+         *  false=已匹配/普通歌,false 之外的 null=队列里没有该行(列表菜单非播放行,
+         *  菜单退 listArtists 形状兜底)。来源=队列行显式挂载标记,标记缺席(旧队列
+         *  快照/恢复路径重建)按 durationSeconds==0/原始空 artists 补判——详见
+         *  setSongEntity 内注释 */
+        val neteaseCloudDiskPrivate: Boolean? = null,
         /** 视频文件路径(Room 实时流):非空且文件在="下载视频"行显示已下载态 */
         val downloadedVideoFilePath: String? = null,
     )
