@@ -435,8 +435,9 @@ private fun AppleMusicQueuePillsRow(
             activeContainer = activePillContainer,
             activeContent = activePillContent,
             // 播客节目进不了歌曲歌单——置灰禁用(药丸保留,行布局不破);网易 MV 同款
-            // (官方 MV 不进歌单,弹窗只会剩 YT 分区)
-            enabled = !state.isPodcastSong && !state.isNeteaseMv,
+            // (官方 MV 不进歌单,弹窗只会剩 YT 分区);云盘私人文件同款置灰
+            // (写类语义未验证,与三点菜单同门控)
+            enabled = !state.isPodcastSong && !state.isNeteaseMv && !state.cloudPrivateFile,
             onClick = { actions.onShowAddToPlaylist() },
             modifier = Modifier.weight(1f),
         )

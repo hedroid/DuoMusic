@@ -26,7 +26,8 @@ expect fun readCloudUploadFileName(uri: String): String?
 /**
  * 读文件内嵌封面(上传队列行显示用,Android=MediaMetadataRetriever 的 embedded
  * picture,只解析头部元数据);null=无内嵌封面/读取失败,行内退云朵兜底。
- * 桌面 picker no-op,恒 null。
+ * 返回值已按行内显示尺寸采样(≤256px)且平台层带 LruCache 限量缓存——IO 密集,
+ * 调用方必须在 IO 线程/协程里调。桌面 picker no-op,恒 null。
  */
 expect fun readCloudUploadArtwork(uri: String): ImageBitmap?
 

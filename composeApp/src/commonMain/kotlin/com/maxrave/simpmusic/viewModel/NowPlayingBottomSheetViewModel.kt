@@ -306,6 +306,12 @@ class NowPlayingBottomSheetViewModel(
         } ?: return)
         val programId = songOrNowPlaying.neteaseProgramId
             ?: nowPlaying.track?.takeIf { it.videoId == songOrNowPlaying.videoId }?.neteaseProgramId
+        // 云盘挂载标记只在"目标曲=当前播放曲"时队列行里有(与 programId 同款取法);
+        // 列表菜单的非播放行靠 songEntity 艺人形状(行数据未被 catalog 重建污染)
+        val cloudDiskMounted =
+            nowPlaying.track
+                ?.takeIf { it.videoId == songOrNowPlaying.videoId }
+                ?.neteaseCloudDiskMounted
         loadNeteasePlaylists(songOrNowPlaying.videoId.toLongOrNull() != null)
         if (songOrNowPlaying.videoId.startsWith(NETEASE_MV_MEDIA_ID_PREFIX)) {
             // MV 不属于歌曲库:菜单使用队列实体，已有下载行只读观察，绝不插入 song 表。
@@ -333,7 +339,13 @@ class NowPlayingBottomSheetViewModel(
             return
         }
         // 先落目标身份再拉云端态：云端回包快于 Room 行时，菜单也不能把节目误判成歌曲。
-        _uiState.update { it.copy(songUIState = songOrNowPlaying.toSheetSongState().copy(neteaseProgramId = programId)) }
+        _uiState.update {
+            it.copy(
+                songUIState =
+                    songOrNowPlaying.toSheetSongState()
+                        .copy(neteaseProgramId = programId, neteaseCloudDiskMounted = cloudDiskMounted),
+            )
+        }
         viewModelScope.launch {
             _uiState.update { state ->
                 state.copy(
@@ -448,6 +460,9 @@ class NowPlayingBottomSheetViewModel(
                                             },
                                         videoType = song.videoType,
                                         neteaseProgramId = song.neteaseProgramId ?: programId,
+                                        // Room 重读整体重建 songUIState,队列行来的挂载标记
+                                        // 不能丢(私人文件门控优先吃它)
+                                        neteaseCloudDiskMounted = state.songUIState.neteaseCloudDiskMounted,
                                         downloadedVideoFilePath = song.downloadedVideoFilePath,
                                     ),
                             )
@@ -925,6 +940,11 @@ data class NowPlayingBottomSheetUIState(
         val videoType: String = "",
         /** 播客节目行(网易电台剧集):非空=下载入口整组隐藏(2026-10-01 用户定,播客不提供下载) */
         val neteaseProgramId: Long? = null,
+        /** 云盘挂载显式标记(仅目标曲=当前播放曲时从队列行读到,列表菜单/其它场景 null):
+         *  false=私人文件。songEntity 的艺人形状在"切歌推进到的私人文件"上已被
+         *  catalog 重建回填污染("Various Artists"),listArtists.isEmpty() 会漏判,
+         *  私人文件门控必须优先吃这个标记 */
+        val neteaseCloudDiskMounted: Boolean? = null,
         /** 视频文件路径(Room 实时流):非空且文件在="下载视频"行显示已下载态 */
         val downloadedVideoFilePath: String? = null,
     )

@@ -252,6 +252,10 @@ class NowPlayingContentState(
     /** 非完整挂载云盘歌(不含播客):经典/MD 主题 below-fold 词卡+信息卡塌缩
      *  (2026-10-10 用户定"不能下拉")——内容塌了滚动钳制自动回弹,无需手势拦截 */
     val cloudLyricsBlocked: Boolean = false,
+    /** 云盘私人文件(未匹配曲库,core 显式挂载标记 false;标记缺席退艺人形状启发式):
+     *  写类语义未验证——三主题快捷"加歌单"置灰禁用,与三点菜单 isCloudPrivateFile
+     *  同一判据(旧持久化队列标记缺席时靠 songEntity 艺人空兜底,见壳层注释) */
+    val cloudPrivateFile: Boolean = false,
     /** 红心=云端账号状态;该源未登录时置灰(onLoginRequired 提示) */
     val likeEnabled: Boolean = true,
     val remoteLikeState: RemoteSongLikeState,

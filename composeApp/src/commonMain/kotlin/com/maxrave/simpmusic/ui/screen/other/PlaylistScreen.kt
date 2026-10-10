@@ -56,10 +56,12 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -109,6 +111,7 @@ import com.maxrave.simpmusic.ui.component.SearchBarEnter
 import com.maxrave.simpmusic.ui.component.rememberHolderPainter
 import com.maxrave.simpmusic.ui.utils.toHiResArtworkUrl
 import com.maxrave.common.NETEASE_CLOUD_DISK_PLAYLIST_ID
+import com.maxrave.simpmusic.expect.readCloudUploadArtwork
 import com.maxrave.simpmusic.expect.ui.multiFilePickerResult
 import com.maxrave.simpmusic.expect.ui.layerBackdrop
 import com.maxrave.simpmusic.expect.ui.rememberBackdrop
@@ -165,12 +168,14 @@ import dev.chrisbanes.haze.HazeInput
 import dev.chrisbanes.haze.blur.hazeBlur
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.mapLatest
+import kotlinx.coroutines.withContext
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
@@ -1694,10 +1699,20 @@ fun PlaylistScreen(
     }
 }
 /**
+ * 上传队列行的内嵌封面(按需解析):行进入组合才解码,平台层带采样+LruCache,
+ * 滚动回看命中缓存。全量预解码已撤——批量高分辨率封面的内存随文件数打爆。
+ */
+@Composable
+private fun rememberCloudUploadArtworkState(uri: String): State<ImageBitmap?> =
+    produceState<ImageBitmap?>(initialValue = null, uri) {
+        value = withContext(Dispatchers.IO) { readCloudUploadArtwork(uri) }
+    }
+
+/**
  * 云盘上传队列行(2026-10-09 用户定案:进度不走弹窗,按选择序直接显示在曲目列表
  * 顶部):未开始=暂停图标+"等待上传"(排队态),当前首=上传图标+"上传中"+行尾
  * 百分比+**文字列下的细进度条**(对齐标题列起止、圆角,不铺满行宽),失败=错误色
- * "上传失败"(保留到批次刷新)。封面=文件内嵌封面(入列时读),无内嵌退云朵兜底。
+ * "上传失败"(保留到批次刷新)。封面=文件内嵌封面(按需解析),无内嵌退云朵兜底。
  * 布局对齐曲目行——48dp 封面/titleSmall 标题/bodySmall 副标题/深底白字。
  */
 @Composable
@@ -1723,8 +1738,11 @@ private fun CloudUploadQueueRow(
                 modifier = Modifier.size(48.dp),
                 contentAlignment = Alignment.Center,
             ) {
+                // 内嵌封面按需解析(只解析可见行;采样 ≤256px + 平台层 LruCache 限量
+                // 缓存)——入列整队预解码会把批量选择的内存随文件数打爆
+                val artworkState by rememberCloudUploadArtworkState(row.key)
                 val artworkPainter =
-                    row.artwork?.let { remember(row.artwork) { BitmapPainter(it) } }
+                    artworkState?.let { remember(it) { BitmapPainter(it) } }
                 Image(
                     painter = artworkPainter ?: coverFallback ?: rememberHolderPainter(),
                     contentDescription = null,

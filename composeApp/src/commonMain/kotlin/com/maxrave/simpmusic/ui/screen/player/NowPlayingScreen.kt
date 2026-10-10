@@ -349,14 +349,29 @@ fun NowPlayingScreenContent(
     // 当前曲是网易 MV(队列/媒体 id 带 NETEASE_MV_ 哨兵):强制渲染视频 + 评论走 R_MV_5_ 线程
     val isNeteaseMv = nowPlayingVideoId?.startsWith(NETEASE_MV_MEDIA_ID_PREFIX) == true
     val isCloudDiskQueue = queueDataState?.data?.playlistId == NETEASE_CLOUD_DISK_PLAYLIST_ID
+    // 当前曲在队列里的行(完整挂载/云盘归属/私人文件判定共用;重建窗口可能查不到)
+    val currentCloudQueueRow =
+        queueDataState?.data?.listTracks?.firstOrNull { it.videoId == nowPlayingVideoId }
     // 完整挂载=当前曲带真实艺人 id(云盘三形状的①);非完整挂载/播客:歌词+一起听
     // 不可用(2026-10-10 用户定:置灰且不可点,上滑手势静默拦截)
     val cloudFullyMounted =
         isCloudDiskQueue &&
-            queueDataState?.data?.listTracks
-                ?.firstOrNull { it.videoId == nowPlayingVideoId }
-                ?.artists
+            currentCloudQueueRow?.artists
                 ?.any { (it.id?.toLongOrNull() ?: 0L) > 0L } == true
+    // 云盘挂载显式标记(core 在剥 id 前按原始形状打):非 null=当前曲确属云盘,
+    // false=私人文件(未匹配)。不能拿队列行 artists 形状推断——catalog 重建会给
+    // 空艺人行回填"Various Artists",切歌推进到的私人文件形状已被污染,只有这个
+    // 标记随 Track.copy 存活重建、随序列化存活持久化。null 还有第三种来源:旧
+    // 持久化队列(升级前保存)或后来插入队列的普通歌曲——后者本就不属云盘。
+    val cloudDiskMountFlag = currentCloudQueueRow?.neteaseCloudDiskMounted
+    // 私人文件:标记 false 直判;标记缺席(旧队列快照)退回 songEntity 艺人空
+    // 启发式(三点菜单 listArtists 同口径)——与菜单的"加歌单"门控保持同源
+    val cloudPrivateFileNow =
+        isCloudDiskQueue &&
+            (
+                cloudDiskMountFlag == false ||
+                    (cloudDiskMountFlag == null && nowPlayingState?.songEntity?.artistName.isNullOrEmpty())
+            )
     // 播客队列的早期判定(isPodcastEpisode 在后面才算,这里手势/按钮拦截先用队列指纹)
     val podcastQueueNow = mediaPlayerHandler.queueData.value?.data?.isNeteasePodcastQueue == true
     val cloudFeaturesBlocked = (isCloudDiskQueue && !cloudFullyMounted) || podcastQueueNow
@@ -726,6 +741,9 @@ fun NowPlayingScreenContent(
             cloudFeaturesBlocked = cloudFeaturesBlocked || isPodcastEpisode,
             cloudFullyMounted = cloudFullyMounted,
             cloudLyricsBlocked = isCloudDiskQueue && !cloudFullyMounted,
+            // 私人文件(写类语义未验证):三主题快捷"加歌单"置灰——与三点菜单
+            // 的 isCloudPrivateFile 同一判据(见 cloudPrivateFileNow 注释)
+            cloudPrivateFile = cloudPrivateFileNow,
             remoteLikeState = remoteLikeState,
             // 红心=云端态;未登录源置灰(点击提示登录);MV 红心=收藏,吃网易登录态
             likeEnabled =
@@ -831,7 +849,11 @@ fun NowPlayingScreenContent(
          onShowMoreSheet = { showSheet = true },
             onShowQueue = { showQueueBottomSheet = true },
             onShowInfo = { showInfoBottomSheet = true },
-            onShowAddToPlaylist = { showAddToPlaylistDirectly = true },
+            // 私人文件与三点菜单同门控(写类语义未验证,按钮已置灰,此处兜底拦
+            // 其它触发路径);正常歌曲不受影响
+            onShowAddToPlaylist = {
+                if (!cloudPrivateFileNow) showAddToPlaylistDirectly = true
+            },
             onSetRemoteLiked = sharedViewModel::setRemoteSongLiked,
             onLoginRequired = sharedViewModel::notifyFavoriteNeedsLogin,
             onShowFullscreenLyrics = {
@@ -957,9 +979,12 @@ fun NowPlayingScreenContent(
             song = null, // Auto set now playing
             setSleepTimerEnable = true,
             changeMainLyricsProviderEnable = true,
-            // 云盘当前曲删除入口(列表菜单同款行;确认弹窗在壳层,不可逆)
+            // 云盘当前曲删除入口(列表菜单同款行;确认弹窗在壳层,不可逆)。
+            // 只认显式挂载标记(非 null=确属云盘)——队列 ID 判定过宽:云盘队列里
+            // 后来插入的普通歌曲(添加到队列/下一首播放)切到时也会露出入口,
+            // 拿普通歌曲 id 调 /cloud/del 语义未验证且可能误删同 id 的云盘条目
             onDeleteFromCloudDisk =
-                if (isCloudDiskQueue) {
+                if (isCloudDiskQueue && cloudDiskMountFlag != null) {
                     { pendingCloudDeleteId = nowPlayingVideoId }
                 } else {
                     null
@@ -975,8 +1000,11 @@ fun NowPlayingScreenContent(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        sharedViewModel.deleteCloudDiskSong(vid)
-                        cloudMutationBus.send(LibraryMutation.CloudDiskChanged)
+                        // 库页回写事件等删除落定且成功再发:删除是异步的,提前发
+                        // 事件会让库页轻拉抢在服务端可见前拿到旧封面/旧计数
+                        sharedViewModel.deleteCloudDiskSong(vid) { ok ->
+                            if (ok) cloudMutationBus.send(LibraryMutation.CloudDiskChanged)
+                        }
                         pendingCloudDeleteId = null
                     },
                 ) {

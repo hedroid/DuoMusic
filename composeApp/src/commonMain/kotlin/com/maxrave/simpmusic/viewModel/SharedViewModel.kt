@@ -307,9 +307,14 @@ class SharedViewModel(
 
     /**
      * 播放页三点删除云盘当前曲(不可逆,调用方负责确认弹窗):删除+toast;
-     * 库页入口的 CloudDiskChanged 回写事件由调用方发(SharedViewModel 不持事件总线)。
+     * 库页入口的 CloudDiskChanged 回写事件由调用方发(SharedViewModel 不持事件总线),
+     * [onResult] 在删除落定后于主线程回调(true=删除成功)——库页回写必须等它,
+     * 提前发事件会让库页轻拉抢在服务端可见前拿到旧计数/旧封面。
      */
-    fun deleteCloudDiskSong(videoId: String) {
+    fun deleteCloudDiskSong(
+        videoId: String,
+        onResult: ((Boolean) -> Unit)? = null,
+    ) {
         viewModelScope.launch {
             val id = videoId.toLongOrNull()
             val ok = id != null && neteaseRepository.deleteCloudDiskSong(id).getOrDefault(false)
@@ -320,6 +325,7 @@ class SharedViewModel(
                     getString(Res.string.error_occurred)
                 },
             )
+            onResult?.invoke(ok)
         }
     }
 

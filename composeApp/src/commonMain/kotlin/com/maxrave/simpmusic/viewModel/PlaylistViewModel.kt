@@ -20,7 +20,6 @@ import com.maxrave.domain.data.model.browse.playlist.PlaylistBrowse
 import com.maxrave.domain.data.model.browse.playlist.PlaylistState
 import com.maxrave.simpmusic.expect.cloudUploadBodyFactory
 import com.maxrave.simpmusic.expect.readCloudUploadFile
-import com.maxrave.simpmusic.expect.readCloudUploadArtwork
 import com.maxrave.simpmusic.expect.readCloudUploadFileName
 import com.maxrave.domain.extension.now
 import com.maxrave.domain.mediaservice.handler.DownloadHandler
@@ -684,47 +683,56 @@ class PlaylistViewModel(
      * firstLoad=true 时从 Loading 起步(整页 spinner),false 保持已显示内容原地替换。
      */
     private fun getCloudDiskData(firstLoad: Boolean) {
+        viewModelScope.launch { refreshCloudDiskData(firstLoad) }
+    }
+
+    /**
+     * [getCloudDiskData] 的可等待版:返回是否刷新成功(false=两次拉取都失败,首载
+     * 时还会置 Error)。上传完成/批量删除后的"清场+库页回写事件"必须等它返回——
+     * 函数内自起协程的旧形态调用即返回,清场会赶在新歌进列表前发生,库页轻拉也
+     * 会抢在服务端可见前拿到旧计数/旧封面。
+     */
+    private suspend fun refreshCloudDiskData(firstLoad: Boolean): Boolean {
         if (firstLoad) _uiState.value = Loading
-        viewModelScope.launch {
-            // 发布后服务端有短暂不一致窗口(code=500,实测 1.5s 内必现):非首载刷新
-            // 失败时 3s 后重拉一次,仍失败保持旧列表不动(别拿空结果覆盖已显示内容)
-            var browse = neteaseRepository.getCloudDiskPage(0).getOrNull()
-            if (browse == null && !firstLoad) {
-                delay(3000)
-                browse = neteaseRepository.getCloudDiskPage(0).getOrNull()
-            }
-            if (browse == null) {
-                if (firstLoad) _uiState.value = Error("cloud disk load failed")
-                return@launch
-            }
-            val nickname =
-                neteaseRepository.getNeteaseAccounts().firstOrNull()
-                    ?.firstOrNull { it.isUsed }?.nickname
-            _uiState.value =
-                Success(
-                    data =
-                        PlaylistState(
-                            id = NETEASE_CLOUD_DISK_PLAYLIST_ID,
-                            title = getString(Res.string.cloud_disk),
-                            isRadio = false,
-                            author = Author(id = "", name = nickname ?: "NetEase Cloud"),
-                            // 头图=第一首歌的封面(用户 2026-10-09 定案;无封面歌走云朵兜底
-                            // painter,调色板自动跟随封面取色)
-                            thumbnail = browse.tracks.firstOrNull()?.thumbnails?.lastOrNull()?.url,
-                            description = cloudDiskCapacityText(browse),
-                            trackCount = browse.totalCount,
-                            year = "",
-                        ),
-                )
-            _tracks.value = browse.tracks
-            _continuation.value = browse.nextOffset?.let { "$NETEASE_CLOUD_DISK_PAGE_PREFIX$it" }
-            // 刷新(上传/删歌后)可能从"到底"回到"有下一页"(如上传后超过 200 首):
-            // 有下一页必须显式回 IDLE,否则残留的 EXHAUST 把翻页入口锁死
-            _tracksListState.value =
-                if (_continuation.value == null) ListState.PAGINATION_EXHAUST else ListState.IDLE
-            // 云盘没有"收藏歌单"语义,顶栏心恒藏
-            _favoriteAvailable.value = false
+        // 发布后服务端有短暂不一致窗口(code=500,实测 1.5s 内必现):非首载刷新
+        // 失败时 3s 后重拉一次,仍失败保持旧列表不动(别拿空结果覆盖已显示内容)
+        var browse = neteaseRepository.getCloudDiskPage(0).getOrNull()
+        if (browse == null && !firstLoad) {
+            delay(3000)
+            browse = neteaseRepository.getCloudDiskPage(0).getOrNull()
         }
+        if (browse == null) {
+            if (firstLoad) _uiState.value = Error("cloud disk load failed")
+            return false
+        }
+        val nickname =
+            neteaseRepository.getNeteaseAccounts().firstOrNull()
+                ?.firstOrNull { it.isUsed }?.nickname
+        _uiState.value =
+            Success(
+                data =
+                    PlaylistState(
+                        id = NETEASE_CLOUD_DISK_PLAYLIST_ID,
+                        title = getString(Res.string.cloud_disk),
+                        isRadio = false,
+                        author = Author(id = "", name = nickname ?: "NetEase Cloud"),
+                        // 头图=第一首歌的封面(用户 2026-10-09 定案;无封面歌走云朵兜底
+                        // painter,调色板自动跟随封面取色)
+                        thumbnail = browse.tracks.firstOrNull()?.thumbnails?.lastOrNull()?.url,
+                        description = cloudDiskCapacityText(browse),
+                        trackCount = browse.totalCount,
+                        year = "",
+                    ),
+            )
+        _tracks.value = browse.tracks
+        _continuation.value = browse.nextOffset?.let { "$NETEASE_CLOUD_DISK_PAGE_PREFIX$it" }
+        // 刷新(上传/删歌后)可能从"到底"回到"有下一页"(如上传后超过 200 首):
+        // 有下一页必须显式回 IDLE,否则残留的 EXHAUST 把翻页入口锁死
+        _tracksListState.value =
+            if (_continuation.value == null) ListState.PAGINATION_EXHAUST else ListState.IDLE
+        // 云盘没有"收藏歌单"语义,顶栏心恒藏
+        _favoriteAvailable.value = false
+        return true
     }
 
     /** 容量描述("已用 X / 共 Y"),缺字段时退化为只显示已用,全缺给空 */
@@ -763,8 +771,6 @@ class PlaylistViewModel(
     data class CloudUploadQueueRow(
         val key: String,
         val fileName: String,
-        /** 文件内嵌封面(入列时读,整个上传期间显示);null=退云朵兜底 */
-        val artwork: androidx.compose.ui.graphics.ImageBitmap? = null,
         val bytesSent: Long = 0,
         val bytesTotal: Long = 0,
         val state: CloudUploadRowState = CloudUploadRowState.PENDING,
@@ -784,8 +790,10 @@ class PlaylistViewModel(
         if (cloudUploadInFlight || uris.isEmpty()) return
         cloudUploadInFlight = true
         viewModelScope.launch {
-            // 先整队入列:文件名+内嵌封面轻量读取(只解析头部元数据,md5 等重活留在
-            // 逐首上传时做),未开始的行显示排队态
+            // 先整队入列:文件名轻量读取(只查显示名,md5 等重活留在逐首上传时做),
+            // 未开始的行显示排队态。内嵌封面不在这里预解码——入列曾把全部选中文件的
+            // 封面整队解码并钉在行数据里(高分辨率批量选择=内存随文件数线性堆到打爆),
+            // 改由行组件按需解析(采样+LruCache 限量,见 readCloudUploadArtwork)
             _cloudUploadQueue.value =
                 withContext(Dispatchers.IO) {
                     uris.map { uri ->
@@ -794,7 +802,6 @@ class PlaylistViewModel(
                             fileName =
                                 (readCloudUploadFileName(uri) ?: uri.substringAfterLast('/'))
                                     .substringBeforeLast('.'),
-                            artwork = readCloudUploadArtwork(uri),
                         )
                     }
                 }
@@ -881,11 +888,16 @@ class PlaylistViewModel(
             )
             // 服务端发布+转码是异步的,稍等再刷(窗口期会 500,刷新内部还会再重试一次)
             delay(2500)
-            getCloudDiskData(firstLoad = false)
-            // 刷新落定后清场(含失败行——汇总 toast 已报数,新歌由列表刷新呈现)
+            // 刷新落定(可等待)再清场:提前清会让上传行先消失而新歌尚未进列表;
+            // 刷新成功才发库页回写事件,失败时库页轻拉只会拿到旧计数/旧封面,
+            // 不如保持现状等下次进入对账
+            val refreshed = refreshCloudDiskData(firstLoad = false)
+            // 清场无条件(含失败行——汇总 toast 已报数,新歌由列表刷新呈现)
             _cloudUploadQueue.value = emptyList()
-            // 库页入口原地刷新(第一首歌=封面、曲目数都可能变)
-            mutationBus.send(LibraryMutation.CloudDiskChanged)
+            if (refreshed) {
+                // 库页入口原地刷新(第一首歌=封面、曲目数都可能变)
+                mutationBus.send(LibraryMutation.CloudDiskChanged)
+            }
             cloudUploadInFlight = false
         }
     }
@@ -917,9 +929,12 @@ class PlaylistViewModel(
                 },
             )
             delay(1200)
-            getCloudDiskData(firstLoad = false)
-            // 库页入口原地刷新(第一首歌=封面、曲目数都可能变)
-            mutationBus.send(LibraryMutation.CloudDiskChanged)
+            // 刷新落定且成功才发库页回写事件(上传完成路径同款:提前发会让库页
+            // 轻拉抢在服务端可见前拿到旧计数)
+            if (refreshCloudDiskData(firstLoad = false)) {
+                // 库页入口原地刷新(第一首歌=封面、曲目数都可能变)
+                mutationBus.send(LibraryMutation.CloudDiskChanged)
+            }
         }
     }
 
