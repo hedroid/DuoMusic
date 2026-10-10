@@ -374,22 +374,24 @@ fun NowPlayingScreenContent(
     val cloudQueueIsFlagEra = queueDataState?.data?.cloudDiskFlagEra == true
     val isCloudDiskSongForMenu =
         isCloudDiskQueue && (cloudDiskMountFlag != null || !cloudQueueIsFlagEra)
-    // 标记缺席时的私人文件形状补判(只喂"加歌单"写入口,它的误判方向=保守封锁,
-    // 安全;见删除入口注释——形状不能证明云盘归属,删陈权限不吃它):私人文件
+    // 标记缺席时的私人文件形状补判——只在**非纪元队列**(旧快照,null 行=大概率
+    // 云盘歌)生效:纪元队列(页面装载/恢复回填)的 null 行=后来插入的普通歌或归属
+    // 未知的原始行,按形状断私人会把元数据残缺的普通歌错锁出写入口。私人文件
     // durationSeconds 恒 0(③ dt=0/兜底构造 0),①②与插入的普通歌都有真实时长;
-    // artists 原始为空作第二信号。⚠️ 必须先要求找到队列行——安全调用对 null 行
-    // 也返回 true,重建窗口查不到当前曲时会把"身份未知"误读成私人形状
+    // ⚠️ 必须先要求找到队列行——安全调用对 null 行也返回 true,重建窗口查不到
+    // 当前曲时会把"身份未知"误读成私人形状
     val cloudLegacyPrivateShape =
         currentCloudQueueRow != null &&
             (currentCloudQueueRow.durationSeconds == 0 || currentCloudQueueRow.artists.isNullOrEmpty())
-    // 私人文件:标记 false 直判;标记缺席走时长/形状补判+songEntity 艺人空兜底
-    // ——与三点菜单的"加歌单"门控保持同源
+    // 私人文件:标记 false 直判;标记缺席且非纪元队列才走形状补判+songEntity
+    // 艺人空兜底——与三点菜单的"加歌单"门控保持同源
     val cloudPrivateFileNow =
         isCloudDiskQueue &&
             (
                 cloudDiskMountFlag == false ||
                     (
                         cloudDiskMountFlag == null &&
+                            !cloudQueueIsFlagEra &&
                             (cloudLegacyPrivateShape || nowPlayingState?.songEntity?.artistName.isNullOrEmpty())
                     )
             )
