@@ -46,6 +46,7 @@
     <string name="error">エラー</string>
     <string name="follow">フォロー</string>
     <string name="retry">再試行</string>
+    <string name="partial_categories_failed">一部の結果を読み込めませんでした：%1$s</string>
     <string name="removed_download">ダウンロードを削除しました</string>
     <string name="remove_download_title">ダウンロードを削除しますか？</string>
     <string name="remove_download_message">ダウンロードした曲が削除されます。いつでも再度ダウンロードできます。</string>

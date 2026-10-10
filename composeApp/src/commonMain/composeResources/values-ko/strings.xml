@@ -46,6 +46,7 @@
     <string name="error">오류</string>
     <string name="follow">팔로우</string>
     <string name="retry">다시 시도</string>
+    <string name="partial_categories_failed">일부 결과를 불러오지 못했습니다: %1$s</string>
     <string name="removed_download">다운로드 제거 완료</string>
     <string name="remove_download_title">다운로드를 삭제할까요?</string>
     <string name="remove_download_message">다운로드한 곡이 삭제됩니다. 언제든지 다시 다운로드할 수 있습니다.</string>

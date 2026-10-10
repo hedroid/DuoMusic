@@ -53,6 +53,7 @@
     <string name="error">Error</string>
     <string name="follow">Follow</string>
     <string name="retry">Retry</string>
+    <string name="partial_categories_failed">Some results failed to load: %1$s</string>
     <string name="removed_download">Removed download</string>
     <string name="remove_download_title">Remove download?</string>
     <string name="remove_download_message">Downloaded songs will be removed. You can download them again anytime.</string>
@@ -343,7 +344,7 @@
     <string name="issue_tracker">Issue Tracker</string>
     <string name="copyright" translatable="false">©2023-%1$s Tuan Minh Nguyen Duc (maxrave-dev)</string>
     <string name="featured_playlists">Featured Playlists</string>
-    <string name="podcasts" translatable="false">Podcasts</string>
+    <string name="podcasts">Podcasts</string>
     <string name="featured_inArtist">Featured on</string>
     <string name="audio_quality">Audio quality</string>
     <string name="play_video_for_video_track_instead_of_audio_only">Play video for video track instead of audio only</string>

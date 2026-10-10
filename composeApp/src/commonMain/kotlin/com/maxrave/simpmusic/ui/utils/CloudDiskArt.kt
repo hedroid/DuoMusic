@@ -44,12 +44,17 @@ private fun createCloudCoverBitmap(
     // 竖向双色分段近似渐变(两块纯色,小尺寸行封面看不出接缝)
     canvas.drawRect(Rect(0f, 0f, s, s / 2f), Paint().apply { color = topColor })
     canvas.drawRect(Rect(0f, s / 2f, s, s), Paint().apply { color = bottomColor })
-    // 白云:三圆 + 底部矩形拉平底缘
+    // 白云:三圆 + 底部矩形拉平底缘。2026-10-10 用户要求整体再放大一档——
+    // 以画布中心为锚 1.22×(原 1.0× 几何见 git 历史),放大后左右余量仍 ~35 单位不贴边
     val white = Paint().apply { color = cloudColor }
     val unit = s / 256f
-    canvas.drawCircle(Offset(88f * unit, 140f * unit), 38f * unit, white)
-    canvas.drawCircle(Offset(128f * unit, 116f * unit), 52f * unit, white)
-    canvas.drawCircle(Offset(170f * unit, 144f * unit), 34f * unit, white)
-    canvas.drawRect(Rect(74f * unit, 150f * unit, 184f * unit, 184f * unit), white)
+    val cloudScale = 1.22f
+    fun fx(x: Float) = (128f + (x - 128f) * cloudScale) * unit
+    fun fy(y: Float) = (128f + (y - 128f) * cloudScale) * unit
+    fun fr(r: Float) = r * cloudScale * unit
+    canvas.drawCircle(Offset(fx(88f), fy(140f)), fr(38f), white)
+    canvas.drawCircle(Offset(fx(128f), fy(116f)), fr(52f), white)
+    canvas.drawCircle(Offset(fx(170f), fy(144f)), fr(34f), white)
+    canvas.drawRect(Rect(fx(74f), fy(150f), fx(184f), fy(184f)), white)
     return image
 }

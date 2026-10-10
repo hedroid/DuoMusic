@@ -52,6 +52,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SearchBar
 import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.Surface
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
@@ -91,6 +92,8 @@ import coil3.request.CachePolicy
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.maxrave.common.Config
+import com.maxrave.common.NETEASE_MV_MEDIA_ID_PREFIX
+import com.maxrave.common.NETEASE_RADIO_SEARCH_RESULT_TYPE
 import com.maxrave.domain.data.entities.SongEntity
 import com.maxrave.domain.data.model.browse.album.Track
 import com.maxrave.logger.Logger
@@ -137,6 +140,7 @@ import com.maxrave.simpmusic.ui.navigation.destination.home.MoodDestination
 import com.maxrave.simpmusic.ui.navigation.destination.home.NeteaseTagDestination
 import com.maxrave.simpmusic.ui.navigation.destination.list.AlbumDestination
 import com.maxrave.simpmusic.ui.navigation.destination.list.ArtistDestination
+import com.maxrave.simpmusic.ui.navigation.destination.list.NeteaseRadioDetailDestination
 import com.maxrave.simpmusic.ui.navigation.destination.list.PlaylistDestination
 import com.maxrave.simpmusic.ui.navigation.destination.list.PodcastDestination
 import com.maxrave.simpmusic.ui.navigation.destination.search.SearchDestination
@@ -169,6 +173,7 @@ import simpmusic.composeapp.generated.resources.in_search
 import simpmusic.composeapp.generated.resources.no_results_found
 import simpmusic.composeapp.generated.resources.playlists
 import simpmusic.composeapp.generated.resources.podcasts
+import simpmusic.composeapp.generated.resources.partial_categories_failed
 import simpmusic.composeapp.generated.resources.retry
 import simpmusic.composeapp.generated.resources.search_for
 import simpmusic.composeapp.generated.resources.search_for_songs_artists_albums_playlists_and_more
@@ -288,11 +293,13 @@ fun SearchScreen(
     val placeholderTexts =
         remember(isNeteaseSource) {
             if (isNeteaseSource) {
-                // 网易源无视频/播客/专辑搜索(tab 已隐藏),占位词同步收敛
+                // 网易源无专辑占位词(YT 同款收敛);视频/播客 tab 已接入保留
                 listOf(
                     "$searchForString $songString...",
                     "$searchForString $artistString...",
                     "$searchForString $playlistString...",
+                    "$searchForString $videoString...",
+                    "$searchForString $podcastString...",
                 )
             } else {
                 listOf(
@@ -351,6 +358,22 @@ fun SearchScreen(
             SearchType.PLAYLISTS -> searchViewModel.searchPlaylists(query)
             SearchType.FEATURED_PLAYLISTS -> searchViewModel.searchFeaturedPlaylist(query)
             SearchType.PODCASTS -> searchViewModel.searchPodcast(query)
+        }
+    }
+
+    /** 按当前 tab 重跑一次搜索(不动焦点/历史):错误态重试与 ALL 聚合失败分类的空 tab 重试用 */
+    val retryCurrentTabSearch: () -> Unit = {
+        if (searchText.isNotEmpty()) {
+            when (searchScreenState.searchType) {
+                SearchType.ALL -> searchViewModel.searchAll(searchText)
+                SearchType.SONGS -> searchViewModel.searchSongs(searchText)
+                SearchType.VIDEOS -> searchViewModel.searchVideos(searchText)
+                SearchType.ALBUMS -> searchViewModel.searchAlbums(searchText)
+                SearchType.ARTISTS -> searchViewModel.searchArtists(searchText)
+                SearchType.PLAYLISTS -> searchViewModel.searchPlaylists(searchText)
+                SearchType.FEATURED_PLAYLISTS -> searchViewModel.searchFeaturedPlaylist(searchText)
+                SearchType.PODCASTS -> searchViewModel.searchPodcast(searchText)
+            }
         }
     }
 
@@ -923,6 +946,21 @@ fun SearchScreen(
                                                             ),
                                                         state = resultsState,
                                                     ) {
+                                                        // ALL 聚合部分失败横幅:失败分类在混排里静默缺席,
+                                                        // 用户停留在本页时由此得知缺席是请求失败所致(切到该分类
+                                                        // tab 的空态错误提示之外的第二落点)。重试=重跑聚合。
+                                                        if (searchScreenState.searchType == SearchType.ALL &&
+                                                            searchScreenState.searchAllFailedCategories.isNotEmpty() &&
+                                                            // 横幅描述的是聚合本身:聚合属于别的源时(切源未及重聚合的窗口)不显示
+                                                            searchScreenState.searchAllSource == selectedSource
+                                                        ) {
+                                                            item(key = "all_partial_failed_banner") {
+                                                                AllPartialFailedBanner(
+                                                                    failedTypes = searchScreenState.searchAllFailedCategories,
+                                                                    onRetry = retryCurrentTabSearch,
+                                                                )
+                                                            }
+                                                        }
                                                         items(currentResults) { result ->
                                                             when (result) {
                                                                 is SongsResult -> {
@@ -965,41 +1003,68 @@ fun SearchScreen(
                                                                 }
 
                                                                 is VideosResult -> {
+                                                                    // 网易 MV(videoId=NETEASE_MV_ 哨兵):与歌手页 MV 货架/收藏列表
+                                                                    // 同链路——playMv 单曲哨兵队列(loadMore 见前缀即止);不走
+                                                                    // RDAMVM 电台包装,也不给三点菜单(MV 不落 song 表,菜单动作全是歌语义)
+                                                                    val isNeteaseMv = result.videoId.startsWith(NETEASE_MV_MEDIA_ID_PREFIX)
                                                                     SongFullWidthItems(
                                                                         track = result.toTrack(),
                                                                         isPlaying = result.videoId == currentVideoId,
                                                                         modifier = Modifier,
-                                                                        onMoreClickListener = {
-                                                                            onMoreClick(result.toTrack().toSongEntity())
-                                                                        },
+                                                                        onMoreClickListener =
+                                                                            if (isNeteaseMv) {
+                                                                                null
+                                                                            } else {
+                                                                                {
+                                                                                    onMoreClick(result.toTrack().toSongEntity())
+                                                                                }
+                                                                            },
                                                                         onClickListener = {
-                                                                            val firstTrack = result.toTrack()
-                                                                            searchViewModel.setQueueData(
-                                                                                QueueData.Data(
-                                                                                    listTracks = arrayListOf(firstTrack),
-                                                                                    firstPlayedTrack = firstTrack,
-                                                                                    playlistId = "RDAMVM${result.videoId}",
-                                                                                    playlistName =
-                                                                                        "\"${searchText}\" ${
-                                                                                            getStringBlocking(
-                                                                                                Res.string.in_search,
-                                                                                            )
-                                                                                        }",
-                                                                                    playlistType = PlaylistType.RADIO,
-                                                                                    continuation = null,
-                                                                                ),
-                                                                            )
-                                                                            searchViewModel.loadMediaItem(firstTrack, Config.VIDEO_CLICK)
+                                                                            if (isNeteaseMv) {
+                                                                                // 选区激活中点按吞掉(selectionMode=false 让点击落到这里,别打断选歌)
+                                                                                if (!selectionState.isActive) sharedViewModel.playMv(result.toTrack())
+                                                                            } else {
+                                                                                val firstTrack = result.toTrack()
+                                                                                searchViewModel.setQueueData(
+                                                                                    QueueData.Data(
+                                                                                        listTracks = arrayListOf(firstTrack),
+                                                                                        firstPlayedTrack = firstTrack,
+                                                                                        playlistId = "RDAMVM${result.videoId}",
+                                                                                        playlistName =
+                                                                                            "\"${searchText}\" ${
+                                                                                                getStringBlocking(
+                                                                                                    Res.string.in_search,
+                                                                                                )
+                                                                                            }",
+                                                                                        playlistType = PlaylistType.RADIO,
+                                                                                        continuation = null,
+                                                                                    ),
+                                                                                )
+                                                                                searchViewModel.loadMediaItem(firstTrack, Config.VIDEO_CLICK)
+                                                                            }
                                                                         },
                                                                         onAddToQueue = {
                                                                             sharedViewModel.addListToQueue(
                                                                                 arrayListOf(result.toTrack()),
                                                                             )
                                                                         },
-                                                                        selectionMode = selectionState.isActive,
-                                                                        isSelected = selectionState.isSelected(result.videoId),
-                                                                        onLongClick = { selectionState.start(it) },
-                                                                        onSelectToggle = { selectionState.toggle(it) },
+                                                                        // 网易 MV 不参与歌曲多选:哨兵 ID 在 song 表无行,选区动作
+                                                                        // (下一首/下载/点赞/加歌单)全是歌语义,加 YT 歌单还会把
+                                                                        // NETEASE_MV_… 当非数字 YT ID 提交——不起选也不可勾
+                                                                        selectionMode = !isNeteaseMv && selectionState.isActive,
+                                                                        isSelected = !isNeteaseMv && selectionState.isSelected(result.videoId),
+                                                                        onLongClick =
+                                                                            if (isNeteaseMv) {
+                                                                                null
+                                                                            } else {
+                                                                                { selectionState.start(it) }
+                                                                            },
+                                                                        onSelectToggle =
+                                                                            if (isNeteaseMv) {
+                                                                                null
+                                                                            } else {
+                                                                                { selectionState.toggle(it) }
+                                                                            },
                                                                     )
                                                                 }
 
@@ -1033,19 +1098,26 @@ fun SearchScreen(
                                                                     PlaylistFullWidthItems(
                                                                         data = result,
                                                                         onClickListener = {
-                                                                            if (result.resultType == "Podcast") {
-                                                                                navController.navigate(
-                                                                                    PodcastDestination(
-                                                                                        result.browseId,
-                                                                                    ),
-                                                                                )
-                                                                            } else {
-                                                                                navController.navigate(
-                                                                                    PlaylistDestination(
-                                                                                        result.browseId,
-                                                                                    ),
-                                                                                )
-                                                                            }
+                                                                            when (result.resultType) {
+                                                                                                // YT 播客(独立播客详情页)
+                                                                                                "Podcast" -> navController.navigate(
+                                                                                                    PodcastDestination(
+                                                                                                        result.browseId,
+                                                                                                    ),
+                                                                                                )
+                                                                                                // 网易电台(数字 id→现有电台详情页,与播客 chip 页同页)
+                                                                                                NETEASE_RADIO_SEARCH_RESULT_TYPE -> navController.navigate(
+                                                                                                    NeteaseRadioDetailDestination(
+                                                                                                        radioId = result.browseId.toLongOrNull() ?: 0L,
+                                                                                                        radioName = result.title,
+                                                                                                    ),
+                                                                                                )
+                                                                                                else -> navController.navigate(
+                                                                                                    PlaylistDestination(
+                                                                                                        result.browseId,
+                                                                                                    ),
+                                                                                                )
+                                                                                            }
                                                                         },
                                                                     )
                                                                 }
@@ -1070,6 +1142,27 @@ fun SearchScreen(
                                                         // Space at bottom to account for bottom navigation and mini player
                                                         item { Spacer(modifier = Modifier.height(150.dp)) }
                                                     }
+                                                } else if (
+                                                    // 空列表 + 失败 → 错误+重试(重跑该分类),别误报"无结果"。
+                                                    // 失败的三类来源(标记都须与当前**词/源**一致):
+                                                    // ① 当前分类 ∈ 聚合失败标记(混排中静默缺席,聚合源=当前源);
+                                                    // ② 当前分类 ∈ 单发失败标记(失败时用户已切走,全局 Error 未写,
+                                                    //    靠它保留;词+源都符合才渲染——换词后旧词失败不显示在新词下);
+                                                    // ③ 当前是 ALL 且聚合有失败(全败/空+败在切走又切回时的兜底)
+                                                    (searchScreenState.searchType in searchScreenState.searchAllFailedCategories &&
+                                                        searchScreenState.searchAllSource == selectedSource) ||
+                                                    searchScreenState.tabSearchFailed[searchScreenState.searchType]
+                                                        ?.let { (failedQuery, failedSource) -> failedQuery == searchText && failedSource == selectedSource } == true ||
+                                                    (searchScreenState.searchType == SearchType.ALL &&
+                                                        searchScreenState.searchAllFailedCategories.isNotEmpty() &&
+                                                        searchScreenState.searchAllSource == selectedSource)
+                                                ) {
+                                                    Box(
+                                                        modifier = Modifier.fillMaxSize(),
+                                                        contentAlignment = Alignment.Center,
+                                                    ) {
+                                                        SearchErrorColumn(onRetry = retryCurrentTabSearch)
+                                                    }
                                                 } else {
                                                     Box(
                                                         modifier = Modifier.fillMaxSize(),
@@ -1088,28 +1181,12 @@ fun SearchScreen(
                                     }
 
                                     is SearchScreenUIState.Error -> {
-                                        Box {
-                                            // Error state
-                                            Column(
-                                                modifier = Modifier.align(Alignment.Center),
-                                                horizontalAlignment = Alignment.CenterHorizontally,
-                                            ) {
-                                                Text(
-                                                    text = stringResource(Res.string.error_occurred),
-                                                    style = typo().titleMedium,
-                                                    fontWeight = FontWeight.Bold,
-                                                    textAlign = TextAlign.Center,
-                                                    modifier = Modifier.fillMaxWidth(),
-                                                )
-                                                Spacer(modifier = Modifier.height(10.dp))
-                                                Button(onClick = {
-                                                    if (searchText.isNotEmpty()) {
-                                                        searchViewModel.searchAll(searchText)
-                                                    }
-                                                }) {
-                                                    Text(text = stringResource(Res.string.retry))
-                                                }
-                                            }
+                                        Box(
+                                            modifier = Modifier.fillMaxSize(),
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            // Error state(重试按当前 tab 重跑,不再恒 searchAll)
+                                            SearchErrorColumn(onRetry = retryCurrentTabSearch)
                                         }
                                     }
 
@@ -1166,14 +1243,19 @@ fun SearchScreen(
             SongSelectionTopAppBar(
                 state = selectionState,
                 onSelectAll = {
+                    // 网易 MV 哨兵 ID 剔除:MV 行不可选(见 VideosResult 分支注释),
+                    // 全选也不带它们——选区动作按歌曲表取行,哨兵 ID 无行
                     val visible =
                         when (searchScreenState.searchType) {
                             SearchType.SONGS -> searchScreenState.searchSongsResult.map { it.videoId }
-                            SearchType.VIDEOS -> searchScreenState.searchVideosResult.map { it.videoId }
+                            SearchType.VIDEOS ->
+                                searchScreenState.searchVideosResult
+                                    .map { it.videoId }
+                                    .filterNot { it.startsWith(NETEASE_MV_MEDIA_ID_PREFIX) }
                             SearchType.ALL ->
                                 searchScreenState.searchAllResult.mapNotNull {
                                     (it as? SongsResult)?.videoId ?: (it as? VideosResult)?.videoId
-                                }
+                                }.filterNot { it.startsWith(NETEASE_MV_MEDIA_ID_PREFIX) }
                             else -> emptyList()
                         }
                     selectionState.toggleSelectAll(visible)
@@ -1327,6 +1409,34 @@ fun SearchScreen(
                                 text = stringResource(id.toStringRes()),
                             ) {
                                 searchViewModel.setSearchType(id)
+                                // 词/源核对:ALL 比对聚合绑定,分类比对各自绑定(categoryBindings);
+                                // 不符(含从未搜过)且搜索框非空 → 就地重搜该 tab——旧词/旧源
+                                // 结果与"尚未搜索"都不再当展示内容(与 ALL 的重聚合对称)。
+                                // 当前 tab 正在加载则跳过:在途搜索必属当前 tab(互斥+切 tab 即
+                                // 取消+派发按当前 tab),此刻绑定还停在上一轮——重查会取消并
+                                // 重启同一请求(加载中重复点当前 tab 的重启问题)
+                                val loadingThisTab =
+                                    searchScreenState.searchType == id && uiState is SearchScreenUIState.Loading
+                                val bindingStale =
+                                    if (id == SearchType.ALL) {
+                                        searchScreenState.searchAllQuery != searchText ||
+                                            searchScreenState.searchAllSource != selectedSource
+                                    } else {
+                                        searchScreenState.categoryBindings[id]
+                                            ?.let { (q, s) -> q == searchText && s == selectedSource } != true
+                                    }
+                                if (!loadingThisTab && searchText.isNotEmpty() && bindingStale) {
+                                    when (id) {
+                                        SearchType.ALL -> searchViewModel.searchAll(searchText)
+                                        SearchType.SONGS -> searchViewModel.searchSongs(searchText)
+                                        SearchType.VIDEOS -> searchViewModel.searchVideos(searchText)
+                                        SearchType.ALBUMS -> searchViewModel.searchAlbums(searchText)
+                                        SearchType.ARTISTS -> searchViewModel.searchArtists(searchText)
+                                        SearchType.PLAYLISTS -> searchViewModel.searchPlaylists(searchText)
+                                        SearchType.FEATURED_PLAYLISTS -> searchViewModel.searchFeaturedPlaylist(searchText)
+                                        SearchType.PODCASTS -> searchViewModel.searchPodcast(searchText)
+                                    }
+                                }
                             }
                             Spacer(modifier = Modifier.width(4.dp))
                         }
@@ -1477,12 +1587,74 @@ enum class SearchUIType {
     SEARCH_RESULTS,
 }
 
-/** 网易源下可见的搜索 tab:其余类型(视频/专辑/精选/播客)无对应能力或点击链路未通 */
+/** 搜索错误列(全局错误态与 ALL 聚合失败分类的空 tab 共用):文案+重试按钮 */
+@Composable
+private fun SearchErrorColumn(onRetry: () -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text = stringResource(Res.string.error_occurred),
+            style = typo().titleMedium,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(modifier = Modifier.height(10.dp))
+        Button(onClick = onRetry) {
+            Text(text = stringResource(Res.string.retry))
+        }
+    }
+}
+
+/** ALL 聚合搜索部分失败横幅:点名失败分类(本地化名),重试重跑聚合。
+ *  只在 ALL tab 且失败集合非空时由列表头部挂载;空结果+失败走全局 Error 态不在此。 */
+@Composable
+private fun AllPartialFailedBanner(
+    failedTypes: Set<SearchType>,
+    onRetry: () -> Unit,
+) {
+    // sortedBy/map 均为 inline lambda,composable 调用合法
+    val names =
+        failedTypes
+            .sortedBy { it.ordinal }
+            .map { stringResource(it.toStringRes()) }
+            .joinToString(", ")
+    Surface(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.errorContainer,
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(start = 14.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
+        ) {
+            Text(
+                text = stringResource(Res.string.partial_categories_failed, names),
+                style = typo().labelMedium,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(onClick = onRetry) {
+                Text(text = stringResource(Res.string.retry))
+            }
+        }
+    }
+}
+
+/** 网易源下可见的搜索 tab:视频=cloudsearch type1004(MV→playMv)、播客=type1009(电台→
+ *  详情页)均已接链路;仅"精选歌单"无网易维度保持隐藏 */
 private val NETEASE_SEARCH_TABS =
     listOf(
         SearchType.ALL,
         SearchType.SONGS,
+        SearchType.VIDEOS,
         SearchType.ARTISTS,
         SearchType.ALBUMS, // M6 专辑页已通,放开
         SearchType.PLAYLISTS,
+        SearchType.PODCASTS,
     )

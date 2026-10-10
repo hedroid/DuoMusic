@@ -65,6 +65,7 @@
     <string name="error">錯誤</string>
     <string name="follow">追蹤</string>
     <string name="retry">再試一次</string>
+    <string name="partial_categories_failed">部分結果載入失敗：%1$s</string>
     <string name="removed_download">移除下載</string>
     <string name="remove_download_title">移除下載？</string>
     <string name="remove_download_message">已下載的歌曲將被刪除，可隨時重新下載。</string>
@@ -154,6 +155,7 @@
     <string name="lyrics">歌詞</string>
     <string name="all">所有</string>
     <string name="videos">影片</string>
+    <string name="podcasts">播客</string>
     <string name="content">內容</string>
     <string name="storage">儲存</string>
     <string name="player_cache">播放器快取</string>
