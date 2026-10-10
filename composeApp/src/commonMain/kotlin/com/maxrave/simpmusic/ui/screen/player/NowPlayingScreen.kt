@@ -364,14 +364,16 @@ fun NowPlayingScreenContent(
     // 标记随 Track.copy 存活重建、随序列化存活持久化。null 还有第三种来源:旧
     // 持久化队列(升级前保存)或后来插入队列的普通歌曲——后者本就不属云盘。
     val cloudDiskMountFlag = currentCloudQueueRow?.neteaseCloudDiskMounted
-    // 队列是否处于标记纪元(任一行带标记=新构建的队列):有→无标记的行=后来插入
-    // 的普通歌;无→升级前保存的旧快照,整队列都是云盘歌(标记集体缺席)。三点菜单
-    // 的"是云盘歌"信号按这个区分——旧快照虽然隐藏删除入口(身份未确认),但
-    // 电台/相似/看MV/分享/点赞/加歌单的云盘门控必须照常生效
-    val cloudQueueHasMountFlags =
-        queueDataState?.data?.listTracks.orEmpty().any { it.neteaseCloudDiskMounted != null }
+    // 队列的云盘标记纪元(core 在 setQueueData 时定型,续批/移除不翻动,见字段注释):
+    // true=标记纪元队列——无标记的行=后来插入的普通歌;false=升级前保存的旧快照,
+    // 整队列按云盘歌对待。不能在 UI 侧按当前曲目现算 any{标记}:旧快照经分页续批
+    // 追加带标记的云盘行后 any 翻 true,旧云盘行会被误判成插入的普通歌(私人文件
+    // 门控整组失效);云盘歌被移光只剩普通歌时 any 翻 false 又把普通歌误判成云盘歌。
+    // 三点菜单的"是云盘歌"信号按纪元区分——旧快照虽然隐藏删除入口(身份未确认),
+    // 但 电台/相似/看MV/分享/点赞/加歌单 的云盘门控必须照常生效
+    val cloudQueueIsFlagEra = queueDataState?.data?.cloudDiskFlagEra == true
     val isCloudDiskSongForMenu =
-        isCloudDiskQueue && (cloudDiskMountFlag != null || !cloudQueueHasMountFlags)
+        isCloudDiskQueue && (cloudDiskMountFlag != null || !cloudQueueIsFlagEra)
     // 标记缺席时的私人文件形状补判(只喂"加歌单"写入口,它的误判方向=保守封锁,
     // 安全;见删除入口注释——形状不能证明云盘归属,删陈权限不吃它):私人文件
     // durationSeconds 恒 0(③ dt=0/兜底构造 0),①②与插入的普通歌都有真实时长;
