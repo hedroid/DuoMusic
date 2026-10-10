@@ -364,14 +364,14 @@ fun NowPlayingScreenContent(
     // 标记随 Track.copy 存活重建、随序列化存活持久化。null 还有第三种来源:旧
     // 持久化队列(升级前保存)或后来插入队列的普通歌曲——后者本就不属云盘。
     val cloudDiskMountFlag = currentCloudQueueRow?.neteaseCloudDiskMounted
-    // 标记缺席时的补判(升级前保存的旧队列快照,含恢复路径经 SongEntity.toTrack()
-    // 重建的当前曲——SongEntity 无标记列,两条路都会缺):私人文件 durationSeconds
-    // 恒 0(③ ar 缺席 dt=0、song 缺席兜底构造 0),①②与后来插入的普通歌都有真实
-    // 时长——时长不像 artists 会被 catalog 重建回填污染,是标记缺席时唯一可靠的
-    // ③签名;artists 原始为空作第二信号(pristine 行)
+    // 标记缺席时的私人文件形状补判(只喂"加歌单"写入口,它的误判方向=保守封锁,
+    // 安全;见删除入口注释——形状不能证明云盘归属,删陈权限不吃它):私人文件
+    // durationSeconds 恒 0(③ dt=0/兜底构造 0),①②与插入的普通歌都有真实时长;
+    // artists 原始为空作第二信号。⚠️ 必须先要求找到队列行——安全调用对 null 行
+    // 也返回 true,重建窗口查不到当前曲时会把"身份未知"误读成私人形状
     val cloudLegacyPrivateShape =
-        currentCloudQueueRow?.durationSeconds == 0 ||
-            currentCloudQueueRow?.artists.isNullOrEmpty()
+        currentCloudQueueRow != null &&
+            (currentCloudQueueRow.durationSeconds == 0 || currentCloudQueueRow.artists.isNullOrEmpty())
     // 私人文件:标记 false 直判;标记缺席走时长/形状补判+songEntity 艺人空兜底
     // ——与三点菜单的"加歌单"门控保持同源
     val cloudPrivateFileNow =
@@ -991,12 +991,14 @@ fun NowPlayingScreenContent(
             setSleepTimerEnable = true,
             changeMainLyricsProviderEnable = true,
             // 云盘当前曲删除入口(列表菜单同款行;确认弹窗在壳层,不可逆)。
-            // 身份判定:新队列只认显式挂载标记(非 null=确属云盘);旧队列(标记缺席)
-            // 私人文件按 durationSeconds==0 铁签名保留删除口,①②/后来插入的普通歌
-            // 身份未知=保守隐藏(不可逆操作宁可漏出)。队列 ID 判定过宽的旧病不回
-            // ——拿普通歌曲 id 调 /cloud/del 语义未验证且可能误删同 id 的云盘条目
+            // 不可逆操作只认显式挂载标记(行在+标记非空=归属确凿):队列 ID 判定过宽
+            // 会把后来插入的普通歌曲误露(拿普通歌曲 id 调 /cloud/del 语义未验证且
+            // 可能误删同 id 的云盘条目);元数据形状(duration==0/空 artists)只证明
+            // "私人文件形状"不证明"属云盘"——插入云盘队列的普通歌也可能缺时长/艺人,
+            // 且重建窗口查不到队列行时形状读数是 null-true 假象。旧队列快照(标记
+            // 缺席)与身份未知的当前曲一律隐藏,宁可漏出;重新进云盘页起播即带标记。
             onDeleteFromCloudDisk =
-                if (isCloudDiskQueue && (cloudDiskMountFlag != null || cloudLegacyPrivateShape)) {
+                if (isCloudDiskQueue && currentCloudQueueRow != null && cloudDiskMountFlag != null) {
                     { pendingCloudDeleteId = nowPlayingVideoId }
                 } else {
                     null
