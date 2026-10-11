@@ -48,11 +48,11 @@ import simpmusic.composeapp.generated.resources.unsaved_toast
 import simpmusic.composeapp.generated.resources.cloud_action_failed_youtube
 import simpmusic.composeapp.generated.resources.unsubscribed_netease_album
 import simpmusic.composeapp.generated.resources.album
+import simpmusic.composeapp.generated.resources.album_load_error
 import simpmusic.composeapp.generated.resources.download_no_space
 import simpmusic.composeapp.generated.resources.downloaded
 import simpmusic.composeapp.generated.resources.downloading
 import simpmusic.composeapp.generated.resources.download_cancelled
-import simpmusic.composeapp.generated.resources.error
 import simpmusic.composeapp.generated.resources.playlist_is_empty
 import simpmusic.composeapp.generated.resources.removed_download
 
@@ -152,7 +152,7 @@ class AlbumViewModel(
                             getAlbumFlow(browseId)
                             refreshRemoteSavedState()
                         } else {
-                            makeToast(getString(Res.string.error) + ": Null data")
+                            makeToast(getString(Res.string.album_load_error))
                             _uiState.update {
                                 it.copy(
                                     loadState = LocalPlaylistState.PlaylistLoadState.Error,
@@ -205,8 +205,9 @@ class AlbumViewModel(
                                     )
                                 }
                             } else {
+                                // 原始异常消息(如"degraded album response")只进日志,不透传 UI
                                 log("Error: ${res.message}", LogLevel.ERROR)
-                                makeToast(getString(Res.string.error) + ": ${res.message}")
+                                makeToast(getString(Res.string.album_load_error))
                                 _uiState.update {
                                     it.copy(
                                         loadState = LocalPlaylistState.PlaylistLoadState.Error,

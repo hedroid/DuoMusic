@@ -987,6 +987,7 @@
     <string name="netease_playlists">Playlists</string>
     <string name="starred_albums">Starred albums</string>
     <string name="netease_home_error">Couldn't load NetEase recommendations. Check your connection and retry.</string>
+    <string name="album_load_error">Couldn't load this album. Check your connection and retry.</string>
     <string name="netease_home_logged_out">Logged out of NetEase — browsing public feeds only, playback unavailable.</string>
     <string name="netease_lyrics">NetEase official lyrics</string>
     <string name="personal_fm">Personal FM</string>

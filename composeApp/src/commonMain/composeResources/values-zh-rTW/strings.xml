@@ -190,6 +190,7 @@
     <string name="title">標題</string>
     <string name="custom_order">客製訂單</string>
     <string name="album">專輯</string>
+    <string name="album_load_error">專輯載入失敗，請檢查網路後重試。</string>
     <string name="youtube_url">YouTube網址</string>
     <string name="netease_url">網易雲音樂連結</string>
     <string name="netease_delete_playlist">刪除播放清單</string>
