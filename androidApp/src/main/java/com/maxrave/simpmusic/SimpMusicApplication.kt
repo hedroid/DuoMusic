@@ -22,6 +22,7 @@ import com.maxrave.logger.Logger
 import com.maxrave.simpmusic.di.viewModelModule
 import com.maxrave.simpmusic.expect.CloudUploadStore
 import com.maxrave.simpmusic.expect.HapticFeedback
+import com.maxrave.simpmusic.expect.installNeteaseWatchmanTokenSource
 import com.maxrave.simpmusic.service.backup.AutoBackupScheduler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -66,6 +67,9 @@ class SimpMusicApplication :
             )
             loadKoinModules(viewModelModule)
         }
+        // 网易 eapi 反作弊 token(易盾 Watchman)生成器:headless WebView 懒初始化,
+        // 生成失败自动降级纯 eapi——装不上也绝不能影响启动
+        installNeteaseWatchmanTokenSource(this)
         // provide custom configuration
         val workConfig =
             Configuration
