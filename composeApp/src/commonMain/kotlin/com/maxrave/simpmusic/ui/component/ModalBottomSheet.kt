@@ -163,8 +163,8 @@ import com.maxrave.simpmusic.extension.greyScale
 import com.maxrave.simpmusic.viewModel.LibraryMutation
 import com.maxrave.simpmusic.viewModel.LibraryMutationBus
 import com.maxrave.simpmusic.ui.icon.AccessAlarm
+import com.maxrave.simpmusic.ui.icon.LinkOff
 import com.maxrave.simpmusic.ui.icon.Search
-import com.maxrave.simpmusic.ui.icon.SyncDisabled
 import com.maxrave.simpmusic.ui.icon.Add
 import com.maxrave.simpmusic.ui.icon.AddCircleOutline
 import com.maxrave.simpmusic.ui.icon.AddPhotoAlternate
@@ -275,7 +275,6 @@ import simpmusic.composeapp.generated.resources.cloud_unlink_action
 import simpmusic.composeapp.generated.resources.cloud_unlink_message
 import simpmusic.composeapp.generated.resources.match_cloud_disk_song
 import simpmusic.composeapp.generated.resources.no_results_found
-import simpmusic.composeapp.generated.resources.search
 import simpmusic.composeapp.generated.resources.unlink_cloud_disk_song
 import simpmusic.composeapp.generated.resources.crop_cover
 import simpmusic.composeapp.generated.resources.codec
@@ -2775,7 +2774,7 @@ fun NowPlayingBottomSheet(
                         }
                         if (!isCloudPrivateFile) {
                             ActionButton(
-                                icon = SimpIcons.SyncDisabled,
+                                icon = SimpIcons.LinkOff,
                                 text = Res.string.unlink_cloud_disk_song,
                             ) {
                                 showCloudUnlinkDialog = true
@@ -3734,14 +3733,7 @@ private fun CloudDiskMatchDialog(
         containerColor = rememberSurfaceDarkColors().container,
         onDismissRequest = { if (!matching) onDismiss() },
         confirmButton = {
-            if (picked == null) {
-                TextButton(
-                    enabled = query.isNotBlank() && !searching,
-                    onClick = { doSearch() },
-                ) {
-                    Text(text = stringResource(Res.string.search), style = typo().labelSmall)
-                }
-            } else {
+            if (picked != null) {
                 TextButton(
                     enabled = !matching,
                     onClick = {
