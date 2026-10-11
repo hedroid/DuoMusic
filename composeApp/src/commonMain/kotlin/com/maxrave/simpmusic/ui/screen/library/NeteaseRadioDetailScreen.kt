@@ -146,6 +146,7 @@ fun NeteaseRadioDetailScreen(
                     navController = navController,
                     playback = playback,
                     hasResume = uiState.resumeProgramId != null,
+                    resumeInFlight = uiState.resumeInFlight,
                     onToggleSubscribe = { viewModel.toggleSubscribe() },
                     onPlayAllOrResume = { viewModel.playAllOrResume() },
                     onResumePlayback = { viewModel.resumePlayback() },
@@ -275,6 +276,7 @@ private fun RadioHeader(
     navController: NavController,
     playback: com.maxrave.simpmusic.viewModel.NeteaseRadioDetailViewModel.RadioPlayback?,
     hasResume: Boolean,
+    resumeInFlight: Boolean = false,
     onToggleSubscribe: () -> Unit,
     onPlayAllOrResume: () -> Unit,
     onResumePlayback: () -> Unit,
@@ -346,8 +348,20 @@ private fun RadioHeader(
                 when (playback) {
                     null ->
                         if (hasResume) {
-                            OutlinedButton(onClick = onResumePlayback, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp)) {
-                                PlayBadgeIcon(SimpIcons.PlayArrow)
+                            OutlinedButton(
+                                onClick = onResumePlayback,
+                                enabled = !resumeInFlight,
+                                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp),
+                            ) {
+                                // 跨页找回在途:小转圈替代播放图标(死灰无反馈会被读作坏了)
+                                if (resumeInFlight) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(18.dp),
+                                        strokeWidth = 2.dp,
+                                    )
+                                } else {
+                                    PlayBadgeIcon(SimpIcons.PlayArrow)
+                                }
                                 Text(
                                     stringResource(Res.string.podcast_resume),
                                     style = typo().labelMedium,

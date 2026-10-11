@@ -4,6 +4,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.lifecycle.viewModelScope
 import com.maxrave.common.Config
 import com.maxrave.common.NETEASE_MV_MEDIA_ID_PREFIX
+import com.maxrave.common.NETEASE_PODCAST_RADIO_QUEUE_PREFIX
 import com.maxrave.common.Config.ALBUM_CLICK
 import com.maxrave.common.Config.DOWNLOAD_CACHE
 import com.maxrave.common.Config.PLAYLIST_CLICK
@@ -179,6 +180,57 @@ class SharedViewModel(
                 }
             }
         }
+        // 播客收听位置记忆(原电台详情页 VM 的 init 循环搬来,CR-26 余项):挂页面 VM 的
+        // viewModelScope 会随页面销毁断流,而音频还能继续播——离开详情页再听一段,重进
+        // 读到的续播位置偏早。这里是进程级 single,radioId 从队列 playlistId 前缀反解,
+        // 不依赖任何页面上下文;pid 双回退 track/songEntity 的 neteaseProgramId(v32 起
+        // 播客构造 Track 携带,core 续页追加的节目同)。10s 粒度轮询,进程死最多丢 10s。
+        viewModelScope.launch {
+            while (true) {
+                delay(10_000)
+                if (mediaPlayerHandler.controlState.value.isPlaying) {
+                    writePodcastResumeSnapshot()
+                }
+            }
+        }
+        // 暂停/停止下降沿补写一次:位置已冻结,把轮询尾巴窗口(≤10s)补上。等 500ms 再写
+        // 并复核仍非播放——节目自动连播时 isPlaying 会短暂闪断,立刻写会拿到"新节目 id
+        // 配上一条末尾位置"的错配;闪断在 500ms 内恢复即跳过(StateFlow conflate,统一读
+        // .value 为准,不用收集到的旧发射值)
+        viewModelScope.launch {
+            var wasPlaying = mediaPlayerHandler.controlState.value.isPlaying
+            mediaPlayerHandler.controlState.collect {
+                val playingNow = mediaPlayerHandler.controlState.value.isPlaying
+                if (wasPlaying && !playingNow) {
+                    delay(500)
+                    if (!mediaPlayerHandler.controlState.value.isPlaying) writePodcastResumeSnapshot()
+                }
+                wasPlaying = mediaPlayerHandler.controlState.value.isPlaying
+            }
+        }
+    }
+
+    /** 播客收听记忆快照落盘:队列是播客电台(NETEASE_PODCAST_RADIO_<id>)且处于在播族
+     *  状态(Progress/Ready/Buffering)时写 "programId|positionMs" 单键。曲尾 3s 内不写
+     *  (续播 seek 到结尾会立即跳完,不如留在上一次正常写点)。 */
+    private suspend fun writePodcastResumeSnapshot() {
+        val radioId =
+            mediaPlayerHandler.queueData.value?.data?.playlistId
+                ?.takeIf { it.startsWith(NETEASE_PODCAST_RADIO_QUEUE_PREFIX) }
+                ?.removePrefix(NETEASE_PODCAST_RADIO_QUEUE_PREFIX)
+                ?.toLongOrNull() ?: return
+        val np = mediaPlayerHandler.nowPlayingState.value
+        val pid = np.track?.neteaseProgramId ?: np.songEntity?.neteaseProgramId ?: return
+        val state = mediaPlayerHandler.simpleMediaState.value
+        val active =
+            state is SimpleMediaState.Progress ||
+                state is SimpleMediaState.Ready ||
+                state is SimpleMediaState.Buffering
+        if (!active) return
+        val pos = mediaPlayerHandler.player.currentPosition
+        val durMs = np.track?.durationSeconds?.let { it * 1000L } ?: 0L
+        if (durMs > 0 && pos >= durMs - 3_000) return
+        dataStoreManager.putString("podcast_resume_$radioId", "$pid|$pos")
     }
 
     // ---------------------------------------------------------------- 音源切换(feat/netease-source)

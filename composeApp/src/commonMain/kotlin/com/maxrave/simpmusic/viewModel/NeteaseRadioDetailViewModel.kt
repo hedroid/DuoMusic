@@ -59,6 +59,8 @@ class NeteaseRadioDetailViewModel(
         /** 上次收听记忆(programId+已播毫秒,持久化;队列清空后回页仍可续播,官方回听同款) */
         val resumeProgramId: Long? = null,
         val resumePositionMs: Long = 0L,
+        /** 跨页找回在途:目标节目不在已载页,/dj/program/detail 直取中(头部按钮转圈防连点) */
+        val resumeInFlight: Boolean = false,
     )
 
     private val _uiState = MutableStateFlow(UiState())
@@ -89,38 +91,9 @@ class NeteaseRadioDetailViewModel(
         }.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), null)
 
     init {
-        // 本电台播放中周期落盘收听记忆(10s 粒度;页面关闭/进程死都最多丢 10s)。
-        // 判定直接读 handler 三个 StateFlow.value,不走 radioPlayback(它是 WhileSubscribed,
-        // 页面退到后台停收集变 null,记忆就断——实测踩过)
-        viewModelScope.launch {
-            while (true) {
-                kotlinx.coroutines.delay(10_000)
-                val id = radioId
-                if (id == 0L) continue
-                val q = mediaPlayerHandler.queueData.value
-                if (q?.data?.playlistId != "NETEASE_PODCAST_RADIO_$id") continue
-                val c = mediaPlayerHandler.controlState.value
-                if (!c.isPlaying) continue
-                // track 在部分转场时机为 null(播放页同款回退 songEntity);Ready 只是装载完成
-                // 一瞬,稳态是 Progress/Buffering——判"在播"族即可
-                val nowTrack = mediaPlayerHandler.nowPlayingState.value
-                val vid = nowTrack.track?.videoId ?: nowTrack.songEntity?.videoId
-                // programId 优先从队列 Track O(1) 直读(播客构造 Track 时携带,core 续页
-                // 追加的节目同样有)——详情 VM 的 programs 只到自己已载的页,播放器续到
-                // 第 2 页以后旧反查永远 miss,记忆就断(CR-26);track 缺槽再回退列表反查
-                val pid =
-                    nowTrack.track?.neteaseProgramId
-                        ?: _uiState.value.programs.firstOrNull { it.mainSongId?.toString() == vid }?.id
-                val state = mediaPlayerHandler.simpleMediaState.value
-                val active = state is com.maxrave.domain.mediaservice.handler.SimpleMediaState.Progress ||
-                    state is com.maxrave.domain.mediaservice.handler.SimpleMediaState.Ready ||
-                    state is com.maxrave.domain.mediaservice.handler.SimpleMediaState.Buffering
-                if (pid != null && active) {
-                    val pos = mediaPlayerHandler.player.currentPosition
-                    dataStoreManager.putString("podcast_resume_$id", "$pid|$pos")
-                }
-            }
-        }
+        // 收听记忆的 10s 落盘循环已搬到 SharedViewModel(进程级 single)——挂这里的
+        // viewModelScope 会随页面销毁断流,而音频还能继续播(CR-26 余项,2026-10-11)。
+        // 本 VM 只负责读侧:load() 读记忆、resumePlayback() 消费。
     }
 
     /** 头部按钮:非本队=播放全部(当前列表顺序整队起播);本队=继续/暂停(PlayPause 翻转) */
@@ -272,14 +245,73 @@ class NeteaseRadioDetailViewModel(
         }
     }
 
-    /** 头部"继续播放":跳到记忆节目+seek 到记忆位置(队列不在本台时) */
+    /** 头部"继续播放":跳到记忆节目+seek 到记忆位置(队列不在本台时,按钮门控保证)。
+     *  目标节目在已载页→playFrom;不在(播放器续到第 2 页后队列被其它音乐顶掉)→
+     *  /dj/program/detail 按 id 单节目直取组单曲队列(CR-26 余项收口)——任意深度恒
+     *  1 次请求,不碰 byradio 分页(同电台连续翻页是 405 限流高危形态);取失败回落
+     *  playFrom(0)(旧行为)。队尾语义:单曲播完即止,不上自动续页。 */
     fun resumePlayback() {
+        if (_uiState.value.resumeInFlight) return
         val pid = _uiState.value.resumeProgramId ?: return
         val idx = _uiState.value.programs.indexOfFirst { it.id == pid }
         if (idx >= 0) {
             playFrom(idx, _uiState.value.resumePositionMs)
-        } else {
-            playFrom(0)
+            return
+        }
+        _uiState.update { it.copy(resumeInFlight = true) }
+        viewModelScope.launch {
+            neteaseRepository.getDjProgramDetail(pid).fold(
+                onSuccess = { program ->
+                    _uiState.update { it.copy(resumeInFlight = false) }
+                    log("resume: program detail fetched id=$pid mainSongId=${program.mainSongId}")
+                    playSingleProgram(program, _uiState.value.resumePositionMs)
+                },
+                onFailure = { e ->
+                    // 节目下架(detail code=404)/网络失败:回落旧行为从第一集播
+                    log("resume: program detail fetch failed id=$pid ($e)")
+                    _uiState.update { it.copy(resumeInFlight = false) }
+                    playFrom(0)
+                },
+            )
+        }
+    }
+
+    /** 单节目直取起播:目标节目为唯一曲目,playlistId 仍挂本台哨兵(详情页按钮态/
+     *  收听记忆管线不变);seek 到记忆位置。 */
+    private fun playSingleProgram(
+        program: NeteaseDjProgram,
+        startMs: Long,
+    ) {
+        val rs =
+            program.toResultSong() ?: run {
+                // mainSong 缺失(不可播形状):回落整队
+                playFrom(0)
+                return
+            }
+        // 与 playFrom 同款:播客归类回填(v32 前建的旧行没有列值,起播时显式 UPDATE)
+        viewModelScope.launch { songRepository.updateNeteaseProgramIdIfNull(rs.videoId, rs.neteaseProgramId) }
+        val track = rs.toTrack()
+        setQueueData(
+            QueueData.Data(
+                listTracks = arrayListOf(track),
+                firstPlayedTrack = track,
+                playlistId = "NETEASE_PODCAST_RADIO_$radioId",
+                playlistName = _uiState.value.radio?.name ?: "",
+                playlistType = PlaylistType.PLAYLIST,
+                continuation = null,
+            ),
+        )
+        sharedViewModel.loadMediaItemFromTrack(track, Config.PLAYLIST_CLICK, 0)
+        if (startMs > 0) seekWhenReady(startMs)
+    }
+
+    /** 等 READY 再 seek(装载中 seek 无效);8s 兜底超时仍试一次 */
+    private fun seekWhenReady(startMs: Long) {
+        viewModelScope.launch {
+            kotlinx.coroutines.withTimeoutOrNull(8000) {
+                mediaPlayerHandler.simpleMediaState.first { it is com.maxrave.domain.mediaservice.handler.SimpleMediaState.Ready }
+            }
+            mediaPlayerHandler.player.seekTo(startMs)
         }
     }
 
@@ -323,12 +355,7 @@ class NeteaseRadioDetailViewModel(
         sharedViewModel.loadMediaItemFromTrack(first, Config.PLAYLIST_CLICK, index)
         if (startMs > 0) {
             // 等 READY 再 seek(装载中 seek 无效);首曲即目标节目(index 定位保证)
-            viewModelScope.launch {
-                kotlinx.coroutines.withTimeoutOrNull(8000) {
-                    mediaPlayerHandler.simpleMediaState.first { it is com.maxrave.domain.mediaservice.handler.SimpleMediaState.Ready }
-                }
-                mediaPlayerHandler.player.seekTo(startMs)
-            }
+            seekWhenReady(startMs)
         }
     }
 
