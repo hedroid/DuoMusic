@@ -71,6 +71,7 @@
     <string name="edit_playlist_info">编辑歌单信息</string>
     <string name="edit_playlist_cover">编辑封面</string>
     <string name="netease_playlist_info_saved">已保存</string>
+    <string name="netease_playlist_info_saved_unverified">已提交，暂无法确认云端已生效</string>
     <string name="netease_playlist_info_partially_saved">部分修改未保存：%1$s</string>
     <string name="playlist_cover_updated">封面已更新</string>
     <string name="pin_to_top">置顶</string>

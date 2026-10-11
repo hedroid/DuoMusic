@@ -71,6 +71,7 @@
     <string name="edit_playlist_info">再生リスト情報を編集</string>
     <string name="edit_playlist_cover">カバーを編集</string>
     <string name="netease_playlist_info_saved">保存しました</string>
+    <string name="netease_playlist_info_saved_unverified">送信しましたが、クラウドへの保存を確認できません</string>
     <string name="playlist_cover_updated">カバーを更新しました</string>
     <string name="pin_to_top">トップに固定</string>
     <string name="pinned_to_top">トップに移動しました</string>

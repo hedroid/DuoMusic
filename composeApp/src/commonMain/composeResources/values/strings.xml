@@ -78,6 +78,7 @@
     <string name="edit_playlist_info">Edit playlist info</string>
     <string name="edit_playlist_cover">Edit cover</string>
     <string name="netease_playlist_info_saved">Saved</string>
+    <string name="netease_playlist_info_saved_unverified">Submitted, but cloud save could not be confirmed</string>
     <string name="netease_playlist_info_partially_saved">Some changes were not saved: %1$s</string>
     <string name="playlist_cover_updated">Cover updated</string>
     <string name="pin_to_top">Pin to top</string>

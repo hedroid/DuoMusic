@@ -71,6 +71,7 @@
     <string name="edit_playlist_info">재생 목록 정보 편집</string>
     <string name="edit_playlist_cover">커버 편집</string>
     <string name="netease_playlist_info_saved">저장되었습니다</string>
+    <string name="netease_playlist_info_saved_unverified">제출되었지만 클라우드 저장을 확인하지 못했어요</string>
     <string name="playlist_cover_updated">커버가 업데이트되었습니다</string>
     <string name="pin_to_top">맨 위로 고정</string>
     <string name="pinned_to_top">맨 위로 이동했습니다</string>

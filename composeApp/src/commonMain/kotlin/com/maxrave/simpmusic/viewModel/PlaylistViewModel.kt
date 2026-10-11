@@ -85,6 +85,7 @@ import simpmusic.composeapp.generated.resources.removed_from_playlist
 import simpmusic.composeapp.generated.resources.netease_action_failed
 import simpmusic.composeapp.generated.resources.netease_playlist_info_partially_saved
 import simpmusic.composeapp.generated.resources.netease_playlist_info_saved
+import simpmusic.composeapp.generated.resources.netease_playlist_info_saved_unverified
 import simpmusic.composeapp.generated.resources.pinned_to_top
 import simpmusic.composeapp.generated.resources.playlist_cover_updated
 import simpmusic.composeapp.generated.resources.cloud_action_failed_netease
@@ -321,7 +322,9 @@ class PlaylistViewModel(
      * 一起丢弃,页面显示旧值、重试还重发)——服务端接受的项本地即刻回写(内存
      * uiState/_playlistEntity/Room 三处+库页事件),失败项保留旧值;部分失败 toast
      * 点名未保存的项,全败走 405/网络文案分流。写包 NonCancellable(保存后用户
-     * 立刻返回导航不打断在途写)。
+     * 立刻返回导航不打断在途写)。*Updated 由 repo 层写后回读对账终值;
+     * 回读两连败时 toast 用"已提交未确认"(readbackConfirmed)而非"已保存"
+     * (2026-10-11 CR 二轮:业务码不能证明云端落地)。
      */
     fun updateNeteasePlaylistInfo(
         newName: String,
@@ -364,8 +367,12 @@ class PlaylistViewModel(
                             playlistRepository.updatePlaylistTitleAndDescription(id, appliedTitle, appliedDescription)
                         }
                         when {
-                            failedLabels.isEmpty() ->
+                            failedLabels.isEmpty() && result.readbackConfirmed ->
                                 makeToast(getString(Res.string.netease_playlist_info_saved))
+                            failedLabels.isEmpty() ->
+                                // 回读两连败:写已达服务端但无法证明落地,不说"已保存";
+                                // 本地已乐观回写新值,下次进入对账自愈
+                                makeToast(getString(Res.string.netease_playlist_info_saved_unverified))
                             anyUpdated ->
                                 makeToast(getString(Res.string.netease_playlist_info_partially_saved, failedLabels.joinToString(", ")))
                             else ->
