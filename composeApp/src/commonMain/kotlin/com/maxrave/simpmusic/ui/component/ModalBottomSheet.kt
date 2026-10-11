@@ -4464,8 +4464,8 @@ fun PlaylistBottomSheet(
     // 网易自建歌单"编辑歌单信息"(名/描述/标签):非 null 才露菜单行。
     playlistDescription: String? = null,
     playlistTags: List<String> = emptyList(),
-    /** 官方标签候选(null=加载中,空=加载失败退化为只能取消现有标签) */
-    tagOptions: List<String>? = null,
+    /** 官方标签候选分组(null=加载中,空=加载失败退化为只能取消现有标签;组名空=无组头) */
+    tagGroups: List<Pair<String, List<String>>>? = null,
     onEditInfo: ((name: String, description: String, tags: List<String>) -> Unit)? = null,
     // 网易自建歌单"编辑封面"(选图→裁剪→两步上传);非 null 才露菜单行
     onEditCover: ((jpegBytes: ByteArray) -> Unit)? = null,
@@ -4508,7 +4508,7 @@ fun PlaylistBottomSheet(
             initialName = playlistName,
             initialDescription = playlistDescription.orEmpty(),
             initialTags = playlistTags,
-            tagOptions = tagOptions,
+            tagGroups = tagGroups,
             onDismiss = { showEditInfo = false },
             onSave = { name, description, tags ->
                 onEditInfo(name, description, tags)
@@ -4678,16 +4678,27 @@ internal fun EditNeteasePlaylistInfoDialog(
     initialName: String,
     initialDescription: String,
     initialTags: List<String>,
-    tagOptions: List<String>?,
+    tagGroups: List<Pair<String, List<String>>>?,
     onDismiss: () -> Unit,
     onSave: (name: String, description: String, tags: List<String>) -> Unit,
 ) {
     var name by remember { mutableStateOf(initialName) }
     var description by remember { mutableStateOf(initialDescription) }
     var selectedTags by remember { mutableStateOf(initialTags) }
-    // 候选 = 官方 hottags + 当前标签去重(已在但不在热门集的标签仍可见、可取消)
-    val options = remember(tagOptions, initialTags) {
-        (initialTags + (tagOptions ?: emptyList())).distinct()
+    // 候选 = 分组全量目录(官方 app 选择器同源);不在目录里的存量标签单独置顶渲染,可取消
+    val catalogNames = remember(tagGroups) { tagGroups?.flatMap { it.second }?.toSet() }
+    val staleCurrentTags = remember(initialTags, catalogNames) {
+        initialTags.filter { it !in (catalogNames ?: emptySet()) }
+    }
+    // 组名(服务端中文词表)与存量标签合并去重(同组重名只渲染一次)
+    fun toggleTag(tag: String) {
+        selectedTags =
+            when {
+                tag in selectedTags -> selectedTags - tag
+                selectedTags.size < 3 -> selectedTags + tag
+                // 已满 3 个:忽略(上限提示文案常驻)
+                else -> selectedTags
+            }
     }
     AlertDialog(
         containerColor = rememberSurfaceDarkColors().container,
@@ -4727,7 +4738,7 @@ internal fun EditNeteasePlaylistInfoDialog(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(modifier = Modifier.height(4.dp))
-                if (tagOptions == null) {
+                if (tagGroups == null) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -4746,20 +4757,37 @@ internal fun EditNeteasePlaylistInfoDialog(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    options.forEach { tag ->
+                    staleCurrentTags.forEach { tag ->
                         FilterChip(
                             selected = tag in selectedTags,
-                            onClick = {
-                                selectedTags =
-                                    when {
-                                        tag in selectedTags -> selectedTags - tag
-                                        selectedTags.size < 3 -> selectedTags + tag
-                                        // 已满 3 个:忽略(上限提示文案常驻)
-                                        else -> selectedTags
-                                    }
-                            },
+                            onClick = { toggleTag(tag) },
                             label = { Text(text = tag) },
                         )
+                    }
+                }
+                tagGroups?.forEach { (group, tags) ->
+                    if (tags.isEmpty()) return@forEach
+                    if (group.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = group,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        tags
+                            .filter { it !in staleCurrentTags }
+                            .forEach { tag ->
+                                FilterChip(
+                                    selected = tag in selectedTags,
+                                    onClick = { toggleTag(tag) },
+                                    label = { Text(text = tag) },
+                                )
+                            }
                     }
                 }
             }

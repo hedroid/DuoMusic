@@ -227,7 +227,7 @@ fun PlaylistScreen(
     val favoriteAvailable by viewModel.favoriteAvailable.collectAsStateWithLifecycle()
     // 网易自建歌单(creatorId==uid 且非红心):编辑歌单信息/编辑封面/置顶的入口门控
     val neteaseOwn by viewModel.neteaseOwnPlaylist.collectAsStateWithLifecycle()
-    val neteaseTagOptions by viewModel.neteaseTagOptions.collectAsStateWithLifecycle()
+    val neteaseTagGroups by viewModel.neteaseTagGroups.collectAsStateWithLifecycle()
     val tracks by viewModel.tracks.collectAsStateWithLifecycle()
     val tracksListState by viewModel.tracksListState.collectAsStateWithLifecycle()
 
@@ -1654,7 +1654,7 @@ fun PlaylistScreen(
                         onAddToQueue = if (data.isRadio) null else addToQueue,
                         playlistDescription = data.description,
                         playlistTags = data.tags,
-                        tagOptions = neteaseTagOptions,
+                        tagGroups = neteaseTagGroups,
                         onEditInfo =
                             if (neteaseOwn) {
                                 { name, description, tags ->

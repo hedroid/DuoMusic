@@ -380,16 +380,19 @@ class PlaylistViewModel(
          } }
     }
 
-    /** 编辑歌单信息弹窗的标签候选(官方 hottags);null=尚未拉取,空表=拉取失败退化为只读展示 */
-    private val _neteaseTagOptions = MutableStateFlow<List<String>?>(null)
-    val neteaseTagOptions: StateFlow<List<String>?> = _neteaseTagOptions
+    /**
+     * 编辑歌单信息弹窗的标签候选(**分组**:分类目录五组 ~70 个,失败退 hottags 单组);
+     * null=尚未拉取,空表=拉取失败退化为只读展示
+     */
+    private val _neteaseTagGroups = MutableStateFlow<List<Pair<String, List<String>>>?>(null)
+    val neteaseTagGroups: StateFlow<List<Pair<String, List<String>>>?> = _neteaseTagGroups
     private var tagOptionsJob: Job? = null
 
     fun loadNeteaseTagOptions() {
-        if (_neteaseTagOptions.value != null || tagOptionsJob?.isActive == true) return
+        if (_neteaseTagGroups.value != null || tagOptionsJob?.isActive == true) return
         tagOptionsJob =
             viewModelScope.launch {
-                _neteaseTagOptions.value = neteaseRepository.getNeteaseHotTags() ?: emptyList()
+                _neteaseTagGroups.value = neteaseRepository.getNeteaseTagGroups() ?: emptyList()
             }
     }
 
