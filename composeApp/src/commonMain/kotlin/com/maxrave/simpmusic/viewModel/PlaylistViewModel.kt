@@ -83,6 +83,9 @@ import simpmusic.composeapp.generated.resources.downloaded
 import simpmusic.composeapp.generated.resources.downloading
 import simpmusic.composeapp.generated.resources.removed_from_playlist
 import simpmusic.composeapp.generated.resources.netease_action_failed
+import simpmusic.composeapp.generated.resources.netease_playlist_info_saved
+import simpmusic.composeapp.generated.resources.pinned_to_top
+import simpmusic.composeapp.generated.resources.playlist_cover_updated
 import simpmusic.composeapp.generated.resources.cloud_action_failed_netease
 import simpmusic.composeapp.generated.resources.saved_toast
 import simpmusic.composeapp.generated.resources.unsaved_toast
@@ -147,6 +150,14 @@ class PlaylistViewModel(
     private val _favoriteAvailable = MutableStateFlow(true)
     val favoriteAvailable: StateFlow<Boolean> = _favoriteAvailable
 
+    /**
+     * 当前网易自建歌单(在 userPlaylists 列表里且非红心,严格口径):详情页"编辑歌单
+     * 信息/编辑封面/置顶"的入口门控。判定在 [refreshFavoriteAvailability] 里与藏心
+     * 同一处回填(Room 兜底分支同样生效;未拉过库列表时 fail-closed 不显示)。
+     */
+    private val _neteaseOwnPlaylist = MutableStateFlow(false)
+    val neteaseOwnPlaylist: StateFlow<Boolean> = _neteaseOwnPlaylist
+
     /** 从库页"创建的歌单/系统歌单"分区进入时为 true(nav 参数,不依赖网络) */
     private var ownYouTubeNavHint = false
 
@@ -156,12 +167,15 @@ class PlaylistViewModel(
     ) {
         if (id.toLongOrNull() != null) {
             viewModelScope.launch {
-                val hidden =
-                    neteaseRepository.isNeteaseLikedPlaylist(id) ||
-                        neteaseRepository.isOwnNeteasePlaylist(id)
-                _favoriteAvailable.value = !hidden
+                val liked = neteaseRepository.isNeteaseLikedPlaylist(id)
+                // 严格口径:歌单须真的在 userPlaylists 里(官方个性化歌单如每日推荐
+                // creatorId=用户本人,creatorId 判定会把编辑/置顶入口误开到官方歌单)
+                _neteaseOwnPlaylist.value = !liked && neteaseRepository.isNeteaseUserPlaylist(id)
+                // 藏心维持既有 creatorId 口径(官方个性化歌单照藏,语义上没有"收藏"目标)
+                _favoriteAvailable.value = !(liked || neteaseRepository.isOwnNeteasePlaylist(id))
             }
         } else {
+            _neteaseOwnPlaylist.value = false
             _favoriteAvailable.value = !(ownYouTube || ownYouTubeNavHint)
         }
     }
@@ -284,6 +298,129 @@ class PlaylistViewModel(
                             _playlistEntity.update { it?.copy(liked = false) }
                             makeToast(getString(Res.string.deleted_playlist))
                             mutationBus.send(LibraryMutation.PlaylistRemoved(id))
+                        } else {
+                            makeToast(getString(Res.string.netease_action_failed))
+                        }
+                    },
+                    onFailure = { makeToast(getString(neteaseWriteErrorString(it, Res.string.netease_action_failed))) },
+                )
+         } }
+    }
+
+    /**
+     * 编辑自己的网易歌单信息(改名/描述/标签,一个弹窗一次提交):无变化早退零请求;
+     * 成功后三处回写——内存 uiState(页头即刻变)、_playlistEntity、Room 行,并发库页
+     * 本地回写事件。写包 NonCancellable(保存后用户立刻返回导航不打断在途写)。
+     */
+    fun updateNeteasePlaylistInfo(
+        newName: String,
+        newDescription: String,
+        newTags: List<String>,
+    ) {
+        val state = (uiState.value as? Success)?.data ?: return
+        val id = state.id
+        if (id.toLongOrNull() == null) return
+        val name = newName.trim()
+        val description = newDescription.trim()
+        val nameChanged = name != state.title
+        val descriptionChanged = description != (state.description ?: "")
+        val tagsChanged = newTags != state.tags
+        if (!nameChanged && !descriptionChanged && !tagsChanged) return
+        viewModelScope.launch { withContext(NonCancellable) {
+            neteaseRepository
+                .updateNeteasePlaylistInfo(
+                    id,
+                    newName = name.takeIf { nameChanged },
+                    newDescription = description.takeIf { descriptionChanged },
+                    newTags = newTags.takeIf { tagsChanged },
+                ).fold(
+                    onSuccess = { ok ->
+                        if (ok) {
+                            _uiState.value = Success(state.copy(title = name, description = description, tags = newTags))
+                            _playlistEntity.update { it?.copy(title = name, description = description) }
+                            playlistRepository.updatePlaylistTitleAndDescription(id, name, description)
+                            makeToast(getString(Res.string.netease_playlist_info_saved))
+                            mutationBus.send(LibraryMutation.NeteasePlaylistInfoUpdated(id, title = name))
+                        } else {
+                            makeToast(getString(Res.string.netease_action_failed))
+                        }
+                    },
+                    onFailure = { makeToast(getString(neteaseWriteErrorString(it, Res.string.netease_action_failed))) },
+                )
+         } }
+    }
+
+    /** 编辑歌单信息弹窗的标签候选(官方 hottags);null=尚未拉取,空表=拉取失败退化为只读展示 */
+    private val _neteaseTagOptions = MutableStateFlow<List<String>?>(null)
+    val neteaseTagOptions: StateFlow<List<String>?> = _neteaseTagOptions
+    private var tagOptionsJob: Job? = null
+
+    fun loadNeteaseTagOptions() {
+        if (_neteaseTagOptions.value != null || tagOptionsJob?.isActive == true) return
+        tagOptionsJob =
+            viewModelScope.launch {
+                _neteaseTagOptions.value = neteaseRepository.getNeteaseHotTags() ?: emptyList()
+            }
+    }
+
+    /**
+     * 更换自己的网易歌单封面(两步 nos 上传)。成功后以服务端回读的新封面 URL 为准
+     * 三处回写(页面头图/内存实体/Room 行)+库页事件;调色板随新头图自然重生成。
+     */
+    fun updateNeteasePlaylistCover(jpegBytes: ByteArray) {
+        val id = (uiState.value as? Success)?.data?.id ?: return
+        if (id.toLongOrNull() == null) return
+        viewModelScope.launch { withContext(NonCancellable) {
+            neteaseRepository
+                .updateNeteasePlaylistCover(id, jpegBytes)
+                .fold(
+                    onSuccess = { ok ->
+                        if (ok) {
+                            // 权威回读(与建单回读同一管线):新封面 URL 服务端说了算,
+                            // 顺带回填创建者缓存。失败保持旧封面不动,只报成功 toast 不合适——
+                            // 回读失败时页面头图旧值仍在,库页下次拉取自然收敛
+                            val fresh = runCatching {
+                                neteaseRepository.getNeteasePlaylistAsLibraryRow(id)
+                            }.getOrNull()
+                            val newThumb = fresh?.thumbnails
+                            if (!newThumb.isNullOrEmpty()) {
+                                (uiState.value as? Success)?.data?.let { state ->
+                                    _uiState.value = Success(state.copy(thumbnail = newThumb))
+                                }
+                                _playlistEntity.update { it?.copy(thumbnails = newThumb) }
+                                playlistRepository.updatePlaylistThumbnails(id, newThumb)
+                                mutationBus.send(
+                                    LibraryMutation.NeteasePlaylistInfoUpdated(id, thumbnails = newThumb),
+                                )
+                            }
+                            makeToast(getString(Res.string.playlist_cover_updated))
+                        } else {
+                            makeToast(getString(Res.string.netease_action_failed))
+                        }
+                    },
+                    onFailure = { makeToast(getString(neteaseWriteErrorString(it, Res.string.netease_action_failed))) },
+                )
+         } }
+    }
+
+    /**
+     * 置顶一首歌(轻量排序):云端按服务端权威全量 trackIds 重排提交;成功后页面内存
+     * 列表原地把该歌挪到队首(已加载部分),Room 缓存随下次整单拉取自然收敛。
+     */
+    fun pinNeteaseTrackToTop(videoId: String) {
+        val id = (uiState.value as? Success)?.data?.id ?: return
+        if (id.toLongOrNull() == null) return
+        viewModelScope.launch { withContext(NonCancellable) {
+            neteaseRepository
+                .pinNeteaseTrackToTop(id, videoId)
+                .fold(
+                    onSuccess = { ok ->
+                        if (ok) {
+                            _tracks.update { list ->
+                                listOfNotNull(list.firstOrNull { it.videoId == videoId }) +
+                                    list.filterNot { it.videoId == videoId }
+                            }
+                            makeToast(getString(Res.string.pinned_to_top))
                         } else {
                             makeToast(getString(Res.string.netease_action_failed))
                         }
@@ -572,6 +709,7 @@ class PlaylistViewModel(
         _downloadedList.value = emptyList()
         _listColors.value = emptyList()
         _favoriteAvailable.value = true
+        _neteaseOwnPlaylist.value = false
         checkDownloadedPlaylist?.cancel()
         checkDownloadedPlaylist = null
     }
@@ -657,6 +795,7 @@ class PlaylistViewModel(
                                                 year = data.first.year,
                                                 shuffleEndpoint = data.first.shuffleEndpoint,
                                                 radioEndpoint = data.first.radioEndpoint,
+                                                tags = data.first.tags,
                                             ),
                                     )
                                 _tracks.value = data.first.tracks

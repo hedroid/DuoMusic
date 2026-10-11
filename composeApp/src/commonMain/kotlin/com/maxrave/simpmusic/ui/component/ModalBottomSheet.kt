@@ -15,6 +15,8 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -58,6 +60,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -160,6 +163,7 @@ import com.maxrave.simpmusic.ui.icon.AccessAlarm
 import com.maxrave.simpmusic.ui.icon.Add
 import com.maxrave.simpmusic.ui.icon.AddCircleOutline
 import com.maxrave.simpmusic.ui.icon.AddPhotoAlternate
+import com.maxrave.simpmusic.ui.icon.KeyboardDoubleArrowUp
 import com.maxrave.simpmusic.ui.icon.Album
 import com.maxrave.simpmusic.ui.icon.CheckCircle
 import com.maxrave.simpmusic.ui.icon.Close
@@ -234,6 +238,12 @@ import simpmusic.composeapp.generated.resources.added_to_youtube_playlist
 import simpmusic.composeapp.generated.resources.create_new_playlist
 import simpmusic.composeapp.generated.resources.could_not_create_playlist
 import simpmusic.composeapp.generated.resources.playlist_name
+import simpmusic.composeapp.generated.resources.edit_playlist_cover
+import simpmusic.composeapp.generated.resources.edit_playlist_info
+import simpmusic.composeapp.generated.resources.loading
+import simpmusic.composeapp.generated.resources.pin_to_top
+import simpmusic.composeapp.generated.resources.playlist_tags
+import simpmusic.composeapp.generated.resources.playlist_tags_limit
 import simpmusic.composeapp.generated.resources.remove_from_playlist
 import simpmusic.composeapp.generated.resources.unsubscribe_from_library
 import simpmusic.composeapp.generated.resources.netease_delete_playlist
@@ -1850,6 +1860,8 @@ fun NowPlayingBottomSheet(
     onLibraryDelete: (() -> Unit)? = null,
     // 歌单页内打开且该歌单可移除歌曲(网易自建歌单)时传入;播放页等其它场景不传不显示
     onRemoveFromPlaylist: (() -> Unit)? = null,
+    // 网易自建歌单内传入:置顶该歌(轻量排序,manipulate op=update 提交新序全量)
+    onPinToTop: (() -> Unit)? = null,
     // 云盘页单曲菜单传入:从云盘删除(不可逆,调用方负责确认弹窗);其它场景不传不显示。
     // 播放页的旧队列快照(升级前保存,无挂载标记)不传删除(身份未确认不可逆操作
     // 隐藏)——但当前曲仍是云盘歌,曲库门控必须照常生效,所以另有 isCloudDiskSong
@@ -2448,6 +2460,17 @@ fun NowPlayingBottomSheet(
                             ) {
                                 hideModalBottomSheet()
                                 onRemoveFromPlaylist?.invoke()
+                            }
+                        }
+                    }
+                    Crossfade(targetState = onPinToTop != null) {
+                        if (it) {
+                            ActionButton(
+                                icon = SimpIcons.KeyboardDoubleArrowUp,
+                                text = Res.string.pin_to_top,
+                            ) {
+                                hideModalBottomSheet()
+                                onPinToTop?.invoke()
                             }
                         }
                     }
@@ -4123,6 +4146,14 @@ fun PlaylistBottomSheet(
     onUnsubscribe: (() -> Unit)? = null,
     // 网易自建歌单详情页"更多"菜单露出:删除歌单(/playlist/delete,不可逆)。调用方负责强确认。
     onDeletePlaylist: (() -> Unit)? = null,
+    // 网易自建歌单"编辑歌单信息"(名/描述/标签):非 null 才露菜单行。
+    playlistDescription: String? = null,
+    playlistTags: List<String> = emptyList(),
+    /** 官方标签候选(null=加载中,空=加载失败退化为只能取消现有标签) */
+    tagOptions: List<String>? = null,
+    onEditInfo: ((name: String, description: String, tags: List<String>) -> Unit)? = null,
+    // 网易自建歌单"编辑封面"(选图→裁剪→两步上传);非 null 才露菜单行
+    onEditCover: ((jpegBytes: ByteArray) -> Unit)? = null,
 ) {
     val coroutineScope = rememberCoroutineScope()
     val modelBottomSheetState =
@@ -4135,6 +4166,42 @@ fun PlaylistBottomSheet(
             }
         }
     var showEditTitle by remember { mutableStateOf(false) }
+    // 网易自建歌单编辑:封面选图→裁剪(本地歌单同款管线,裁完直接喂上传回调)
+    var coverAwaitingCrop by remember { mutableStateOf<ByteArray?>(null) }
+    val coverPickerLauncher =
+        photoPickerResult { pickedUri ->
+            pickedUri?.let { uri ->
+                coroutineScope.launch { coverAwaitingCrop = readLocalImageBytes(uri) }
+            }
+        }
+    coverAwaitingCrop?.let { bytes ->
+        ImageCropperDialog(
+            imageBytes = bytes,
+            titleText = stringResource(Res.string.edit_playlist_cover),
+            confirmText = stringResource(Res.string.save),
+            cancelText = stringResource(Res.string.cancel),
+            onDismiss = { coverAwaitingCrop = null },
+            onCropped = { cropped ->
+                coverAwaitingCrop = null
+                onEditCover?.invoke(cropped)
+            },
+        )
+    }
+    var showEditInfo by remember { mutableStateOf(false) }
+    if (showEditInfo && onEditInfo != null) {
+        EditNeteasePlaylistInfoDialog(
+            initialName = playlistName,
+            initialDescription = playlistDescription.orEmpty(),
+            initialTags = playlistTags,
+            tagOptions = tagOptions,
+            onDismiss = { showEditInfo = false },
+            onSave = { name, description, tags ->
+                onEditInfo(name, description, tags)
+                showEditInfo = false
+                hideModalBottomSheet()
+            },
+        )
+    }
     if (showEditTitle) {
         var newTitle by remember { mutableStateOf(playlistName) }
         val showEditTitleSheetState =
@@ -4227,6 +4294,16 @@ fun PlaylistBottomSheet(
                         hideModalBottomSheet()
                     }
                 }
+                if (onEditInfo != null) {
+                    ActionButton(icon = SimpIcons.Edit, text = Res.string.edit_playlist_info) {
+                        showEditInfo = true
+                    }
+                }
+                if (onEditCover != null) {
+                    ActionButton(icon = SimpIcons.AddPhotoAlternate, text = Res.string.edit_playlist_cover) {
+                        coverPickerLauncher.launch()
+                    }
+                }
                 if (onUnsubscribe != null) {
                     ActionButton(
                         icon = SimpIcons.Delete,
@@ -4272,6 +4349,121 @@ fun PlaylistBottomSheet(
             }
         }
     }
+}
+
+/**
+ * 网易自建歌单"编辑歌单信息"弹窗(名/描述/标签):**居中 AlertDialog** 而非底部 sheet
+ * ——M3 sheet 内 TextField 会被 IME 压住(项目定案:要输入文字的弹窗一律 AlertDialog,
+ * 与库页 CreatePlaylistDialog 同形态)。标签=官方候选集 chip 多选(最多 3 个),
+ * 候选未拉到/拉失败时只展示现有标签(可取消,不能加新)。
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun EditNeteasePlaylistInfoDialog(
+    initialName: String,
+    initialDescription: String,
+    initialTags: List<String>,
+    tagOptions: List<String>?,
+    onDismiss: () -> Unit,
+    onSave: (name: String, description: String, tags: List<String>) -> Unit,
+) {
+    var name by remember { mutableStateOf(initialName) }
+    var description by remember { mutableStateOf(initialDescription) }
+    var selectedTags by remember { mutableStateOf(initialTags) }
+    // 候选 = 官方 hottags + 当前标签去重(已在但不在热门集的标签仍可见、可取消)
+    val options = remember(tagOptions, initialTags) {
+        (initialTags + (tagOptions ?: emptyList())).distinct()
+    }
+    AlertDialog(
+        containerColor = rememberSurfaceDarkColors().container,
+        titleContentColor = rememberSurfaceDarkColors().content,
+        textContentColor = rememberSurfaceDarkColors().content,
+        title = { Text(text = stringResource(Res.string.edit_playlist_info)) },
+        text = {
+            Column(
+                modifier =
+                    Modifier
+                        .heightIn(max = 420.dp)
+                        .verticalScroll(rememberScrollState()),
+            ) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text(text = stringResource(Res.string.title)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text(text = stringResource(Res.string.description)) },
+                    minLines = 2,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = stringResource(Res.string.playlist_tags),
+                    style = MaterialTheme.typography.labelLarge,
+                )
+                Text(
+                    text = stringResource(Res.string.playlist_tags_limit),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                if (tagOptions == null) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = stringResource(Res.string.loading),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    options.forEach { tag ->
+                        FilterChip(
+                            selected = tag in selectedTags,
+                            onClick = {
+                                selectedTags =
+                                    when {
+                                        tag in selectedTags -> selectedTags - tag
+                                        selectedTags.size < 3 -> selectedTags + tag
+                                        // 已满 3 个:忽略(上限提示文案常驻)
+                                        else -> selectedTags
+                                    }
+                            },
+                            label = { Text(text = tag) },
+                        )
+                    }
+                }
+            }
+        },
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(
+                enabled = name.isNotBlank(),
+                onClick = { onSave(name.trim(), description.trim(), selectedTags) },
+            ) {
+                Text(text = stringResource(Res.string.save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(text = stringResource(Res.string.cancel))
+            }
+        },
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

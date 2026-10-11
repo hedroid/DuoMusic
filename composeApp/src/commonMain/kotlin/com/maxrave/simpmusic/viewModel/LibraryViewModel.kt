@@ -621,6 +621,25 @@ class LibraryViewModel(
                 }
             }
 
+            is LibraryMutation.NeteasePlaylistInfoUpdated -> {
+                // 改名/换封面:行不在(从未拉过库)时无需插入,下次首拉自然是新值
+                (_neteasePlaylist.value as? LocalResource.Success)?.let { state ->
+                    _neteasePlaylist.value =
+                        LocalResource.Success(
+                            state.data.orEmpty().map { entity ->
+                                if (entity.id == mutation.playlistId) {
+                                    entity.copy(
+                                        title = mutation.title ?: entity.title,
+                                        thumbnails = mutation.thumbnails ?: entity.thumbnails,
+                                    )
+                                } else {
+                                    entity
+                                }
+                            },
+                        )
+                }
+            }
+
             is LibraryMutation.YouTubePlaylistCreated -> {
                 // 空库账号 split 发 null、分区停在 Loading——插入行来自权威回读,
                 // 直接以单行 Success 起步,不等下一次拉取

@@ -68,6 +68,14 @@
     <string name="this_song_is_not_available">此歌曲不可用</string>
     <string name="in_charts">在图表</string>
     <string name="playlist_name_cannot_be_empty">歌单名称不能为空</string>
+    <string name="edit_playlist_info">编辑歌单信息</string>
+    <string name="edit_playlist_cover">编辑封面</string>
+    <string name="netease_playlist_info_saved">已保存</string>
+    <string name="playlist_cover_updated">封面已更新</string>
+    <string name="pin_to_top">置顶</string>
+    <string name="pinned_to_top">已置顶</string>
+    <string name="playlist_tags">标签</string>
+    <string name="playlist_tags_limit">最多选择 3 个标签</string>
     <string name="this_app_needs_to_access_your_notification">此应用需要通知权限</string>
     <string name="shared">已分享</string>
     <string name="rich_synced">逐字逐句</string>

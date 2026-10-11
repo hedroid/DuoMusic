@@ -52,6 +52,16 @@ sealed interface LibraryMutation {
     data class AlbumUnsubscribed(val albumId: String) : LibraryMutation
 
     /**
+     * 网易自建歌单信息编辑成功(改名/换封面)。title/thumbnails 为新值,null=该项没变;
+     * 库页收到后原地更新对应 tile 的标题/封面。
+     */
+    data class NeteasePlaylistInfoUpdated(
+        val playlistId: String,
+        val title: String? = null,
+        val thumbnails: String? = null,
+    ) : LibraryMutation
+
+    /**
      * 云盘内容变化(单曲/批量删除、上传批次完成):第一首歌(=入口封面)与曲目数
      * 都可能变——库页收到后重拉入口信息(limit=1 轻请求),返回库页即见新封面/数量。
      */
@@ -66,6 +76,7 @@ fun LibraryMutation.owner(): MusicSource =
     when (this) {
         is LibraryMutation.NeteaseHeartCountChanged,
         is LibraryMutation.NeteasePlaylistCreated,
+        is LibraryMutation.NeteasePlaylistInfoUpdated,
         LibraryMutation.CloudDiskChanged,
         -> MusicSource.NETEASE
 

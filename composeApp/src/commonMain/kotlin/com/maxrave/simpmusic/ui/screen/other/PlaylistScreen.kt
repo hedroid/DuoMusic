@@ -196,6 +196,7 @@ import simpmusic.composeapp.generated.resources.downloaded
 import simpmusic.composeapp.generated.resources.downloading
 import simpmusic.composeapp.generated.resources.error
 import simpmusic.composeapp.generated.resources.playlist
+import simpmusic.composeapp.generated.resources.playlist_tags
 import simpmusic.composeapp.generated.resources.radio
 import simpmusic.composeapp.generated.resources.search
 import simpmusic.composeapp.generated.resources.unlimited
@@ -224,6 +225,9 @@ fun PlaylistScreen(
     val liked by viewModel.liked.collectAsStateWithLifecycle()
     // 自建歌单/网易红心歌单没有收藏语义,顶栏心隐藏(PlaylistViewModel.favoriteAvailable)
     val favoriteAvailable by viewModel.favoriteAvailable.collectAsStateWithLifecycle()
+    // 网易自建歌单(creatorId==uid 且非红心):编辑歌单信息/编辑封面/置顶的入口门控
+    val neteaseOwn by viewModel.neteaseOwnPlaylist.collectAsStateWithLifecycle()
+    val neteaseTagOptions by viewModel.neteaseTagOptions.collectAsStateWithLifecycle()
     val tracks by viewModel.tracks.collectAsStateWithLifecycle()
     val tracksListState by viewModel.tracksListState.collectAsStateWithLifecycle()
 
@@ -380,6 +384,11 @@ fun PlaylistScreen(
     }
     val onPlaylistMoreClick: () -> Unit = {
         playlistBottomSheetShow = true
+    }
+
+    // "更多"菜单打开且是网易自建歌单时预拉官方标签候选(编辑弹窗的 chip 数据源)
+    LaunchedEffect(playlistBottomSheetShow, neteaseOwn) {
+        if (playlistBottomSheetShow && neteaseOwn) viewModel.loadNeteaseTagOptions()
     }
 
     LaunchedEffect(key1 = id) {
@@ -610,6 +619,16 @@ fun PlaylistScreen(
                                                                 color = Color(0xC4FFFFFF),
                                                                 textAlign = TextAlign.Center,
                                                             )
+                                                            // 网易官方标签(编辑歌单信息可改;YT 歌单恒空不渲染)
+                                                            if (data.tags.isNotEmpty()) {
+                                                                Text(
+                                                                    text = "${stringResource(Res.string.playlist_tags)}: ${data.tags.joinToString(" · ")}",
+                                                                    style = typo().bodySmall,
+                                                                    color = Color(0x96FFFFFF),
+                                                                    textAlign = TextAlign.Center,
+                                                                    maxLines = 1,
+                                                                )
+                                                            }
                                                         }
                                                     }
                                                 }
@@ -1171,6 +1190,15 @@ fun PlaylistScreen(
                                                         },
                                                     )
                                                 }
+                                                // 网易官方标签(编辑歌单信息可改;YT 歌单恒空不渲染)
+                                                if (data.tags.isNotEmpty()) {
+                                                    Text(
+                                                        text = "${stringResource(Res.string.playlist_tags)}: ${data.tags.joinToString(" · ")}",
+                                                        color = Color.White.copy(alpha = 0.59f),
+                                                        style = typo().bodySmall,
+                                                        modifier = Modifier.padding(top = 4.dp),
+                                                    )
+                                                }
                                                 Text(
                                                     text =
                                                         if (data.isRadio) {
@@ -1577,6 +1605,13 @@ fun PlaylistScreen(
                         onLikeChanged = { liked ->
                             if (!liked) pendingUnlikeId = track.videoId
                         },
+                        // 网易自建歌单内:置顶该歌(轻量排序)
+                        onPinToTop =
+                            if (neteaseOwn) {
+                                { viewModel.pinNeteaseTrackToTop(track.videoId) }
+                            } else {
+                                null
+                            },
                         // 云盘单曲删除:登记目标,确认弹窗(不可逆)落定再调 VM
                         onDeleteFromCloudDisk = if (isCloudDisk) {
                             { pendingCloudDeleteSong = track }
@@ -1610,6 +1645,23 @@ fun PlaylistScreen(
                             viewModel.updatePlaylistTitle(newTitle, data.id)
                         },
                         onAddToQueue = if (data.isRadio) null else addToQueue,
+                        playlistDescription = data.description,
+                        playlistTags = data.tags,
+                        tagOptions = neteaseTagOptions,
+                        onEditInfo =
+                            if (neteaseOwn) {
+                                { name, description, tags ->
+                                    viewModel.updateNeteasePlaylistInfo(name, description, tags)
+                                }
+                            } else {
+                                null
+                            },
+                        onEditCover =
+                            if (neteaseOwn) {
+                                { jpegBytes -> viewModel.updateNeteasePlaylistCover(jpegBytes) }
+                            } else {
+                                null
+                            },
                     )
                 }
                 AnimatedVisibility(

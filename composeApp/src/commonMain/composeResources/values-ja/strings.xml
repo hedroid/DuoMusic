@@ -68,6 +68,14 @@
     <string name="this_song_is_not_available">この曲は利用できません。</string>
     <string name="in_charts">チャート内</string>
     <string name="playlist_name_cannot_be_empty">再生リスト名は空にできません。</string>
+    <string name="edit_playlist_info">再生リスト情報を編集</string>
+    <string name="edit_playlist_cover">カバーを編集</string>
+    <string name="netease_playlist_info_saved">保存しました</string>
+    <string name="playlist_cover_updated">カバーを更新しました</string>
+    <string name="pin_to_top">トップに固定</string>
+    <string name="pinned_to_top">トップに移動しました</string>
+    <string name="playlist_tags">タグ</string>
+    <string name="playlist_tags_limit">タグは最大3つまで</string>
     <string name="this_app_needs_to_access_your_notification">このアプリは、通知へのアクセスを必要とします</string>
     <string name="shared">共有</string>
     <string name="rich_synced">単語ごと</string>

@@ -75,6 +75,14 @@
     <string name="this_song_is_not_available">This song is not available</string>
     <string name="in_charts">in Charts</string>
     <string name="playlist_name_cannot_be_empty">Playlist name cannot be empty</string>
+    <string name="edit_playlist_info">Edit playlist info</string>
+    <string name="edit_playlist_cover">Edit cover</string>
+    <string name="netease_playlist_info_saved">Saved</string>
+    <string name="playlist_cover_updated">Cover updated</string>
+    <string name="pin_to_top">Pin to top</string>
+    <string name="pinned_to_top">Moved to top</string>
+    <string name="playlist_tags">Tags</string>
+    <string name="playlist_tags_limit">Up to 3 tags</string>
     <string name="this_app_needs_to_access_your_notification">This app needs to access your notification</string>
     <string name="shared">Shared</string>
     <string name="rich_synced">Word by word</string>
