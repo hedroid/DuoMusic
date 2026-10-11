@@ -90,10 +90,10 @@
 | SONGS | cloudsearch type=1（端点已有） | 保留 |
 | ARTISTS | cloudsearch type=100（端点已有） | 保留 |
 | PLAYLISTS | cloudsearch type=1000（端点已有） | 保留 |
-| VIDEOS | MV(type=1004)，播放链路无 | 隐藏 |
-| ALBUMS | type=10 端点未封装，且专辑详情 M6 未做点击必失败 | 本期隐藏，M6 后补 |
+| VIDEOS | MV(type=1004) | 隐藏（M3 时无播放链路；**2026-10 已解锁**——MV 全链路 10-07 落地，搜索 tab 10-10 接入 core aced620+主仓 201799aa） |
+| ALBUMS | type=10 | 本期隐藏，M6 后补（**后已解锁**——M6 2026-09-14 落地，searchAlbums 已封装并路由，ALBUMS tab 对网易可见可点） |
 | FEATURED_PLAYLISTS | 网易搜索无此维度（=PLAYLISTS 重复） | 隐藏 |
-| PODCASTS | 电台/播客播放链路无 | 隐藏 |
+| PODCASTS | 电台/播客 | 隐藏（M3 时无播放链路；**2026-10-10 已解锁**——type=1009 电台搜索一次拉完，电台行点击进电台详情页） |
 
 UI 实现：chips 按 selectedSource 过滤，不动 `SearchType` 枚举。
 
@@ -804,8 +804,9 @@ dump bounds 取,目测两次全偏)。
 > 本节是**索引**（全局视图），刻意精简；接手顺序：项目 `AGENTS.md`（会话自动加载，
 > 含各 TODO 资产级细节与实测要点）→ 本文档各工作包小节（已做项的实施记录）→
 > `core/service/netease/PITFALLS.md`（改网易代码前必读的端点坑）。
-> **实施级细节分布**：相似歌曲页/跨源歌词/M10 下载/AI 三件 → AGENTS.md 有完整 TODO 小节，
-> 可直接开工；M9 灰歌/M7 评论/M8 云盘/播客/MV → 仅有索引行，**接手先出方案再动码**
+> **实施级细节分布**：相似歌曲页/跨源歌词/AI 三件 → AGENTS.md 有完整 TODO 小节，
+> 可直接开工；M9 灰歌/M7 评论/M8 云盘/播客/MV/M10 下载重做 → **均已落地**（实施记录
+> 在 AGENTS.md/项目记忆，不在此重复建小节）；Listen Together → **接手先出方案再动码**
 > （方案写回本文档对应小节，沿用 M3/M5/M6 的先例）。
 > M2 已全部收口（库页三分区/双品牌角标/收藏同步/删除入口/红心逻辑/曲目分页），不再列入。
 
@@ -814,14 +815,14 @@ dump bounds 取,目测两次全偏)。
 | 项 | 现状资产 | 规模 |
 |---|---|---|
 | ~~相似歌曲独立页~~ ✅ 已落地（2026-09-25，core 145cbf5+主仓 f13e0f1d：三点菜单入口(网易歌)→SimilarSongsScreen 分页列表，整队起播；MoreSongs 同构骨架） | | |
-| M7 评论页 | songComments 分页端点+repo 方法现成，详情卡已在用前 2 热评 | 中 |
+| ~~M7 评论页~~ ✅ 已落地（2026-09-26~27，弹窗形态非独立页：三主题入口+发布/回复/点赞/楼中楼/emoji/三档翻页，写操作一律 xeapi；MV R_MV_5_ 与播客节目线程评论亦通） | — |
 | 无尽队列下拉=橡皮筋触发 | 用户 2026-09-25 定需求：①橡皮筋效果做强（现 overscroll 默认拉伸感弱）；②**追加时机改成"触发橡皮筋才追加"**——现实现是近底边沿自动续批+滚动停 250ms 手势兜底（AGENTS.md 播放队列页增强三轮），满屏小队列下拉本身就是 overscroll 无滚动事件，需改走 nestedScroll 连接器吃 post-scroll 段作唯一触发信号并自绘更强橡皮筋；两套队列 UI（QueueBottomSheet/AppleMusicQueueView）同改 | 中 |
 | 日志排查功能 | 用户 2026-09-25 定需求：真机（三星 release）kermit/logcat 全被 ROM 静默，出问题只能靠模拟器复现。方向=app 内日志环形缓冲（kermit 接自定义 writer）+设置页"导出日志"→写文件/系统分享面板；要覆盖网络层既有 W 级埋点（netease api rejected 等） | 中 |
 | ~~M8 云盘页~~ ✅ 已落地（2026-10-09，见上方 M8 行） | — |
-| ~~网易播客~~ ✅ 一期已落地（2026-09-28，core 20b618b+d033346+主仓 2c377db8/f8de68b8）：库页"播客"chip（**仅网易登录显示**，紧跟您的网易云）→ 播客主页（分类 chips/我的订阅/最新节目/猜你喜欢/精选电台/热门电台榜，区块独立降级，形状对齐 Melodia=rinchao0721/Melodia 真机抓包）+ 电台详情页（已订阅态/节目 30 批分页/订阅退订闭环/整队起播）。**铁律：节目可播的是 mainSong.id（节目自身 id 取流无效）；订阅列表=weapi /djradio/get/subed（不带 uid，旧 /user/ 前缀路径业务 404 已死）；订阅/退订未登录也回 200 必须先验登录态**。播放队列 playlistId 用 NETEASE_PODCAST_ 前缀（避开 NETEASE_RADIO_ 无尽哨兵）。DjPodcastProbe=形状探针。**二期追加（2026-09-28~29）**：付费节目三层拦截（programFeeType 节目层判定+取流 26KB 占位 sizeBytes<100KB+注册表先于缓存兜底，f31c4d7）+可听性角标（付费/VIP/已购）+收听量字段+byradio 频控治理（800ms 排队，3d3fa71；"成功但空"=限流静默形态，详情页不可用+重试）+**官方 tab 移植三件（40992e9+1a64e3b0）：分类浏览=/djradio/hot（拉电台列表,与被忽略的 program cateId 两回事）、电台榜热门/新晋切换（type 1/0）、热门节目榜=/program/toplist（元素 {"program"} 包装须解包）**；节目评论零成本（播放页评论按钮对节目天然可用，R_SO_4 歌曲线程直连）。余量：节目落库收藏/下载、搜索 type=1009 解锁 PODCASTS tab、收听历史、相似电台（端点未通放弃） | 中（余量） |
+| ~~网易播客~~ ✅ 一期已落地（2026-09-28，core 20b618b+d033346+主仓 2c377db8/f8de68b8）：库页"播客"chip（**仅网易登录显示**，紧跟您的网易云）→ 播客主页（分类 chips/我的订阅/最新节目/猜你喜欢/精选电台/热门电台榜，区块独立降级，形状对齐 Melodia=rinchao0721/Melodia 真机抓包）+ 电台详情页（已订阅态/节目 30 批分页/订阅退订闭环/整队起播）。**铁律：节目可播的是 mainSong.id（节目自身 id 取流无效）；订阅列表=weapi /djradio/get/subed（不带 uid，旧 /user/ 前缀路径业务 404 已死）；订阅/退订未登录也回 200 必须先验登录态**。播放队列 playlistId 用 NETEASE_PODCAST_ 前缀（避开 NETEASE_RADIO_ 无尽哨兵）。DjPodcastProbe=形状探针。**二期追加（2026-09-28~29）**：付费节目三层拦截（programFeeType 节目层判定+取流 26KB 占位 sizeBytes<100KB+注册表先于缓存兜底，f31c4d7）+可听性角标（付费/VIP/已购）+收听量字段+byradio 频控治理（800ms 排队，3d3fa71；"成功但空"=限流静默形态，详情页不可用+重试）+**官方 tab 移植三件（40992e9+1a64e3b0）：分类浏览=/djradio/hot（拉电台列表,与被忽略的 program cateId 两回事）、电台榜热门/新晋切换（type 1/0）、热门节目榜=/program/toplist（元素 {"program"} 包装须解包）**；节目评论零成本（播放页评论按钮对节目天然可用，R_SO_4 歌曲线程直连）。余量：节目落库收藏/下载、收听历史（=播客/电台的收听记录，与 2026-10-11 定案**不做**的全局「最近播放」页是两回事，勿混）、相似电台（端点未通放弃）；~~搜索 type=1009 解锁 PODCASTS tab~~ ✅ 2026-10-10 已接入（core aced620+fb9db94+主仓 201799aa：服务端硬上限 10 条且 offset>0 回空=一次拉完不做分页，电台行点击进电台详情页） | 中（余量） |
 | 跨源歌词供应商（YT 歌用网易/QQ 词库） | 接入点全现成（getLyricsFromFormat/LyricsProvider），Lyrico 匹配算法待移植 | 中偏大 |
-| 网易 MV | 搜索 type=1004 现隐藏；需打破 isVideo 恒 false 的管线假设（取流/追踪/watchtime/详情卡），走 /mv/detail + /mv/url | 中偏大 |
-| M10 离线下载管线 | SimpleCache→文件式改造；公共 Download 导出路径已通（AGENTS.md 调研） | 大 |
+| ~~网易 MV~~ ✅ 已落地（2026-10-07 三批 core b900df2→19a399b→e867ea8+主仓 6c792ed2→7643a45e→17c55949：NETEASE_MV_ 哨兵路由+brs 直链+16:9 缩略图驱动视频层，isVideo 恒 false 的管线假设已破；四批 MV 下载并入管理体系 ba2c2537；主页 MV 总榜行+库页「收藏的 MV」网格页 e9d2ea65；mv/sub t=0 服务端假成功→写后 delay 回读对账；搜索 VIDEOS tab=type=1004 分页健康，2026-10-10 core aced620+主仓 201799aa） | — |
+| ~~M10 离线下载管线~~ ✅ 已落地（2026-10-03~07 下载重做一~十三轮，主仓 1ce47cca..526689e+core fb0764a..：文件式存储 DownloadManager 打底+COMPLETED 转存/批量三选弹窗/管理页七态多选/设置下载分区/网易音质 8 档/flac 手写 Vorbis Comment/MV 下载/删除级联；详录 AGENTS.md「下载功能重做」） | — |
 | Listen Together 混源过滤 | 需协议层设计（数字 ID 会发给 Metrolist 客户端） | 待设计 |
 | AI 三件 / 歌曲导出改造 | 调研结论在 AGENTS.md | 大 / 另评估 |
 
