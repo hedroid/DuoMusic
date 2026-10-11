@@ -83,6 +83,7 @@ import simpmusic.composeapp.generated.resources.downloaded
 import simpmusic.composeapp.generated.resources.downloading
 import simpmusic.composeapp.generated.resources.removed_from_playlist
 import simpmusic.composeapp.generated.resources.netease_action_failed
+import simpmusic.composeapp.generated.resources.netease_playlist_info_partially_saved
 import simpmusic.composeapp.generated.resources.netease_playlist_info_saved
 import simpmusic.composeapp.generated.resources.pinned_to_top
 import simpmusic.composeapp.generated.resources.playlist_cover_updated
@@ -97,6 +98,9 @@ import simpmusic.composeapp.generated.resources.remove_from_playlist_failed
 import simpmusic.composeapp.generated.resources.download_cancelled
 import simpmusic.composeapp.generated.resources.error
 import simpmusic.composeapp.generated.resources.playlist
+import simpmusic.composeapp.generated.resources.playlist_tags
+import simpmusic.composeapp.generated.resources.title
+import simpmusic.composeapp.generated.resources.description
 import simpmusic.composeapp.generated.resources.playlist_is_empty
 import simpmusic.composeapp.generated.resources.radio
 import simpmusic.composeapp.generated.resources.radio_not_available
@@ -168,9 +172,11 @@ class PlaylistViewModel(
         if (id.toLongOrNull() != null) {
             viewModelScope.launch {
                 val liked = neteaseRepository.isNeteaseLikedPlaylist(id)
-                // 严格口径:歌单须真的在 userPlaylists 里(官方个性化歌单如每日推荐
-                // creatorId=用户本人,creatorId 判定会把编辑/置顶入口误开到官方歌单)
-                _neteaseOwnPlaylist.value = !liked && neteaseRepository.isNeteaseUserPlaylist(id)
+                // 严格口径:须为可编辑自建歌单(userPlaylists 里 creator==uid 且 NORMAL)。
+                // 双维度缺一不可——官方个性化歌单(每日推荐/雷达)creatorId=用户本人,
+                // 收藏的他人歌单又在 userPlaylists 列表里,单看任一维度都会误开入口
+                // (2026-10-11 CR:此前只查列表成员,收藏歌单也漏出编辑/封面/置顶)
+                _neteaseOwnPlaylist.value = !liked && neteaseRepository.isOwnEditableNeteasePlaylist(id)
                 // 藏心维持既有 creatorId 口径(官方个性化歌单照藏,语义上没有"收藏"目标)
                 _favoriteAvailable.value = !(liked || neteaseRepository.isOwnNeteasePlaylist(id))
             }
@@ -309,8 +315,11 @@ class PlaylistViewModel(
 
     /**
      * 编辑自己的网易歌单信息(改名/描述/标签,一个弹窗一次提交):无变化早退零请求;
-     * 成功后三处回写——内存 uiState(页头即刻变)、_playlistEntity、Room 行,并发库页
-     * 本地回写事件。写包 NonCancellable(保存后用户立刻返回导航不打断在途写)。
+     * **逐项对账回写**(2026-10-11 CR:此前整组成败连坐,desc 失败会把已成功的改名
+     * 一起丢弃,页面显示旧值、重试还重发)——服务端接受的项本地即刻回写(内存
+     * uiState/_playlistEntity/Room 三处+库页事件),失败项保留旧值;部分失败 toast
+     * 点名未保存的项,全败走 405/网络文案分流。写包 NonCancellable(保存后用户
+     * 立刻返回导航不打断在途写)。
      */
     fun updateNeteasePlaylistInfo(
         newName: String,
@@ -334,15 +343,36 @@ class PlaylistViewModel(
                     newDescription = description.takeIf { descriptionChanged },
                     newTags = newTags.takeIf { tagsChanged },
                 ).fold(
-                    onSuccess = { ok ->
-                        if (ok) {
-                            _uiState.value = Success(state.copy(title = name, description = description, tags = newTags))
-                            _playlistEntity.update { it?.copy(title = name, description = description) }
-                            playlistRepository.updatePlaylistTitleAndDescription(id, name, description)
-                            makeToast(getString(Res.string.netease_playlist_info_saved))
-                            mutationBus.send(LibraryMutation.NeteasePlaylistInfoUpdated(id, title = name))
-                        } else {
-                            makeToast(getString(Res.string.netease_action_failed))
+                    onSuccess = { result ->
+                        // 请求了但没落定的项=该项失败(逐项对账)
+                        val failedLabels = buildList {
+                            if (nameChanged && !result.nameUpdated) add(getString(Res.string.title))
+                            if (descriptionChanged && !result.descriptionUpdated) add(getString(Res.string.description))
+                            if (tagsChanged && !result.tagsUpdated) add(getString(Res.string.playlist_tags))
+                        }
+                        val appliedTitle = if (result.nameUpdated) name else state.title
+                        // description 归一 null→"":与 descriptionChanged 的比较口径一致
+                        val appliedDescription = if (result.descriptionUpdated) description else (state.description ?: "")
+                        val appliedTags = if (result.tagsUpdated) newTags else state.tags
+                        val anyUpdated = result.nameUpdated || result.descriptionUpdated || result.tagsUpdated
+                        if (anyUpdated || failedLabels.isEmpty()) {
+                            _uiState.value =
+                                Success(state.copy(title = appliedTitle, description = appliedDescription, tags = appliedTags))
+                            _playlistEntity.update { it?.copy(title = appliedTitle, description = appliedDescription) }
+                            playlistRepository.updatePlaylistTitleAndDescription(id, appliedTitle, appliedDescription)
+                        }
+                        when {
+                            failedLabels.isEmpty() ->
+                                makeToast(getString(Res.string.netease_playlist_info_saved))
+                            anyUpdated ->
+                                makeToast(getString(Res.string.netease_playlist_info_partially_saved, failedLabels.joinToString(", ")))
+                            else ->
+                                result.firstFailure?.let {
+                                    makeToast(getString(neteaseWriteErrorString(it, Res.string.netease_action_failed)))
+                                } ?: makeToast(getString(Res.string.netease_action_failed))
+                        }
+                        if (anyUpdated) {
+                            mutationBus.send(LibraryMutation.NeteasePlaylistInfoUpdated(id, title = appliedTitle))
                         }
                     },
                     onFailure = { makeToast(getString(neteaseWriteErrorString(it, Res.string.netease_action_failed))) },

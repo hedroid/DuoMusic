@@ -825,6 +825,20 @@ dump bounds 取,目测两次全偏)。
 | Listen Together 混源过滤 | 需协议层设计（数字 ID 会发给 Metrolist 客户端） | 待设计 |
 | AI 三件 / 歌曲导出改造 | 调研结论在 AGENTS.md | 大 / 另评估 |
 
+### 暂缓 TODO 与不做项（2026-10-11）
+
+- **TODO：歌曲百科与制作信息（暂缓，先不实现）**：仅针对网易普通歌曲，展示作词、作曲、编曲、制作人员及歌曲故事。优先复用三主题共用的播放页「歌曲信息」面板：制作名单按实际有值的角色逐行显示，长名单与故事原位展开，明确区分歌曲资料与现有艺人／专辑简介；无资料时不造占位字段。候选只读接口为 `/song/wiki/summary` 与 `/ugc/song/get`，字段形状、登录要求和覆盖率尚未在本项目验证。将来启动前先做只读探针，再定数据模型；打开信息面板时按歌曲 ID 懒加载，切歌时取消旧请求并校验回包归属。
+- **不做：最近播放、历史日推**。不作为网易源后续功能计划，也不为此新增入口或接口。
+
+### 自建歌单编辑 CR 三修（2026-10-11）
+
+> 对五件套（core f5e8075+主仓 d280fd02）的代码评审反馈三项，全部修复并模拟器实测。
+
+- **门控改双维度严格集（P1）**：`isNeteaseUserPlaylist` 只查 userPlaylists 成员，收藏的他人歌单也漏出编辑/封面/置顶入口。改为 `ownEditablePlaylistIds`（列表里 creatorId==uid 且 specialType==NORMAL 的子集，双维度缺一不可——单查 creatorId 会误开官方个性化歌单，单查成员会误开收藏歌单），仅 getLibraryPlaylists 全量与建单成功两处播种（详情页回填不进此集）；建单成功同步补集，新歌单编辑入口不再等全量拉库。VM 侧 `neteaseOwnPlaylist` 消费同款。实测：收藏歌单（堡垒原声，creator 退行_）More 菜单无编辑/封面、歌曲菜单无置顶；自建测试歌单两入口齐。
+- **编辑逐项对账（P1）**：`updateNeteasePlaylistInfo` 原为整组 runCatching 连坐（desc 失败丢弃已成功的改名，界面显示旧值且重试重发）。改为逐项独立尝试（CancellationException 直抛），返回 `NeteasePlaylistInfoUpdateResult{nameUpdated,tagsUpdated,descriptionUpdated,firstFailure}`；VM 按落定项回写（uiState/_playlistEntity/Room 三处+库页事件仅在任何一项成功时发），失败项保留旧值，部分失败 toast `netease_playlist_info_partially_saved`（"部分修改未保存：%1$s"，base+zh-CN+zh-TW）点名失败字段，全败走 405/网络文案分流。实测：desc 405 同时 name+tags 正常落定，页面标题/标签即刻更新，事件照发。顺修：原实现 tags 分支漏 `.getOrThrow()`（失败被静默吞成成功）。
+- **空标签清空打通（P2）**：repo 层删 `isNotEmpty` 跳过、端点删 `require`，空列表发 `tags=""`。实测协议层无拒绝（code 200），本地清空生效；**但当日账号风控窗口期 tags 写入（含非空 set）一律 code 200 不落地**——20 分钟后 v6 weapi+公开老 API 双通道回读 tags 均 []，与 desc 明 405 同窗的暗吞形态。本地按 code 200 乐观回写、重进页面对账自洽；窗口外落地性待复验（注意：昨天会话留在服务端的 tags 今晨首查已为空，疑同因）。
+- 建单补集实测被同窗口拦截（`playlist/create code=400`，2026-09-22 同签名账号级风控），该行为代码级确认（成功路径一行补集，create 失败本就无新单可编辑）。
+
 ### 可做（小成本快赢）
 
 > **2026-09-24 一轮清空六项**（core d3c70a1/3f04f02/c736d70 + 主仓 25e31f51/67b1c81e/39c6a78a）：

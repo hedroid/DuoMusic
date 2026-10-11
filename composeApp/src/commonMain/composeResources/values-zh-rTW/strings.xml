@@ -90,6 +90,7 @@
     <string name="edit_playlist_info">編輯歌單資訊</string>
     <string name="edit_playlist_cover">編輯封面</string>
     <string name="netease_playlist_info_saved">已儲存</string>
+    <string name="netease_playlist_info_partially_saved">部分修改未儲存：%1$s</string>
     <string name="playlist_cover_updated">封面已更新</string>
     <string name="pin_to_top">置頂</string>
     <string name="pinned_to_top">已置頂</string>
