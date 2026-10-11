@@ -1618,6 +1618,13 @@ fun PlaylistScreen(
                         } else {
                             null
                         },
+                        // 云盘歌曲信息纠正(匹配/解除)落定→原地刷新+库页回写
+                        // (服务端会换条目 id,必须整页重拉,方法内部含窗口等待)
+                        onCloudDiskSongInfoChanged = if (isCloudDisk) {
+                            { ok -> if (ok) viewModel.refreshCloudDiskAfterMutation() }
+                        } else {
+                            null
+                        },
                     )
                 }
                 if (playlistBottomSheetShow) {

@@ -705,6 +705,15 @@
     <string name="delete_from_cloud_disk">클라우드에서 삭제</string>
     <string name="delete_from_cloud_disk_title">%1$d곡을 삭제할까요?</string>
     <string name="delete_from_cloud_disk_message">선택한 곡이 클라우드에서 영구 삭제되며 복구할 수 없습니다.</string>
+    <string name="match_cloud_disk_song">노래 매칭</string>
+    <string name="unlink_cloud_disk_song">노래 정보 연결 해제</string>
+    <string name="cloud_match_search_hint">노래 검색</string>
+    <string name="cloud_match_confirm">이 곡의 정보를 클라우드 파일에 적용할까요?</string>
+    <string name="cloud_match_action">매칭</string>
+    <string name="cloud_match_done">노래 정보를 업데이트했습니다</string>
+    <string name="cloud_unlink_action">해제</string>
+    <string name="cloud_unlink_done">노래 정보 연결을 해제했습니다</string>
+    <string name="cloud_unlink_message">연결을 해제하면 서버가 자동으로 이 노래를 다시 인식합니다.</string>
     <string name="cloud_delete_done">%1$d곡 삭제됨</string>
     <string name="cloud_delete_partial">%1$d곡 삭제, %2$d곡 실패</string>
     <string name="cloud_upload_all_done">%1$d곡 업로드 완료</string>

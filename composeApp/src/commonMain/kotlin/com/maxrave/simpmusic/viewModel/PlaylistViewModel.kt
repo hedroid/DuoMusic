@@ -826,6 +826,20 @@ class PlaylistViewModel(
     }
 
     /**
+     * 云盘歌曲信息纠正(匹配/解除关联,2026-10-11)后的原地刷新:服务端换 id 有
+     * 短暂窗口,稍等再刷;刷新成功才发库页回写事件(上传/删除路径同款口径——
+     * 提前发会让库页轻拉抢在服务端可见前拿到旧计数/旧封面)。
+     */
+    fun refreshCloudDiskAfterMutation() {
+        viewModelScope.launch {
+            delay(1200)
+            if (refreshCloudDiskData(firstLoad = false)) {
+                mutationBus.send(LibraryMutation.CloudDiskChanged)
+            }
+        }
+    }
+
+    /**
      * [getCloudDiskData] 的可等待版:返回是否刷新成功(false=两次拉取都失败,首载
      * 时还会置 Error)。上传完成/批量删除后的"清场+库页回写事件"必须等它返回——
      * 函数内自起协程的旧形态调用即返回,清场会赶在新歌进列表前发生,库页轻拉也

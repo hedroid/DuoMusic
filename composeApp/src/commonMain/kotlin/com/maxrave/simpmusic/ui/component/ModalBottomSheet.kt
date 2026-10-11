@@ -145,7 +145,10 @@ import com.maxrave.domain.mediaservice.handler.EndlessRadioLockKind
 import com.maxrave.domain.mediaservice.handler.MediaPlayerHandler
 import com.maxrave.domain.mediaservice.handler.QueueData
 import com.maxrave.domain.repository.PlaylistRepository
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.ui.text.input.ImeAction
 import com.maxrave.data.repository.NeteaseRepositoryImpl
+import com.maxrave.netease.model.NeteaseSong
 import com.maxrave.domain.utils.FilterState
 import com.maxrave.domain.utils.connectArtists
 import com.maxrave.domain.utils.toListName
@@ -160,6 +163,8 @@ import com.maxrave.simpmusic.extension.greyScale
 import com.maxrave.simpmusic.viewModel.LibraryMutation
 import com.maxrave.simpmusic.viewModel.LibraryMutationBus
 import com.maxrave.simpmusic.ui.icon.AccessAlarm
+import com.maxrave.simpmusic.ui.icon.Search
+import com.maxrave.simpmusic.ui.icon.SyncDisabled
 import com.maxrave.simpmusic.ui.icon.Add
 import com.maxrave.simpmusic.ui.icon.AddCircleOutline
 import com.maxrave.simpmusic.ui.icon.AddPhotoAlternate
@@ -262,6 +267,16 @@ import simpmusic.composeapp.generated.resources.bitrate
 import simpmusic.composeapp.generated.resources.bpm
 import simpmusic.composeapp.generated.resources.can_not_be_empty
 import simpmusic.composeapp.generated.resources.cancel
+import simpmusic.composeapp.generated.resources.back
+import simpmusic.composeapp.generated.resources.cloud_match_action
+import simpmusic.composeapp.generated.resources.cloud_match_confirm
+import simpmusic.composeapp.generated.resources.cloud_match_search_hint
+import simpmusic.composeapp.generated.resources.cloud_unlink_action
+import simpmusic.composeapp.generated.resources.cloud_unlink_message
+import simpmusic.composeapp.generated.resources.match_cloud_disk_song
+import simpmusic.composeapp.generated.resources.no_results_found
+import simpmusic.composeapp.generated.resources.search
+import simpmusic.composeapp.generated.resources.unlink_cloud_disk_song
 import simpmusic.composeapp.generated.resources.crop_cover
 import simpmusic.composeapp.generated.resources.codec
 import simpmusic.composeapp.generated.resources.comments_title
@@ -1871,6 +1886,11 @@ fun NowPlayingBottomSheet(
     // 整队列按云盘歌对待;标记纪元队列里无标记的行=后来插入的普通歌,传 false)。
     // 云盘页/队列页等列表菜单不传(默认 false,列表行自身就是云盘数据源)
     isCloudDiskSong: Boolean = false,
+    // 云盘歌曲信息纠正(匹配/解除关联)落定回调(true=写成功;组件内部已完成 toast
+    // 与确认弹窗):云盘页用它原地刷新列表+发库页回写事件,播放页只发库页事件。
+    // 两种操作服务端都会把条目 id 换掉,页面必须整页重拉(见 CloudDiskMatchDialog
+    // 注释),所以回调只给"成功与否",不带可原地 patch 的信息
+    onCloudDiskSongInfoChanged: ((Boolean) -> Unit)? = null,
     // 需要让宿主页面立即响应点赞状态变化时传入(例如红心歌单取消红心后剔除歌曲)
     onLikeChanged: ((Boolean) -> Unit)? = null,
     dataStoreManager: DataStoreManager = koinInject<DataStoreManager>(),
@@ -1888,6 +1908,8 @@ fun NowPlayingBottomSheet(
     val programLikePending by viewModel.programLikePending.collectAsStateWithLifecycle()
     val neteaseLoggedIn by koinInject<com.maxrave.simpmusic.viewModel.SharedViewModel>()
         .neteaseLoggedIn.collectAsStateWithLifecycle()
+    // 云盘歌曲信息纠正的执行/toast 走 SharedViewModel(与删除云盘曲同款)
+    val cloudInfoSharedViewModel = koinInject<com.maxrave.simpmusic.viewModel.SharedViewModel>()
     // "下载视频"行的下载中态(DownloadManager 视频条目在途实时流)
     val videoDownloading by viewModel.videoDownloading.collectAsStateWithLifecycle()
     val coroutineScope = rememberCoroutineScope()
@@ -1917,6 +1939,10 @@ fun NowPlayingBottomSheet(
     var showCancelVideoDownloadDialog by remember { mutableStateOf(false) }
     var showRedownloadVideoDialog by remember { mutableStateOf(false) }
     var showDeleteVideoDialog by remember { mutableStateOf(false) }
+    // 云盘歌曲信息纠正(2026-10-11):匹配=搜索曲库目标绑定;解除=清掉关联让服务端
+    // 重新指纹识别。见菜单行注释
+    var cloudMatchDialog by remember { mutableStateOf(false) }
+    var showCloudUnlinkDialog by remember { mutableStateOf(false) }
     val crossfadeEnabled by dataStoreManager.crossfadeEnabled.collectAsState(DataStoreManager.FALSE)
 
     LaunchedEffect(uiState) {
@@ -1980,6 +2006,58 @@ fun NowPlayingBottomSheet(
                 ),
             )
         }
+    }
+
+    // 云盘歌曲匹配(搜索目标→确认→提交;居中 AlertDialog,输入法弹窗问题的通用解)
+    if (cloudMatchDialog) {
+        CloudDiskMatchDialog(
+            videoId = uiState.songUIState.videoId,
+            initialQuery = uiState.songUIState.title,
+            onDismiss = { cloudMatchDialog = false },
+            // 成功才收弹窗+菜单并通知调用方刷新(失败留在弹窗里可重选目标)
+            onMatched = { ok ->
+                cloudMatchDialog = false
+                hideModalBottomSheet()
+                onCloudDiskSongInfoChanged?.invoke(ok)
+            },
+        )
+    }
+    // 解除歌曲信息关联确认(与删除云盘曲同款形态)
+    if (showCloudUnlinkDialog) {
+        AlertDialog(
+            containerColor = rememberSurfaceDarkColors().container,
+            onDismissRequest = { showCloudUnlinkDialog = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showCloudUnlinkDialog = false
+                        hideModalBottomSheet()
+                        cloudInfoSharedViewModel.unlinkCloudDiskSong(uiState.songUIState.videoId) { ok ->
+                            onCloudDiskSongInfoChanged?.invoke(ok)
+                        }
+                    },
+                ) {
+                    Text(text = stringResource(Res.string.cloud_unlink_action), style = typo().labelSmall)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCloudUnlinkDialog = false }) {
+                    Text(text = stringResource(Res.string.cancel), style = typo().labelSmall)
+                }
+            },
+            title = {
+                Text(
+                    text = stringResource(Res.string.unlink_cloud_disk_song),
+                    style = typo().labelSmall,
+                )
+            },
+            text = {
+                Text(
+                    text = stringResource(Res.string.cloud_unlink_message),
+                    style = typo().bodyMedium,
+                )
+            },
+        )
     }
 
     if (addToAPlaylist) {
@@ -2679,6 +2757,28 @@ fun NowPlayingBottomSheet(
                                 }
 
                                 else -> Unit
+                            }
+                        }
+                    }
+                    // 云盘歌曲信息纠正(2026-10-11,探针两轮实证端点行为):匹配=搜索
+                    // 曲库目标绑定,成功后条目 id 换成目标库 id(①完整挂载:真实
+                    // 艺人/专辑 id+歌词可用);解除=清掉关联,服务端会立刻重新指纹
+                    // 识别(id 再换、回到指纹猜测的形态,不是回到裸文件)。两行只对
+                    // 云盘歌出现(云盘页行/播放页当前曲);解除对未匹配私人文件(③)
+                    // 没有关联可清,隐藏
+                    if (isCloudDiskPage) {
+                        ActionButton(
+                            icon = SimpIcons.Search,
+                            text = Res.string.match_cloud_disk_song,
+                        ) {
+                            cloudMatchDialog = true
+                        }
+                        if (!isCloudPrivateFile) {
+                            ActionButton(
+                                icon = SimpIcons.SyncDisabled,
+                                text = Res.string.unlink_cloud_disk_song,
+                            ) {
+                                showCloudUnlinkDialog = true
                             }
                         }
                     }
@@ -3586,6 +3686,229 @@ fun SleepTimerBottomSheet(
 // 互斥)+ 列表顶部"新建歌单"直接建云端歌单并塞入这首歌。管线保留,恢复改 true。
 // 登记:docs/HIDDEN_FEATURES.md
 private const val SHOW_LOCAL_PLAYLIST_SECTION = false
+
+/**
+ * 云盘歌曲匹配弹窗(2026-10-11):搜索曲库目标 → 点选确认 → /cloud/user/song/match。
+ * 居中 AlertDialog(M3 sheet 内 TextField 会被 IME 压住,项目定案:输入弹窗一律
+ * AlertDialog)。两相呈现:搜索相(输入框+候选列表)+确认相(目标卡+说明文案)。
+ * 成功后服务端把条目 id 换成目标库 id(旧 id 失效)——onMatched(true) 交调用方
+ * 整页重拉;失败留在原位可重选(SharedViewModel 已 toast 原因)。
+ */
+@Composable
+private fun CloudDiskMatchDialog(
+    videoId: String,
+    initialQuery: String,
+    onDismiss: () -> Unit,
+    onMatched: (Boolean) -> Unit,
+    neteaseRepository: NeteaseRepositoryImpl = koinInject(),
+    sharedViewModel: SharedViewModel = koinInject(),
+) {
+    var query by remember { mutableStateOf(initialQuery) }
+    // null=尚未搜索(不闪"未找到"空态);失败时若已有列表保留旧列表静默
+    var results by remember { mutableStateOf<List<NeteaseSong>?>(null) }
+    var searching by remember { mutableStateOf(false) }
+    var searchFailed by remember { mutableStateOf(false) }
+    var picked by remember { mutableStateOf<NeteaseSong?>(null) }
+    var matching by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    fun doSearch() {
+        val q = query.trim()
+        if (q.isEmpty() || searching) return
+        searching = true
+        searchFailed = false
+        scope.launch {
+            neteaseRepository.searchNeteaseSongsForMatch(q)
+                .onSuccess { results = it }
+                .onFailure { if (results == null) searchFailed = true }
+            searching = false
+        }
+    }
+
+    // 进入即按预填词(歌名/未匹配文件的文件名)搜一次
+    LaunchedEffect(Unit) {
+        if (query.isNotBlank()) doSearch()
+    }
+
+    AlertDialog(
+        containerColor = rememberSurfaceDarkColors().container,
+        onDismissRequest = { if (!matching) onDismiss() },
+        confirmButton = {
+            if (picked == null) {
+                TextButton(
+                    enabled = query.isNotBlank() && !searching,
+                    onClick = { doSearch() },
+                ) {
+                    Text(text = stringResource(Res.string.search), style = typo().labelSmall)
+                }
+            } else {
+                TextButton(
+                    enabled = !matching,
+                    onClick = {
+                        val target = picked ?: return@TextButton
+                        matching = true
+                        sharedViewModel.matchCloudDiskSong(videoId, target.id) { ok ->
+                            if (ok) {
+                                onMatched(true)
+                            } else {
+                                matching = false
+                            }
+                        }
+                    },
+                ) {
+                    Text(text = stringResource(Res.string.cloud_match_action), style = typo().labelSmall)
+                }
+            }
+        },
+        dismissButton = {
+            if (picked != null) {
+                TextButton(enabled = !matching, onClick = { picked = null }) {
+                    Text(text = stringResource(Res.string.back), style = typo().labelSmall)
+                }
+            } else {
+                TextButton(onClick = onDismiss) {
+                    Text(text = stringResource(Res.string.cancel), style = typo().labelSmall)
+                }
+            }
+        },
+        title = {
+            Text(text = stringResource(Res.string.match_cloud_disk_song), style = typo().labelSmall)
+        },
+        text = {
+            val pickedSong = picked
+            if (pickedSong == null) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = query,
+                        onValueChange = { query = it },
+                        label = { Text(text = stringResource(Res.string.cloud_match_search_hint)) },
+                        singleLine = true,
+                        enabled = !matching,
+                        trailingIcon = {
+                            IconButton(
+                                onClick = { doSearch() },
+                                enabled = !searching && query.isNotBlank(),
+                            ) {
+                                Icon(imageVector = SimpIcons.Search, contentDescription = null)
+                            }
+                        },
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                        keyboardActions = KeyboardActions(onSearch = { doSearch() }),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    when {
+                        searching ->
+                            Box(
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .height(220.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                CircularProgressIndicator()
+                            }
+
+                        results == null && searchFailed ->
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = stringResource(Res.string.error_occurred),
+                                    style = typo().bodyMedium,
+                                )
+                                TextButton(onClick = { doSearch() }) {
+                                    Text(text = stringResource(Res.string.retry), style = typo().labelSmall)
+                                }
+                            }
+
+                        results?.isEmpty() == true ->
+                            Box(
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .height(220.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    text = stringResource(Res.string.no_results_found),
+                                    style = typo().bodyMedium,
+                                )
+                            }
+
+                        else ->
+                            LazyColumn(modifier = Modifier.heightIn(max = 320.dp)) {
+                                items(
+                                    items = results.orEmpty(),
+                                    key = { it.id },
+                                ) { song ->
+                                    CloudMatchCandidateRow(song) { picked = song }
+                                }
+                            }
+                    }
+                }
+            } else {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    CloudMatchCandidateRow(song = pickedSong, onClick = {})
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = stringResource(Res.string.cloud_match_confirm),
+                        style = typo().bodyMedium,
+                    )
+                }
+            }
+        },
+    )
+}
+
+/** 匹配候选行:48dp 封面 + 标题/艺人·专辑(单行截断,行高与歌单弹窗行同族) */
+@Composable
+private fun CloudMatchCandidateRow(
+    song: NeteaseSong,
+    onClick: () -> Unit,
+) {
+    val c = rememberSurfaceDarkColors()
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .clickable(onClick = onClick)
+                .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        AsyncImage(
+            model =
+                song.coverUrl?.let {
+                    if (it.contains('?')) it else "$it?param=200y200"
+                },
+            contentDescription = null,
+            modifier =
+                Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(8.dp)),
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = song.name,
+                style = typo().titleSmall,
+                color = c.content,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text =
+                    listOfNotNull(
+                        song.artists.takeIf { it.isNotEmpty() }?.joinToString(" / "),
+                        song.albumName,
+                    ).joinToString(" · "),
+                style = typo().bodySmall,
+                color = c.subtitle,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

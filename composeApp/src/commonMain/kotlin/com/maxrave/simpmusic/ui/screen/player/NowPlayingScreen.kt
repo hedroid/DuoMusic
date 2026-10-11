@@ -1030,6 +1030,11 @@ fun NowPlayingScreenContent(
             // 三点菜单的"是云盘歌"信号(与删除回调分离,见调用方注释):旧队列快照
             // 删除隐藏但曲库门控照常;标记纪元队列里插入的普通歌按普通歌对待
             isCloudDiskSong = isCloudDiskSongForMenu,
+            // 云盘歌曲信息纠正(匹配/解除)落定→发库页回写事件(云盘页在外时库页
+            // 入口原地刷新);本页自身无可刷列表,当前曲旧 id 过期属已知边界
+            onCloudDiskSongInfoChanged = { ok ->
+                if (ok) cloudMutationBus.send(LibraryMutation.CloudDiskChanged)
+            },
         )
     }
 

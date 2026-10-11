@@ -116,6 +116,8 @@ import org.koin.core.component.inject
 import org.simpmusic.lastfm.completeLogin
 import simpmusic.composeapp.generated.resources.mv_subscribed
 import simpmusic.composeapp.generated.resources.cloud_delete_done
+import simpmusic.composeapp.generated.resources.cloud_match_done
+import simpmusic.composeapp.generated.resources.cloud_unlink_done
 import simpmusic.composeapp.generated.resources.error_occurred
 import simpmusic.composeapp.generated.resources.mv_saved_to_download
 import simpmusic.composeapp.generated.resources.mv_unsubscribed
@@ -375,6 +377,57 @@ class SharedViewModel(
                     getString(Res.string.cloud_delete_done, 1)
                 } else {
                     getString(Res.string.error_occurred)
+                },
+            )
+            onResult?.invoke(ok)
+        }
+    }
+
+    /**
+     * 云盘歌曲信息纠正(2026-10-11 探针实证端点行为):adjustSongId=目标曲库歌曲 id。
+     * 成功后服务端把条目 id 换掉——拿旧 videoId 的一切(队列行/正在播的歌)就此过期,
+     * 调用方须整页重拉;解除路径见 [unlinkCloudDiskSong]。
+     */
+    fun matchCloudDiskSong(
+        videoId: String,
+        adjustSongId: Long,
+        onResult: ((Boolean) -> Unit)? = null,
+    ) {
+        viewModelScope.launch {
+            val id = videoId.toLongOrNull()
+            val result = id?.let { neteaseRepository.matchCloudDiskSong(it, adjustSongId) }
+            val ok = result?.isSuccess == true
+            // 失败透传服务端消息("当前歌曲不支持匹配"等业务拒绝自解释,建单同款口径)
+            makeToast(
+                if (ok) {
+                    getString(Res.string.cloud_match_done)
+                } else {
+                    result?.exceptionOrNull()?.message?.takeIf { it.isNotBlank() }
+                        ?: getString(Res.string.error_occurred)
+                },
+            )
+            onResult?.invoke(ok)
+        }
+    }
+
+    /**
+     * 解除云盘歌曲的信息关联(asid=0):清掉手动/自动匹配,服务端会立刻重新指纹
+     * 识别(并非回到裸文件,确认文案按此表述)。
+     */
+    fun unlinkCloudDiskSong(
+        videoId: String,
+        onResult: ((Boolean) -> Unit)? = null,
+    ) {
+        viewModelScope.launch {
+            val id = videoId.toLongOrNull()
+            val result = id?.let { neteaseRepository.matchCloudDiskSong(it, 0L) }
+            val ok = result?.isSuccess == true
+            makeToast(
+                if (ok) {
+                    getString(Res.string.cloud_unlink_done)
+                } else {
+                    result?.exceptionOrNull()?.message?.takeIf { it.isNotBlank() }
+                        ?: getString(Res.string.error_occurred)
                 },
             )
             onResult?.invoke(ok)

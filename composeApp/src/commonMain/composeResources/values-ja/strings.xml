@@ -604,6 +604,15 @@
     <string name="delete_from_cloud_disk">クラウドから削除</string>
     <string name="delete_from_cloud_disk_title">%1$d 曲を削除しますか？</string>
     <string name="delete_from_cloud_disk_message">選択した曲はクラウドから完全に削除され、元に戻せません。</string>
+    <string name="match_cloud_disk_song">曲情報をマッチング</string>
+    <string name="unlink_cloud_disk_song">曲情報の関連を解除</string>
+    <string name="cloud_match_search_hint">曲を検索</string>
+    <string name="cloud_match_confirm">この曲の情報をクラウドファイルに適用しますか？</string>
+    <string name="cloud_match_action">マッチング</string>
+    <string name="cloud_match_done">曲情報を更新しました</string>
+    <string name="cloud_unlink_action">解除</string>
+    <string name="cloud_unlink_done">曲情報の関連を解除しました</string>
+    <string name="cloud_unlink_message">解除すると、サーバーが自動でこの曲の再識別を試みます。</string>
     <string name="cloud_delete_done">%1$d 曲を削除しました</string>
     <string name="cloud_delete_partial">%1$d 曲を削除、%2$d 曲失敗</string>
     <string name="cloud_upload_all_done">%1$d 曲をアップロードしました</string>
