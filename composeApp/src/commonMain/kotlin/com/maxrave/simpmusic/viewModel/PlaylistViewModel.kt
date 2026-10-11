@@ -243,11 +243,13 @@ class PlaylistViewModel(
      * 失败按平台 toast。自建网易歌单无"收藏"概念,心已在 UI 隐藏不会走到这里。
      * 双向都发库页本地回写:取消收藏→移除;收藏→插入完整行(收藏发生时正在看这个歌单,
      * 实体数据现成在手,库页插入的行与网络拉回的同构,无占位跳变)。
+     * 写包 NonCancellable(2026-10-11 CR:点收藏立即返回,viewModelScope 随页面销毁
+     * 会掐断在途写——服务端照改而本地回写/库页事件全丢;与删除/编辑同款保护)。
      */
     fun setRemoteSaved(saved: Boolean) {
         val id = (uiState.value as? Success)?.data?.id ?: return
         val isNeteaseId = id.toLongOrNull() != null
-        viewModelScope.launch {
+        viewModelScope.launch { withContext(NonCancellable) {
             _remoteSavePending.value = true
             // 网易分支失败会抛出服务端原文(如"操作过于频繁,请稍后再试"),直接 toast 更可读
             val outcome = runCatching { playlistRepository.setRemoteSavedState(id, saved) }
@@ -271,7 +273,7 @@ class PlaylistViewModel(
                 )
             }
             _remoteSavePending.value = false
-        }
+        } }
     }
 
     /** 收藏事件的载荷:详情页完整实体;Room 行缺席时从页面状态兜底构造 */
