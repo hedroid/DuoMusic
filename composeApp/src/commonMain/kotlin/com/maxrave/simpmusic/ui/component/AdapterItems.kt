@@ -1,6 +1,9 @@
 package com.maxrave.simpmusic.ui.component
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -8,10 +11,14 @@ import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.gestures.snapping.SnapLayoutInfoProvider
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -35,6 +42,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -46,7 +54,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -79,6 +92,7 @@ import com.maxrave.domain.data.model.mood.moodmoments.Item
 import com.maxrave.domain.data.model.searchResult.albums.AlbumsResult
 import com.maxrave.domain.data.model.searchResult.playlists.PlaylistsResult
 import com.maxrave.domain.data.model.searchResult.songs.Artist
+import com.maxrave.domain.data.model.streams.YouTubeWatchEndpoint
 import com.maxrave.domain.data.type.ChartItem
 import com.maxrave.domain.data.type.HomeContentType
 import com.maxrave.domain.data.type.MonthlyRecapItem
@@ -88,7 +102,6 @@ import com.maxrave.domain.utils.connectArtists
 import com.maxrave.domain.utils.toListName
 import com.maxrave.domain.utils.toSongEntity
 import com.maxrave.domain.utils.toTrack
-import com.maxrave.logger.Logger
 import com.maxrave.simpmusic.Platform
 import com.maxrave.simpmusic.expect.ui.HorizontalScrollBar
 import com.maxrave.simpmusic.getPlatform
@@ -97,6 +110,8 @@ import com.maxrave.simpmusic.ui.navigation.destination.list.ArtistDestination
 import com.maxrave.simpmusic.ui.navigation.destination.list.BrowseDestination
 import com.maxrave.simpmusic.ui.navigation.destination.list.PlaylistDestination
 import com.maxrave.simpmusic.ui.navigation.destination.list.PodcastDestination
+import com.maxrave.simpmusic.ui.icon.PlayArrow
+import com.maxrave.simpmusic.ui.icon.SimpIcons
 import com.maxrave.simpmusic.ui.theme.LocalForceDarkText
 import com.maxrave.simpmusic.ui.theme.typo
 import com.maxrave.simpmusic.viewModel.HomeViewModel
@@ -110,6 +125,7 @@ import simpmusic.composeapp.generated.resources.app_name
 import simpmusic.composeapp.generated.resources.live_badge
 import simpmusic.composeapp.generated.resources.description
 import simpmusic.composeapp.generated.resources.more
+import simpmusic.composeapp.generated.resources.play_all
 import simpmusic.composeapp.generated.resources.playlist
 import simpmusic.composeapp.generated.resources.subscribers
 import simpmusic.composeapp.generated.resources.wrapped_recap_subtitle
@@ -369,6 +385,110 @@ fun MediaRow(
 }
 
 /**
+ * A Home shelf's header: the optional avatar, strapline and title, plus the one button YouTube
+ * sends with the shelf — "More" (a browse page) or "Play all" (a watch endpoint). Every shelf
+ * style uses it, so the two buttons look and behave the same everywhere.
+ */
+@Composable
+fun HomeSectionHeader(
+    data: HomeItem,
+    navController: NavController,
+    onPlayAll: () -> Unit,
+) {
+    val channelId = data.channelId
+    val moreEndpoint = data.moreEndpoint
+    Row(
+        modifier =
+            if (channelId != null) {
+                Modifier
+                    .focusable(true)
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable {
+                        navController.navigate(
+                            ArtistDestination(
+                                channelId = channelId,
+                            ),
+                        )
+                    }
+            } else if (moreEndpoint != null) {
+                // The section title carries the same endpoint as its "More" button, as on the web.
+                Modifier
+                    .focusable(true)
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable { navController.navigateToMoreEndpoint(moreEndpoint, data.title) }
+            } else {
+                Modifier
+            },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        AnimatedVisibility(
+            visible = (data.thumbnail?.lastOrNull() != null),
+            modifier = Modifier.align(Alignment.CenterVertically),
+        ) {
+            AsyncImage(
+                model =
+                    ImageRequest
+                        .Builder(LocalPlatformContext.current)
+                        .data(data.thumbnail?.lastOrNull()?.url)
+                        .diskCachePolicy(CachePolicy.ENABLED)
+                        .diskCacheKey(data.thumbnail?.lastOrNull()?.url)
+                        .crossfade(550)
+                        .build(),
+                contentDescription = "",
+                placeholder = rememberHolderPainter(),
+                error = rememberHolderPainter(),
+                modifier =
+                    Modifier
+                        .size(36.dp)
+                        .clip(
+                            CircleShape,
+                        ),
+            )
+        }
+        Column(
+            Modifier
+                .weight(1f)
+                .padding(start = 10.dp),
+        ) {
+            AnimatedVisibility(visible = (data.subtitle != null && data.subtitle != "")) {
+                Text(
+                    text = data.subtitle ?: "",
+                    style = typo().bodySmall,
+                )
+            }
+            Text(
+                text = data.title,
+                style = typo().headlineMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        if (moreEndpoint != null) {
+            TextButton(
+                onClick = { navController.navigateToMoreEndpoint(moreEndpoint, data.title) },
+                colors =
+                    ButtonDefaults
+                        .textButtonColors()
+                        .copy(contentColor = MaterialTheme.colorScheme.onSurface),
+            ) {
+                Text(stringResource(Res.string.more), style = typo().bodySmall)
+            }
+        } else if (data.playAllEndpoint != null) {
+            TextButton(
+                onClick = onPlayAll,
+                colors =
+                    ButtonDefaults
+                        .textButtonColors()
+                        .copy(contentColor = MaterialTheme.colorScheme.onSurface),
+            ) {
+                Text(stringResource(Res.string.play_all), style = typo().bodySmall)
+            }
+        }
+    }
+}
+
+/**
  * One shelf item, drawn as the card its ids call for, with Home's click handling: a song or video
  * starts its radio, anything else opens its page. Shared by Home's rows and the "More" page, so an
  * item behaves the same in both.
@@ -400,7 +520,7 @@ fun HomeContentCard(
                         playlistId = playlistId,
                     ),
                 )
-            }, data = temp, fillMaxWidth = fillMaxWidth)
+            }, data = temp, fillMaxWidth = fillMaxWidth, onPlay = temp.hoverPlay(viewModel))
         }
     } else if ((browseId != null && temp.videoId == null) || (browseId != null && temp.videoId == "")) {
         if (browseId.startsWith("UC")) {
@@ -418,7 +538,7 @@ fun HomeContentCard(
                         podcastId = browseId,
                     ),
                 )
-            }, data = temp, fillMaxWidth = fillMaxWidth)
+            }, data = temp, fillMaxWidth = fillMaxWidth, onPlay = temp.hoverPlay(viewModel))
         } else {
             HomeItemContentPlaylist(onClick = {
                 navController.navigate(
@@ -426,7 +546,7 @@ fun HomeContentCard(
                         browseId = browseId,
                     ),
                 )
-            }, data = temp, fillMaxWidth = fillMaxWidth)
+            }, data = temp, fillMaxWidth = fillMaxWidth, onPlay = temp.hoverPlay(viewModel))
         }
     } else if (temp.thumbnails.firstOrNull()?.width != temp.thumbnails.firstOrNull()?.height) {
         HomeItemVideo(
@@ -434,6 +554,7 @@ fun HomeContentCard(
             onLongClick = { onLongClick(temp) },
             data = temp,
             fillMaxWidth = fillMaxWidth,
+            onPlay = temp.hoverPlay(viewModel),
         )
     } else {
         HomeItemSong(
@@ -441,6 +562,79 @@ fun HomeContentCard(
             onLongClick = { onLongClick(temp) },
             data = temp,
             fillMaxWidth = fillMaxWidth,
+            onPlay = temp.hoverPlay(viewModel),
+        )
+    }
+}
+
+/**
+ * The card's hover play button. A song or video plays exactly as a tap on the card does, so every
+ * one of them gets it. A playlist or album plays what YouTube's own play button points at, straight
+ * from Home; a playlist card that came without one still plays by its id. Artists and podcasts,
+ * which have nothing to play, get no button.
+ */
+private fun Content.hoverPlay(viewModel: BaseViewModel): (() -> Unit)? {
+    if (!videoId.isNullOrEmpty()) return { playRadio(viewModel) }
+    val endpoint =
+        playEndpoint
+            ?: playlistId?.takeUnless { it.startsWith("UC") }?.let { YouTubeWatchEndpoint(playlistId = it.removePrefix("VL")) }
+            ?: return null
+    return { viewModel.playFromEndpoint(endpoint, title) }
+}
+
+/**
+ * Spotify-style hover for a Home card: while the pointer is over it, or keyboard focus is on it,
+ * the card sits on a faint onSurface tint and [HoverPlayButton] rises onto the artwork. Touch
+ * screens never hover, so phones keep the plain card. Returns the card's modifier (it has to come
+ * before the card's own focusable to see its focus) and whether the card is active.
+ */
+@Composable
+internal fun rememberCardHover(enabled: Boolean): Pair<Modifier, Boolean> {
+    val source = remember { MutableInteractionSource() }
+    val hovered by source.collectIsHoveredAsState()
+    var focused by remember { mutableStateOf(false) }
+    val active = enabled && (hovered || focused)
+    val tint by animateColorAsState(
+        targetValue = if (active) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f) else Color.Transparent,
+        label = "cardHoverTint",
+    )
+    val modifier =
+        Modifier
+            .onFocusChanged { focused = it.isFocused }
+            .hoverable(source)
+            .drawBehind { drawRoundRect(color = tint, cornerRadius = CornerRadius(8.dp.toPx())) }
+    return modifier to active
+}
+
+/** The theme-coloured play button of a hovered Home card, rising onto the artwork's corner. */
+@Composable
+internal fun BoxScope.HoverPlayButton(
+    visible: Boolean,
+    onClick: () -> Unit,
+) {
+    val progress by animateFloatAsState(
+        targetValue = if (visible) 1f else 0f,
+        animationSpec = tween(200),
+        label = "hoverPlay",
+    )
+    Box(
+        Modifier
+            .align(Alignment.BottomEnd)
+            .padding(8.dp)
+            .graphicsLayer {
+                alpha = progress
+                translationY = (1f - progress) * 8.dp.toPx()
+            }.size(44.dp)
+            .shadow(6.dp, CircleShape)
+            .background(MaterialTheme.colorScheme.primary, CircleShape)
+            .clickable(enabled = visible, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = SimpIcons.PlayArrow,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onPrimary,
+            modifier = Modifier.size(24.dp),
         )
     }
 }
@@ -455,7 +649,7 @@ fun Content.homeCardAspectRatio(): Float {
     return if (!opensPage && wide) 16f / 9f else 1f
 }
 
-private fun Content.playRadio(viewModel: BaseViewModel) {
+internal fun Content.playRadio(viewModel: BaseViewModel) {
     val firstQueue: Track = toTrack()
     viewModel.setQueueData(
         QueueData.Data(
@@ -519,6 +713,8 @@ fun HomeItemContentPlaylist(
     // true=封面铺满所在网格槽宽(Adaptive/More 页网格,槽宽>thumbSize 时保持左右边距对称);
     // false=固定 thumbSize 方卡(主页 LazyRow 等固定尺寸场景)。
     fillMaxWidth: Boolean = false,
+    // Home's hover play button; null leaves the card exactly as it was.
+    onPlay: (() -> Unit)? = null,
 ) {
     val titleColor = if (forceDark) Color.White else MaterialTheme.colorScheme.onSurface
     val thumbModifier =
@@ -528,8 +724,10 @@ fun HomeItemContentPlaylist(
             Modifier.size(thumbSize)
         }
     val textWidth = if (fillMaxWidth) Modifier.fillMaxWidth() else Modifier.width(thumbSize)
+    val (hoverModifier, hovered) = rememberCardHover(enabled = onPlay != null)
     Box(
         Modifier
+            .then(hoverModifier)
             .wrapContentSize()
             .focusable(true)
             .clip(RoundedCornerShape(8.dp))
@@ -689,6 +887,7 @@ fun HomeItemContentPlaylist(
                         )
                     }
                 }
+                if (onPlay != null) HoverPlayButton(visible = hovered, onClick = onPlay)
             }
             Text(
                 text =
@@ -932,11 +1131,15 @@ fun HomeItemSong(
     data: Content,
     // Fill a grid cell instead of the fixed 160dp, as Metrolist's browse grid does.
     fillMaxWidth: Boolean = false,
+    // Home's hover play button; null leaves the card exactly as it was.
+    onPlay: (() -> Unit)? = null,
 ) {
     val textWidth = if (fillMaxWidth) Modifier.fillMaxWidth() else Modifier.width(160.dp)
+    val (hoverModifier, hovered) = rememberCardHover(enabled = onPlay != null)
     Box(
         modifier =
             Modifier
+                .then(hoverModifier)
                 .fillMaxSize()
                 .focusable(true)
                 .clip(RoundedCornerShape(8.dp))
@@ -960,28 +1163,29 @@ fun HomeItemSong(
                         it
                     }
                 }
-            Logger.w("AsyncImage", "HomeItemSong: $thumb")
-            AsyncImage(
-                model =
-                    ImageRequest
-                        .Builder(LocalPlatformContext.current)
-                        .data(thumb)
-                        .diskCachePolicy(CachePolicy.ENABLED)
-                        .diskCacheKey(thumb)
-                        .crossfade(550)
-                        .build(),
-                placeholder = rememberHolderPainter(),
-                error = rememberHolderPainter(),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier =
-                    Modifier
-                        .align(Alignment.CenterHorizontally)
-                        .then(if (fillMaxWidth) Modifier.fillMaxWidth().aspectRatio(1f) else Modifier.size(160.dp))
-                        .clip(
-                            RoundedCornerShape(10.dp),
-                        ),
-            )
+            Box(Modifier.align(Alignment.CenterHorizontally)) {
+                AsyncImage(
+                    model =
+                        ImageRequest
+                            .Builder(LocalPlatformContext.current)
+                            .data(thumb)
+                            .diskCachePolicy(CachePolicy.ENABLED)
+                            .diskCacheKey(thumb)
+                            .crossfade(550)
+                            .build(),
+                    placeholder = rememberHolderPainter(),
+                    error = rememberHolderPainter(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier =
+                        Modifier
+                            .then(if (fillMaxWidth) Modifier.fillMaxWidth().aspectRatio(1f) else Modifier.size(160.dp))
+                            .clip(
+                                RoundedCornerShape(10.dp),
+                            ),
+                )
+                if (onPlay != null) HoverPlayButton(visible = hovered, onClick = onPlay)
+            }
             Text(
                 text = data.title,
                 style = typo().titleSmall,
@@ -1040,11 +1244,15 @@ fun HomeItemVideo(
     forceDark: Boolean = LocalForceDarkText.current,
     // Fill a grid cell instead of the fixed 284.5dp, as Metrolist's browse grid does.
     fillMaxWidth: Boolean = false,
+    // Home's hover play button; null leaves the card exactly as it was.
+    onPlay: (() -> Unit)? = null,
 ) {
     val titleColor = if (forceDark) Color.White else MaterialTheme.colorScheme.onSurface
     val textWidth = if (fillMaxWidth) Modifier.fillMaxWidth() else Modifier.width(284.5.dp)
+    val (hoverModifier, hovered) = rememberCardHover(enabled = onPlay != null)
     Box(
         Modifier
+            .then(hoverModifier)
             .fillMaxSize()
             .focusable(true)
             .clip(RoundedCornerShape(8.dp))
@@ -1060,29 +1268,30 @@ fun HomeItemVideo(
                     .then(if (fillMaxWidth) Modifier else Modifier.heightIn(min = 236.dp)),
         ) {
             val thumb = data.thumbnails.lastOrNull()?.url
-            Logger.w("AsyncImage", "HomeItemSong: $thumb")
-            AsyncImage(
-                model =
-                    ImageRequest
-                        .Builder(LocalPlatformContext.current)
-                        .data(thumb)
-                        .diskCachePolicy(CachePolicy.ENABLED)
-                        .diskCacheKey(thumb)
-                        .crossfade(550)
-                        .build(),
-                placeholder = rememberHolderPainter(isVideo = true),
-                error = rememberHolderPainter(isVideo = true),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier =
-                    Modifier
-                        .align(Alignment.CenterHorizontally)
-                        .then(if (fillMaxWidth) Modifier.fillMaxWidth() else Modifier.height(160.dp))
-                        .aspectRatio(16f / 9f)
-                        .clip(
-                            RoundedCornerShape(10.dp),
-                        ),
-            )
+            Box(Modifier.align(Alignment.CenterHorizontally)) {
+                AsyncImage(
+                    model =
+                        ImageRequest
+                            .Builder(LocalPlatformContext.current)
+                            .data(thumb)
+                            .diskCachePolicy(CachePolicy.ENABLED)
+                            .diskCacheKey(thumb)
+                            .crossfade(550)
+                            .build(),
+                    placeholder = rememberHolderPainter(isVideo = true),
+                    error = rememberHolderPainter(isVideo = true),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier =
+                        Modifier
+                            .then(if (fillMaxWidth) Modifier.fillMaxWidth() else Modifier.height(160.dp))
+                            .aspectRatio(16f / 9f)
+                            .clip(
+                                RoundedCornerShape(10.dp),
+                            ),
+                )
+                if (onPlay != null) HoverPlayButton(visible = hovered, onClick = onPlay)
+            }
             Text(
                 text = data.title,
                 style = typo().titleSmall,
@@ -1178,7 +1387,6 @@ fun HomeItemArtist(
                     .then(if (fillMaxWidth) Modifier else Modifier.heightIn(min = 236.dp)),
         ) {
             val thumb = data.thumbnails.lastOrNull()?.url
-            Logger.w("AsyncImage", "HomeItemSong: $thumb")
             AsyncImage(
                 model =
                     ImageRequest
@@ -1298,7 +1506,6 @@ fun ItemVideoChart(
                     .padding(10.dp),
         ) {
             val thumb = data.thumbnails.lastOrNull()?.url
-            Logger.w("AsyncImage", "HomeItemSong: $thumb")
             AsyncImage(
                 model =
                     ImageRequest
@@ -1415,7 +1622,6 @@ fun ItemArtistChart(
                 )
             }
             val thumb = data.thumbnails.lastOrNull()?.url
-            Logger.w("AsyncImage", "HomeItemSong: $thumb")
             AsyncImage(
                 model =
                     ImageRequest
@@ -1528,7 +1734,6 @@ fun ItemTrackChart(
                 }
             }
             val thumb = data.thumbnails?.lastOrNull()?.url
-            Logger.w("AsyncImage", "HomeItemSong: $thumb")
             AsyncImage(
                 model =
                     ImageRequest

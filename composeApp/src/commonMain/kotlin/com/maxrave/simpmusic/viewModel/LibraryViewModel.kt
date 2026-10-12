@@ -12,6 +12,7 @@ import com.maxrave.domain.data.entities.SongEntity
 import com.maxrave.domain.source.MusicSource
 import com.maxrave.domain.data.model.searchResult.albums.AlbumsResult
 import com.maxrave.domain.data.model.searchResult.artists.ArtistsResult
+import com.maxrave.domain.data.model.library.LibraryOverview
 import com.maxrave.domain.data.model.searchResult.playlists.PlaylistsResult
 import com.maxrave.domain.data.model.searchResult.songs.Thumbnail
 import com.maxrave.domain.data.type.ChartItem
@@ -97,6 +98,9 @@ class LibraryViewModel(
 
     private val _currentScreen: MutableStateFlow<LibraryChipType> = MutableStateFlow(LibraryChipType.YOUR_LIBRARY)
     val currentScreen: StateFlow<LibraryChipType> get() = _currentScreen.asStateFlow()
+
+    // A chip was picked (a tap, or a deep link) before the one saved last time finished loading.
+    private var screenChosen = false
     private val _recentlyAdded: MutableStateFlow<LocalResource<List<RecentlyType>>> =
         MutableStateFlow(LocalResource.Loading())
     val recentlyAdded: StateFlow<LocalResource<List<RecentlyType>>> get() = _recentlyAdded.asStateFlow()
@@ -178,6 +182,10 @@ class LibraryViewModel(
     /** 顶栏头像=当前音源登录账号的头像:网易源=云村账号,其它(含 YT)=Google 账号;未登录空串=隐藏 */
     private val _sourceAccountThumbnail = MutableStateFlow("")
     val sourceAccountThumbnail: StateFlow<String> get() = _sourceAccountThumbnail.asStateFlow()
+
+    /** Counts and newest artwork for the four Your library cards; null until the first read lands. */
+    private val _libraryOverview: MutableStateFlow<LibraryOverview?> = MutableStateFlow(null)
+    val libraryOverview: StateFlow<LibraryOverview?> get() = _libraryOverview.asStateFlow()
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val youtubeLoggedIn = dataStoreManager.loggedIn.mapLatest { it == DataStoreManager.TRUE }
@@ -327,6 +335,9 @@ class LibraryViewModel(
             accountHealJob.join()
             neteaseLogoutJob.join()
         }
+        viewModelScope.launch {
+            commonRepository.getLibraryOverview().collect { _libraryOverview.value = it }
+        }
     }
 
     /**
@@ -369,6 +380,7 @@ class LibraryViewModel(
 
     fun setCurrentScreen(chipType: LibraryChipType) {
         com.maxrave.logger.Logger.w("LIBPROBE", "setCurrentScreen -> $chipType")
+        screenChosen = true
         _currentScreen.value = chipType
         viewModelScope.launch {
             dataStoreManager.putString("library_current_screen", chipType.toStringValue())

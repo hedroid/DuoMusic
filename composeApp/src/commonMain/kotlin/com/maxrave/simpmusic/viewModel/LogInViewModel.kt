@@ -2,6 +2,7 @@ package com.maxrave.simpmusic.viewModel
 
 import androidx.lifecycle.viewModelScope
 import com.maxrave.domain.manager.DataStoreManager
+import com.maxrave.logger.Logger
 import com.maxrave.simpmusic.viewModel.base.BaseViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -42,6 +43,7 @@ class LogInViewModel(
                     // Only call it a login when sp_dc was actually present; an empty
                     // capture would otherwise claim success and navigate away.
                     val spdc = it.toMap()["sp_dc"] ?: ""
+                    if (spdc.isEmpty()) Logger.w("Auth", "Spotify: sign-in finished without an sp_dc cookie")
                     dataStoreManager.setSpdc(spdc)
                     _spotifyStatus.value = spdc.isNotEmpty()
                 }

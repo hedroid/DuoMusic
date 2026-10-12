@@ -18,11 +18,13 @@ actual fun MediaPlayerView(
     url: String,
     modifier: Modifier,
     cropToBounds: Boolean,
+    onFirstFrame: () -> Unit,
 ) {
     MediaPlayerViewWithUrl(
         url = url,
         modifier = modifier,
         cropToBounds = cropToBounds,
+        onFirstFrame = onFirstFrame,
     )
 }
 

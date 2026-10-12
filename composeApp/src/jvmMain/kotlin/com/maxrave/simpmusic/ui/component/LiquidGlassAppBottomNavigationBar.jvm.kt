@@ -17,6 +17,7 @@ actual fun LiquidGlassAppBottomNavigationBar(
     showAnalyticsTab: Boolean,
     showMixForYouTab: Boolean,
     onOpenNowPlaying: () -> Unit,
+    liquidGlass: Boolean,
     reloadDestinationIfNeeded: (KClass<*>) -> Unit,
     selectedSource: MusicSource,
     neteaseLoggedIn: Boolean,

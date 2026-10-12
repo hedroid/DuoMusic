@@ -24,11 +24,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import com.maxrave.domain.source.MusicSource
-import com.maxrave.simpmusic.expect.HapticFeedback
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -36,14 +38,16 @@ import androidx.navigation.NavController
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.compose.currentBackStackEntryAsState
+import com.maxrave.domain.source.MusicSource
+import com.maxrave.simpmusic.expect.HapticFeedback
 import com.maxrave.simpmusic.extension.greyScale
-import com.maxrave.simpmusic.ui.icon.SimpIcons
 import com.maxrave.simpmusic.ui.navigation.destination.home.AnalyticsDestination
 import com.maxrave.simpmusic.ui.navigation.destination.home.HomeDestination
 import com.maxrave.simpmusic.ui.navigation.destination.library.LibraryDestination
 import com.maxrave.simpmusic.ui.navigation.destination.library.MixForYouDestination
 import com.maxrave.simpmusic.ui.navigation.destination.search.SearchDestination
 import com.maxrave.simpmusic.ui.theme.typo
+import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import simpmusic.composeapp.generated.resources.*
 import kotlin.math.roundToInt
@@ -67,12 +71,10 @@ fun AppBottomNavigationBar(
     neteaseLoggedIn: Boolean = false,
     onSourceSelected: (MusicSource) -> Unit = { _ -> },
 ) {
-    // ------------------------------------------------ 音源切换:长按搜索钮弹出标准上下文菜单(feat/netease-source)
-    var showSourceMenu by remember { mutableStateOf(false) }
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
-    // `ordinal` identifies a tab, it is NOT the position — Library sits before Analytics and Mix
-    // for you here (用户 2026-09-30 定序) while keeping the ordinal each was declared with, so
-    // that the numbering stays stable whether or not those tabs are present.
+    // `ordinal` identifies a tab, it is NOT the position — Mix for you and Analytics sit before
+    // Library here while keeping the ordinal they were declared with, so that the numbering stays
+    // stable whether or not those tabs are present.
     val bottomNavScreens =
         listOfNotNull(
             BottomNavScreen.Home,
@@ -103,18 +105,8 @@ fun AppBottomNavigationBar(
             selectedIndex = BottomNavScreen.Home.ordinal
         }
     }
-    // Programmatic navigation (launcher shortcuts, deep links) swaps the destination without
-    // going through selectTab, so the highlight must follow the back stack. Only top-level
-    // tab routes match — deeper screens leave the highlight where the last tab tap put it.
-    LaunchedEffect(currentBackStackEntry) {
-        val hierarchy = currentBackStackEntry?.destination?.hierarchy ?: return@LaunchedEffect
-        bottomNavScreens
-            .firstOrNull { screen -> hierarchy.any { it.hasRoute(screen.destination::class) } }
-            ?.let { selectedIndex = it.ordinal }
-    }
     val selectTab: (BottomNavScreen) -> Unit = { screen ->
-        // 底栏 tab 的点击震感:根触感观察器的事件链到不了 bottomBar slot(实测既有边界),
-        // 直接在选中回调里震(用户点击专用路径,程序化导航不走这里,不会误震)
+        // 底栏 tab 的点击震感:根触感观察器的事件链到不了 bottomBar slot(实测既有边界)
         HapticFeedback.tap()
         if (selectedIndex == screen.ordinal) {
             if (currentBackStackEntry?.destination?.hierarchy?.any {
@@ -140,10 +132,6 @@ fun AppBottomNavigationBar(
     // Search rides in its own circular button, so the capsule holds everything else.
     val barTabs = bottomNavScreens.filter { it != BottomNavScreen.Search }
 
-    val capsuleColor = MaterialTheme.colorScheme.surfaceContainer
-    val indicatorColor = MaterialTheme.colorScheme.surfaceContainerHighest
-
-    Box {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         // One centred cluster — capsule, gap, FAB — exactly like the glass bar: fill = false keeps
@@ -158,41 +146,95 @@ fun AppBottomNavigationBar(
                 .padding(top = 4.dp, bottom = 8.dp),
     ) {
         BoxWithConstraints(Modifier.weight(1f, fill = false)) {
-            // Every tab the same width, capped so two tabs on a wide screen do not stretch into
-            // slabs — the same budget rule as the glass tab bar.
-            val tabWidth = ((maxWidth - CapsuleInset * 2) / barTabs.size).coerceAtMost(FlatTabWidth)
-            val selectedPosition = barTabs.indexOfFirst { it.ordinal == selectedIndex }
-            // Where a finger is holding the indicator, in tabs (0f = first); null when nobody is.
-            var dragPosition by remember { mutableStateOf<Float?>(null) }
-            val indicatorOffset by animateDpAsState(
-                tabWidth * (dragPosition ?: selectedPosition.coerceAtLeast(0).toFloat()),
-                // Under the finger while dragging; on release it springs to the tab it was let go on.
-                animationSpec = if (dragPosition != null) snap() else spring(visibilityThreshold = Dp.VisibilityThreshold),
-                label = "flatBarIndicator",
+            FlatTabBar(
+                tabs = barTabs,
+                selectedIndex = selectedIndex,
+                availableWidth = maxWidth,
+                onTabSelected = selectTab,
             )
-            // The tab under the indicator lights up as it is dragged across.
-            val activePosition = dragPosition?.roundToInt() ?: selectedPosition
-            val isLtr = LocalLayoutDirection.current == LayoutDirection.Ltr
+        }
+        Spacer(Modifier.size(12.dp))
+        // 音源切换:长按搜索钮弹出标准上下文菜单(feat/netease-source)
+        var showSourceMenu by remember { mutableStateOf(false) }
+        FlatSearchButton(
+            selected = selectedIndex == BottomNavScreen.Search.ordinal,
+            onClick = { selectTab(BottomNavScreen.Search) },
+            onLongPress = { showSourceMenu = true },
+            switchSourceLabel = stringResource(Res.string.switch_music_source),
+            content = {
+                SourceSwitchMenu(
+                    expanded = showSourceMenu,
+                    onDismiss = { showSourceMenu = false },
+                    selectedSource = selectedSource,
+                    neteaseLoggedIn = neteaseLoggedIn,
+                    onSourceSelected = onSourceSelected,
+                )
+            },
+        )
+    }
+}
+
+/**
+ * The flat capsule of tabs. Like the glass tab bar it can be handed any width from the folded
+ * [CollapsedBarSize] circle up to its full width: the surface follows that width, the tabs keep
+ * their full-width layout and are uncovered from the start edge, and folded it shows
+ * [collapsedContent] instead.
+ */
+@Composable
+internal fun FlatTabBar(
+    tabs: List<BottomNavScreen>,
+    selectedIndex: Int,
+    availableWidth: Dp,
+    onTabSelected: (BottomNavScreen) -> Unit,
+    modifier: Modifier = Modifier,
+    collapsedContent: (@Composable () -> Unit)? = null,
+) {
+    val capsuleColor = MaterialTheme.colorScheme.surfaceContainer
+    val indicatorColor = MaterialTheme.colorScheme.surfaceContainerHighest
+    val tabWidth = flatTabWidth(tabs.size, availableWidth)
+    val fullWidth = tabWidth * tabs.size + CapsuleInset * 2
+    val selectedPosition = tabs.indexOfFirst { it.ordinal == selectedIndex }
+    // Where a finger is holding the indicator, in tabs (0f = first); null when nobody is.
+    var dragPosition by remember { mutableStateOf<Float?>(null) }
+    val indicatorOffset by animateDpAsState(
+        tabWidth * (dragPosition ?: selectedPosition.coerceAtLeast(0).toFloat()),
+        // Under the finger while dragging; on release it springs to the tab it was let go on.
+        animationSpec = if (dragPosition != null) snap() else spring(visibilityThreshold = Dp.VisibilityThreshold),
+        label = "flatBarIndicator",
+    )
+    // The tab under the indicator lights up as it is dragged across.
+    val activePosition = dragPosition?.roundToInt() ?: selectedPosition
+    val isLtr = LocalLayoutDirection.current == LayoutDirection.Ltr
+    Box(
+        modifier =
+            modifier
+                .height(FlatBarHeight)
+                .width(fullWidth)
+                // Also what cuts the full-width tabs down to the surface while the bar is folding.
+                .clip(RoundedCornerShape(FlatBarHeight / 2))
+                .background(capsuleColor),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Box(Modifier.matchParentSize().unfoldingTabs(fullWidth, clipShape = null)) {
             Box(
                 modifier =
                     Modifier
-                        .height(FlatBarHeight)
-                        .clip(RoundedCornerShape(FlatBarHeight / 2))
-                        .background(capsuleColor)
+                        .wrapContentSize(Alignment.CenterStart, unbounded = true)
+                        .size(fullWidth, FlatBarHeight)
                         .padding(horizontal = CapsuleInset)
                         // Press and drag along the tabs to slide the indicator; letting go selects the
                         // tab it rests on. Once the drag starts it cancels the tab's own click.
-                        .pointerInput(barTabs, tabWidth, isLtr) {
+                        .pointerInput(tabs, tabWidth, isLtr) {
                             fun positionAt(x: Float): Float {
                                 val fromStart = if (isLtr) x else size.width - x
-                                return (fromStart / tabWidth.toPx() - 0.5f).coerceIn(0f, barTabs.lastIndex.toFloat())
+                                return (fromStart / tabWidth.toPx() - 0.5f).coerceIn(0f, tabs.lastIndex.toFloat())
                             }
                             detectHorizontalDragGestures(
                                 onDragStart = { dragPosition = positionAt(it.x) },
                                 onDragEnd = {
-                                    val target = dragPosition?.roundToInt()?.let(barTabs::get)
+                                    val target = dragPosition?.roundToInt()?.let(tabs::get)
                                     dragPosition = null
-                                    if (target != null && target.ordinal != selectedIndex) selectTab(target)
+                                    if (target != null && target.ordinal != selectedIndex) onTabSelected(target)
                                 },
                                 onDragCancel = { dragPosition = null },
                             ) { change, _ ->
@@ -215,7 +257,7 @@ fun AppBottomNavigationBar(
                     )
                 }
                 Row {
-                    barTabs.forEachIndexed { position, screen ->
+                    tabs.forEachIndexed { position, screen ->
                         val selected = position == activePosition
                         val contentColor =
                             if (selected) {
@@ -229,7 +271,7 @@ fun AppBottomNavigationBar(
                                     .width(tabWidth)
                                     .fillMaxHeight()
                                     .clip(RoundedCornerShape(FlatIndicatorHeight / 2))
-                                    .clickable { selectTab(screen) },
+                                    .clickable { onTabSelected(screen) },
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center,
                         ) {
@@ -247,50 +289,68 @@ fun AppBottomNavigationBar(
                 }
             }
         }
-        Spacer(Modifier.size(12.dp))
-        val searchSelected = selectedIndex == BottomNavScreen.Search.ordinal
-        Box(
-            modifier =
-                Modifier
-                    .size(FlatIndicatorHeight)
-                    .clip(CircleShape)
-                    .background(if (searchSelected) indicatorColor else capsuleColor)
-                    .searchButtonSemantics(
-                        description = stringResource(Res.string.search),
-                        switchSourceLabel = stringResource(Res.string.switch_music_source),
-                        onTap = { selectTab(BottomNavScreen.Search) },
-                        onLongPress = { showSourceMenu = true },
-                    ).sourceSwitchGesture(
-                        onLongPress = { showSourceMenu = true },
-                        onTap = { selectTab(BottomNavScreen.Search) },
-                    ),
-            contentAlignment = Alignment.Center,
-        ) {
-            CompositionLocalProvider(
-                LocalContentColor provides
-                    if (searchSelected) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-            ) {
-                BottomNavScreen.Search.icon()
+        if (collapsedContent != null) {
+            Box(Modifier.matchParentSize().foldedCircle(fullWidth), contentAlignment = Alignment.Center) {
+                collapsedContent()
             }
-
-            // 音源菜单:锚定在搜索按钮上,标准 Material DropdownMenu —— 材质/配色随主题,
-            // 按钮在屏幕底部,菜单自动翻到按钮上方弹出。
-            SourceSwitchMenu(
-                expanded = showSourceMenu,
-                onDismiss = { showSourceMenu = false },
-                selectedSource = selectedSource,
-                neteaseLoggedIn = neteaseLoggedIn,
-                onSourceSelected = onSourceSelected,
-            )
         }
-    }
     }
 }
 
+/**
+ * The flat round Search button beside [FlatTabBar], lit while Search is the selected tab.
+ * fork: 可选 onLongPress=音源切换菜单(底栏长按交互);content=菜单锚点槽(同 Box 内锚定)。
+ */
+@Composable
+internal fun FlatSearchButton(
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    onLongPress: (() -> Unit)? = null,
+    switchSourceLabel: String? = null,
+    content: (@Composable () -> Unit)? = null,
+) {
+    Box(
+        modifier =
+            modifier
+                .size(FlatIndicatorHeight)
+                .clip(CircleShape)
+                .background(
+                    if (selected) {
+                        MaterialTheme.colorScheme.surfaceContainerHighest
+                    } else {
+                        MaterialTheme.colorScheme.surfaceContainer
+                    },
+                ).then(
+                    if (onLongPress != null) {
+                        Modifier.searchButtonSemantics(
+                            description = stringResource(Res.string.search),
+                            switchSourceLabel = switchSourceLabel ?: "",
+                            onTap = onClick,
+                            onLongPress = onLongPress,
+                        ).sourceSwitchGesture(
+                            onLongPress = onLongPress,
+                            onTap = onClick,
+                        )
+                    } else {
+                        Modifier.clickable(onClick = onClick)
+                    },
+                ),
+        contentAlignment = Alignment.Center,
+    ) {
+        CompositionLocalProvider(
+            LocalContentColor provides
+                if (selected) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+        ) {
+            BottomNavScreen.Search.icon()
+        }
+        content?.invoke()
+    }
+}
 
 // Mirrors the glass tab bar's geometry (TabWidth/BarHeight/BlobHeight/BarInset in
 // LiquidGlassTabBar.android.kt) so the two bars are one form in two materials.
@@ -298,6 +358,76 @@ private val FlatTabWidth = 96.dp
 private val FlatBarHeight = 64.dp
 private val FlatIndicatorHeight = 56.dp
 private val CapsuleInset = 6.dp
+
+// Every tab the same width, capped so two tabs on a wide screen do not stretch into slabs — the
+// same budget rule as the glass tab bar.
+private fun flatTabWidth(
+    tabsCount: Int,
+    availableWidth: Dp,
+): Dp = ((availableWidth - CapsuleInset * 2) / tabsCount).coerceAtMost(FlatTabWidth)
+
+/** Full width of [FlatTabBar] for [tabsCount] tabs given [availableWidth]. */
+internal fun flatTabBarWidth(
+    tabsCount: Int,
+    availableWidth: Dp,
+): Dp = flatTabWidth(tabsCount, availableWidth) * tabsCount + CapsuleInset * 2
+
+// The phone bar folds into one circle at its start edge (LiquidGlassAppBottomNavigationBar). Both
+// tab bars accept any width between this and their full width and fold by it.
+internal val CollapsedBarSize = 48.dp
+
+// 0 at the folded circle, 1 at [fullWidth], read off the width the bar was actually handed.
+private fun Density.foldProgress(
+    width: Int,
+    fullWidth: Dp,
+): Float {
+    val folded = CollapsedBarSize.roundToPx()
+    return ((width - folded).toFloat() / (fullWidth.roundToPx() - folded).coerceAtLeast(1)).coerceIn(0f, 1f)
+}
+
+/**
+ * For a tab bar's tabs, laid out at the bar's [fullWidth] while the bar itself may be narrower.
+ * They fade in once the folded circle's icon has gone, stay unplaced (so untappable) before that,
+ * and while the bar folds they are clipped to [clipShape] — null when the surface clips already.
+ */
+internal fun Modifier.unfoldingTabs(
+    fullWidth: Dp,
+    clipShape: Shape?,
+): Modifier =
+    layout { measurable, constraints ->
+        val progress = foldProgress(constraints.maxWidth, fullWidth)
+        val placeable = measurable.measure(constraints)
+        layout(placeable.width, placeable.height) {
+            val tabsAlpha = ((progress - 0.3f) / 0.7f).coerceIn(0f, 1f)
+            if (tabsAlpha > 0f) {
+                placeable.placeRelativeWithLayer(0, 0) {
+                    alpha = tabsAlpha
+                    if (clipShape != null) {
+                        // Only mid-fold, so whatever bulges out of the bar at rest still can.
+                        clip = progress < 1f
+                        shape = clipShape
+                    }
+                }
+            }
+        }
+    }
+
+/** For the folded circle's content: a [CollapsedBarSize] square at the bar's start, faded out as it unfolds. */
+internal fun Modifier.foldedCircle(fullWidth: Dp): Modifier =
+    layout { measurable, constraints ->
+        val progress = foldProgress(constraints.maxWidth, fullWidth)
+        val size = CollapsedBarSize.roundToPx()
+        val placeable = measurable.measure(Constraints.fixed(size, size))
+        layout(constraints.maxWidth, constraints.maxHeight) {
+            val circleAlpha = (1f - progress / 0.4f).coerceIn(0f, 1f)
+            // Unplaced once gone, so the open bar has nothing over its first tab.
+            if (circleAlpha > 0f) {
+                placeable.placeRelativeWithLayer(0, (constraints.maxHeight - size) / 2) {
+                    alpha = circleAlpha
+                }
+            }
+        }
+    }
 
 @Composable
 fun AppNavigationRail(
@@ -351,8 +481,7 @@ fun AppNavigationRail(
     }
     // 与 AppBottomNavigationBar.selectTab 同一套选中/导航语义,reload 逻辑也一致。
     val selectTab: (BottomNavScreen) -> Unit = { screen ->
-        // 底栏 tab 的点击震感:根触感观察器的事件链到不了 bottomBar slot(实测既有边界),
-        // 直接在选中回调里震(用户点击专用路径,程序化导航不走这里,不会误震)
+        // 底栏 tab 的点击震感:根触感观察器的事件链到不了 bottomBar slot(实测既有边界)
         HapticFeedback.tap()
         if (selectedIndex == screen.ordinal) {
             if (currentBackStackEntry?.destination?.hierarchy?.any {

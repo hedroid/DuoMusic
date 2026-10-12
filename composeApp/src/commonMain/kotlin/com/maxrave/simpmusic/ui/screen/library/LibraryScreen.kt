@@ -10,11 +10,15 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -56,6 +60,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.coerceAtLeast
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
@@ -66,10 +72,14 @@ import coil3.request.crossfade
 import com.maxrave.common.LibraryChipType
 import com.maxrave.domain.source.MusicSource
 import com.maxrave.domain.data.entities.SongEntity
+import com.maxrave.domain.data.model.taste.TasteProfile
 import com.maxrave.domain.utils.LocalResource
 import com.maxrave.logger.Logger
+import com.maxrave.simpmusic.Platform
 import com.maxrave.simpmusic.extension.copy
 import com.maxrave.simpmusic.extension.isScrollingUp
+import com.maxrave.simpmusic.extension.ultraThinBarStyle
+import com.maxrave.simpmusic.getPlatform
 import com.maxrave.simpmusic.ui.component.AddToPlaylistModalBottomSheet
 import com.maxrave.simpmusic.ui.component.Chip
 import com.maxrave.simpmusic.ui.component.EndOfPage
@@ -78,6 +88,8 @@ import com.maxrave.simpmusic.ui.component.LibraryItem
 import com.maxrave.simpmusic.ui.component.LibraryItemState
 import com.maxrave.simpmusic.ui.component.LibraryItemType
 import com.maxrave.simpmusic.ui.component.LibraryTilingBox
+import com.maxrave.simpmusic.ui.component.taste.ShareTasteSheet
+import com.maxrave.simpmusic.ui.component.taste.TasteCard
 import com.maxrave.simpmusic.ui.component.ListenTogetherIconButton
 import com.maxrave.simpmusic.ui.component.RippleIconButton
 import com.maxrave.simpmusic.ui.component.selection.SelectedSongsBottomSheet
@@ -91,10 +103,12 @@ import com.maxrave.simpmusic.ui.navigation.destination.library.LibraryCollection
 import com.maxrave.simpmusic.ui.theme.typo
 import com.maxrave.simpmusic.viewModel.LibraryViewModel
 import com.maxrave.simpmusic.viewModel.NeteasePodcastViewModel
+import com.maxrave.simpmusic.ui.navigation.destination.home.SettingsDestination
 import com.maxrave.simpmusic.viewModel.SongSelectionViewModel
+import com.maxrave.simpmusic.viewModel.TasteUiState
+import com.maxrave.simpmusic.viewModel.TasteViewModel
 import dev.chrisbanes.haze.HazeInput
 import dev.chrisbanes.haze.blur.hazeBlur
-import dev.chrisbanes.haze.blur.materials.HazeMaterials
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 import kotlinx.coroutines.flow.combine
@@ -145,6 +159,7 @@ import simpmusic.composeapp.generated.resources.your_youtube_music
 fun LibraryScreen(
     innerPadding: PaddingValues,
     viewModel: LibraryViewModel = koinViewModel(),
+    sharedViewModel: SharedViewModel = koinInject(),
     navController: NavController,
     onScrolling: (onTop: Boolean) -> Unit = {},
 ) {
@@ -174,10 +189,17 @@ fun LibraryScreen(
     val ownNeteasePlaylistIds by viewModel.ownNeteasePlaylistIds.collectAsStateWithLifecycle()
     val neteaseLikedPlaylistId by viewModel.neteaseLikedPlaylistId.collectAsStateWithLifecycle()
 
-    val selectionState = rememberSongSelectionState()
-    val selectionViewModel: SongSelectionViewModel = koinViewModel()
     // 网易云播客 chip 页 VM(Koin single:数据随 single 存活,tab 往返零重拉)
     val neteasePodcastViewModel: NeteasePodcastViewModel = koinViewModel()
+
+    val libraryOverview by viewModel.libraryOverview.collectAsStateWithLifecycle()
+
+    val selectionState = rememberSongSelectionState()
+    val selectionViewModel: SongSelectionViewModel = koinViewModel()
+    val tasteViewModel: TasteViewModel = koinViewModel()
+    // Held here rather than inside the list item, so the sheet does not close if its card scrolls
+    // out of composition behind it.
+    var sharingTaste by remember { mutableStateOf<TasteProfile?>(null) }
     var showSelectionSheet by rememberSaveable { mutableStateOf(false) }
     var showSelectionAddToPlaylist by rememberSaveable { mutableStateOf(false) }
     val allSelectedDownloaded by selectionViewModel.allSelectedDownloaded.collectAsStateWithLifecycle()
@@ -598,6 +620,9 @@ fun LibraryScreen(
             else -> Unit
         }
     }
+    sharingTaste?.let { profile ->
+        ShareTasteSheet(profile = profile, onDismiss = { sharingTaste = null })
+    }
     val coroutineScope = rememberCoroutineScope()
     if (showAddSheet) {
         var newTitle by remember { mutableStateOf("") }
@@ -679,7 +704,7 @@ fun LibraryScreen(
     Column(
         Modifier
             .background(Color.Transparent)
-            .hazeBlur(HazeInput.Sources(hazeState), HazeMaterials.ultraThin().then { blurEnabled(true) }).onGloballyPositioned { coordinates ->
+            .hazeBlur(HazeInput.Sources(hazeState), ultraThinBarStyle()).onGloballyPositioned { coordinates ->
                 // 双轨:maxOf 锁定值给网格页 contentPadding(防振荡,见声明处说明);
                 // 实时值给下载管理页的固定头(它需要跟着顶栏走,且无振荡风险)。
                 val measured = with(density) { coordinates.size.height.toDp() }

@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -30,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.maxrave.logger.Logger
+import com.maxrave.simpmusic.extension.ultraThinBarStyle
 import com.maxrave.simpmusic.ui.component.CenterLoadingBox
 import com.maxrave.simpmusic.ui.component.EndOfPage
 import com.maxrave.simpmusic.ui.component.HomeItemContentPlaylist
@@ -44,7 +46,6 @@ import com.maxrave.simpmusic.viewModel.MoreAlbumsUIState
 import com.maxrave.simpmusic.viewModel.MoreAlbumsViewModel
 import dev.chrisbanes.haze.HazeInput
 import dev.chrisbanes.haze.blur.hazeBlur
-import dev.chrisbanes.haze.blur.materials.HazeMaterials
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 import org.koin.compose.viewmodel.koinViewModel
@@ -130,7 +131,7 @@ fun MoreAlbumsScreen(
                 TopAppBar(
                     modifier =
                         Modifier
-                            .hazeBlur(HazeInput.Sources(hazeState), HazeMaterials.ultraThin().then { blurEnabled(true) }),
+                            .hazeBlur(HazeInput.Sources(hazeState), ultraThinBarStyle()),
                     title = {
                         Text(
                             text = state.title,
@@ -154,6 +155,7 @@ fun MoreAlbumsScreen(
                                 Modifier
                                     .size(32.dp),
                                 true,
+                                tint = MaterialTheme.colorScheme.onSurface,
                             ) {
                                 navController.navigateUp()
                             }

@@ -118,7 +118,6 @@ import com.maxrave.common.Config.MAIN_PLAYER
 import com.maxrave.simpmusic.Platform
 import com.maxrave.simpmusic.expect.ui.MediaPlayerView
 import com.maxrave.simpmusic.expect.ui.MediaPlayerViewWithSubtitle
-import com.maxrave.simpmusic.expect.ui.PlatformCastButton
 import com.maxrave.simpmusic.expect.ui.toImageBitmap
 import com.maxrave.simpmusic.extension.elapsedLabel
 import com.maxrave.simpmusic.extension.formatDuration
@@ -134,20 +133,24 @@ import com.maxrave.simpmusic.ui.component.AIBadge
 import com.maxrave.simpmusic.ui.component.DescriptionView
 import com.maxrave.simpmusic.ui.component.ExplicitBadge
 import com.maxrave.simpmusic.ui.component.HeartCheckBox
+import com.maxrave.simpmusic.ui.component.LyricsOffsetBar
 import com.maxrave.simpmusic.ui.component.LyricsView
 import com.maxrave.simpmusic.ui.component.PlayPauseButton
 import com.maxrave.simpmusic.ui.component.PlayerControlLayout
+import com.maxrave.simpmusic.ui.component.hasTiming
 import com.maxrave.simpmusic.ui.component.lyrics.ShareLyricsSheet
 import com.maxrave.simpmusic.ui.component.lyrics.toShareLyricsLines
 import com.maxrave.simpmusic.ui.component.SourceBadge
 import com.maxrave.simpmusic.ui.component.artworkBadgeSource
 import com.maxrave.simpmusic.ui.component.rememberHolderPainter
 import com.maxrave.simpmusic.ui.icon.AddCircleOutline
+import com.maxrave.simpmusic.ui.icon.AvTimer
 import com.maxrave.simpmusic.ui.icon.CheckCircle
 import com.maxrave.simpmusic.ui.icon.Favorite
 import com.maxrave.simpmusic.ui.icon.FavoriteBorder
 import com.maxrave.simpmusic.ui.icon.Forward5
 import com.maxrave.simpmusic.ui.icon.Fullscreen
+import com.maxrave.simpmusic.ui.icon.Headphones
 import com.maxrave.simpmusic.ui.icon.Info
 import com.maxrave.simpmusic.ui.icon.MoreVert
 import com.maxrave.simpmusic.ui.icon.PlaylistAdd
@@ -160,6 +163,7 @@ import com.maxrave.simpmusic.ui.icon.Subtitles
 import com.maxrave.simpmusic.ui.icon.SubtitlesOff
 import com.maxrave.simpmusic.ui.icon.ThumbsUpDown
 import com.maxrave.simpmusic.ui.utils.formatCompactCount
+import com.maxrave.simpmusic.ui.screen.player.content.applemusic.AudioOutputSheetHost
 import com.maxrave.simpmusic.ui.theme.blackMoreOverlay
 import com.maxrave.simpmusic.ui.theme.overlay
 import com.maxrave.simpmusic.ui.theme.typo
@@ -173,6 +177,7 @@ import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 import simpmusic.composeapp.generated.resources.Res
 import simpmusic.composeapp.generated.resources.artists
+import simpmusic.composeapp.generated.resources.audio_output
 import simpmusic.composeapp.generated.resources.crossfading
 import simpmusic.composeapp.generated.resources.description
 import simpmusic.composeapp.generated.resources.like_and_dislike
@@ -182,6 +187,7 @@ import simpmusic.composeapp.generated.resources.fans_count
 import simpmusic.composeapp.generated.resources.likes_count
 import simpmusic.composeapp.generated.resources.line_synced
 import simpmusic.composeapp.generated.resources.lyrics
+import simpmusic.composeapp.generated.resources.lyrics_offset
 import simpmusic.composeapp.generated.resources.lyrics_provider_betterlyrics
 import simpmusic.composeapp.generated.resources.lyrics_provider_lrc
 import simpmusic.composeapp.generated.resources.lyrics_provider_simpmusic
@@ -221,6 +227,8 @@ fun NowPlayingContentSpotify(
 
 
     var showShareLyricsSheet by rememberSaveable { mutableStateOf(false) }
+    var showLyricsOffsetBar by rememberSaveable { mutableStateOf(false) }
+    var showOutputSheet by rememberSaveable { mutableStateOf(false) }
 
     // Height
     var topAppBarHeightDp by rememberSaveable {
@@ -350,6 +358,8 @@ fun NowPlayingContentSpotify(
                         !state.artworkMotionInProgress &&
                             isCurrentArtworkPage &&
                             state.screenData.canvasData != null
+                    // A canvas that fills the page; Apple Music animated artwork (Layer 3). fork: 翻页运动中只保持静态封面
+                    val pageAnimatedArtwork = state.screenData.canvasData?.takeIf { isCurrentArtworkPage && it.isAnimatedArtwork() }
 
                     // Per-page palette state. Adjacent artwork is decoded before it becomes
                     // current, so the shell can glide to its palette after the pager settles.
@@ -775,6 +785,19 @@ fun NowPlayingContentSpotify(
                                 }
                             }
                         }
+
+                        // ── Layer 3: Apple Music's animated artwork (current track) ──
+                        // Not a canvas: it plays the Apple Music style's way, edge to edge at the
+                        // top of the page and dissolving into a mesh of its own colours, under
+                        // controls that never hide. Covers Layers 0–2 once its still is up.
+                        if (pageAnimatedArtwork != null) {
+                            AppleMusicAnimatedArtworkPage(
+                                canvas = pageAnimatedArtwork,
+                                cover = state.screenData.bitmap,
+                                topChrome = topAppBarHeightDp.dp,
+                                pageColor = PlayerBackdropColor,
+                            )
+                        }
                     }
                 }
 
@@ -913,7 +936,7 @@ fun NowPlayingContentSpotify(
                                 val currentLyricLineText =
                                     if (!hasSyncedLyrics ||
                                         state.cloudLyricsBlocked ||
-                                        state.screenData.canvasData != null ||
+                                        state.screenData.fullscreenCanvas() != null ||
                                         state.currentLyricLineIndex < 0
                                     ) {
                                         ""
@@ -995,38 +1018,39 @@ fun NowPlayingContentSpotify(
                                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                                                 verticalAlignment = Alignment.CenterVertically,
                                             ) {
-                                                IconButton(
-                                                    modifier =
-                                                        Modifier
-                                                            .size(24.dp)
-                                                            .aspectRatio(1f)
-                                                            .clip(CircleShape),
-                                                    onClick = {
-                                                        actions.onShowInfo()
-                                                    },
-                                                ) {
-                                                    Icon(imageVector = SimpIcons.Info, tint = Color.White, contentDescription = "")
-                                                }
-                                                // Cyan rather than colorScheme.primary: this screen is force-dark whatever
-                                                // the app theme is, so a light-theme primary would sink into the black
-                                                // backdrop. Mirrors the `if (forceDark) Color.Cyan` rule in FullWidthItems.
-                                                PlatformCastButton(
-                                                    modifier = Modifier.size(24.dp),
+                                                Icon(imageVector = SimpIcons.Info, tint = Color.White, contentDescription = "")
+                                            }
+                                            // Where the sound goes: the phone's own outputs and the Cast
+                                            // receivers in one sheet, the same one the Apple Music style opens.
+                                            // Cyan rather than colorScheme.primary: this screen is force-dark whatever
+                                            // the app theme is, so a light-theme primary would sink into the black
+                                            // backdrop. Mirrors the `if (forceDark) Color.Cyan` rule in FullWidthItems.
+                                            IconButton(
+                                                modifier =
+                                                    Modifier
+                                                        .size(24.dp)
+                                                        .aspectRatio(1f)
+                                                        .clip(CircleShape),
+                                                onClick = { showOutputSheet = true },
+                                            ) {
+                                                Icon(
+                                                    imageVector = SimpIcons.Headphones,
                                                     tint = if (state.castState.isRemote) Color.Cyan else Color.White,
+                                                    contentDescription = stringResource(Res.string.audio_output),
                                                 )
-                                                AnimatedVisibility(visible = state.castState.isRemote) {
-                                                    Text(
-                                                        text =
-                                                            stringResource(
-                                                                Res.string.playing_on_device,
-                                                                state.castState.deviceName ?: "Cast",
-                                                            ),
-                                                        style = typo().bodySmall,
-                                                        color = Color.Cyan,
-                                                        maxLines = 1,
-                                                        overflow = TextOverflow.Ellipsis,
-                                                    )
-                                                }
+                                            }
+                                            androidx.compose.animation.AnimatedVisibility(visible = state.castState.isRemote) {
+                                                Text(
+                                                    text =
+                                                        stringResource(
+                                                            Res.string.playing_on_device,
+                                                            state.castState.deviceName ?: "Cast",
+                                                        ),
+                                                    style = typo().bodySmall,
+                                                    color = Color.Cyan,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                )
                                             }
                                         }
 
@@ -1250,6 +1274,21 @@ fun NowPlayingContentSpotify(
                                             }
                                             Spacer(modifier = Modifier.width(8.dp))
                                         }
+                                        if (state.screenData.lyricsData.hasTiming()) {
+                                            CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
+                                                IconButton(
+                                                    onClick = { showLyricsOffsetBar = !showLyricsOffsetBar },
+                                                ) {
+                                                    Icon(
+                                                        imageVector = SimpIcons.AvTimer,
+                                                        contentDescription = stringResource(Res.string.lyrics_offset),
+                                                        tint = Color.White,
+                                                        modifier = Modifier.size(16.dp),
+                                                    )
+                                                }
+                                            }
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                        }
                                         CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
                                             IconButton(
                                                 onClick = { showShareLyricsSheet = true },
@@ -1279,6 +1318,19 @@ fun NowPlayingContentSpotify(
                                             ) {
                                                 Text(text = stringResource(Res.string.show), color = Color.White)
                                             }
+                                        }
+                                    }
+                                    AnimatedVisibility(
+                                        visible = showLyricsOffsetBar && state.screenData.lyricsData.hasTiming(),
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                                            horizontalArrangement = Arrangement.End,
+                                        ) {
+                                            LyricsOffsetBar(
+                                                offsetMs = state.lyricsOffsetMs.toInt(),
+                                                onOffsetChange = actions.onLyricsOffsetChange,
+                                            )
                                         }
                                     }
                                     // Lyrics Layout
@@ -1753,6 +1805,13 @@ fun NowPlayingContentSpotify(
             )
         }
     }
+
+    if (showOutputSheet) {
+        AudioOutputSheetHost(
+            castState = state.castState,
+            onDismiss = { showOutputSheet = false },
+        )
+    }
 }
 
 // The focused info layout (controls visible) and the canvas-unfocused overlay rendered this
@@ -2089,6 +2148,7 @@ internal fun ColumnScope.SpotifyPlaybackControls(
                     else if (timeline.total > 0L) timeline.current.toFloat() / timeline.total else 0f,
                 ),
             style = typo().bodyMedium,
+            color = state.secondaryTextColor(),
             modifier = Modifier.weight(1f),
             textAlign = TextAlign.Left,
         )
@@ -2141,6 +2201,7 @@ internal fun ColumnScope.SpotifyPlaybackControls(
         Text(
             text = timeline.lengthLabel(),
             style = typo().bodyMedium,
+            color = state.secondaryTextColor(),
             modifier = Modifier.weight(1f),
             textAlign = TextAlign.Right,
         )

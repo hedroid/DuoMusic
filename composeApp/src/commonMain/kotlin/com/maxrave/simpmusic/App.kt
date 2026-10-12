@@ -50,6 +50,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.font.FontWeight
@@ -64,6 +67,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_MEDIUM_LOWER_BOUND
 import com.maxrave.domain.data.model.intent.GenericIntent
+import com.maxrave.common.LibraryChipType
 import com.maxrave.domain.data.player.GenericMediaItem
 import com.maxrave.domain.manager.DataStoreManager
 import com.maxrave.domain.manager.DataStoreManager.Values.TRUE
@@ -80,6 +84,9 @@ import com.maxrave.simpmusic.ui.component.AppNavigationRail
 import com.maxrave.simpmusic.ui.component.LiquidGlassAppBottomNavigationBar
 import com.maxrave.simpmusic.ui.component.LocalAppBottomOverlayPadding
 import com.maxrave.simpmusic.ui.component.LocalAppContentPadding
+import com.maxrave.simpmusic.ui.component.LocalAppDialogOpen
+import com.maxrave.simpmusic.ui.component.LocalNowPlayingOpen
+import com.maxrave.simpmusic.ui.component.LocalUserStarted
 import com.maxrave.simpmusic.ui.icon.ArrowForwardIos
 import com.maxrave.simpmusic.ui.icon.SimpIcons
 import com.maxrave.simpmusic.ui.navigation.destination.home.AnalyticsDestination
@@ -108,11 +115,14 @@ import com.maxrave.simpmusic.ui.theme.fontFamily
 import com.maxrave.simpmusic.ui.theme.parseThemeColorHex
 import com.maxrave.simpmusic.ui.theme.typo
 import com.maxrave.simpmusic.utils.VersionManager
+import com.maxrave.simpmusic.utils.isAppLinkAvailable
+import com.maxrave.simpmusic.utils.libraryTabOf
 import com.maxrave.simpmusic.viewModel.SharedViewModel
 import com.mikepenz.markdown.m3.Markdown
 import com.mikepenz.markdown.m3.markdownTypography
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.datetime.LocalDateTime
@@ -251,6 +261,21 @@ fun App(
         mutableStateOf(false)
     }
 
+    // Every dialog this file raises on its own. Home's launch banner waits until none is up; see
+    // LocalAppDialogOpen. (The banner waits for a running update check by itself.)
+    val appDialogOpen =
+        shouldShowUpdateDialog || showNotificationPermissionDialog ||
+            showDesktopNotificationPermissionDialog || sleepTimerState.isDone
+
+    // Set by the first press or wheel scroll anywhere in the app this launch, or by opening Now
+    // Playing. A launch banner that has not had its turn yet then waits for a later launch.
+    var userStarted by remember {
+        mutableStateOf(false)
+    }
+    LaunchedEffect(isShowNowPlaylistScreen) {
+        if (isShowNowPlaylistScreen) userStarted = true
+    }
+
     val hazeState =
         rememberHazeState()
 
@@ -288,10 +313,7 @@ fun App(
         val data = intent.data
         Logger.d("MainActivity", "onCreate: $data")
         if (data != null) {
-            // 字符串比较:这里曾用 coil3.toUri() 造比较对象,而 intent.data 是 eygraber 的
-            // KmpUri——两个不相干类型 == 恒 false,通知深链(点系统通知进通知页)冷/热路径
-            // 全部静默失效。KmpUri.toString() 即原始 uri 串。
-            if (data.toString() == "simpmusic://notification") {
+            if (data.scheme == "simpmusic" && data.host == "notification") {
                 viewModel.setIntent(null)
                 navController.navigate(
                     NotificationDestination,
@@ -325,6 +347,13 @@ fun App(
                         segments.getOrNull(1)
                     }
                 Logger.d("MainActivity", "simpmusic.org deep link, appPath: $appPath")
+                // A path added to the when below must also go into APP_LINK_PATHS in AppLinks.kt.
+                // Some screens exist only with local tracking on or while signed in to YouTube; see
+                // isAppLinkAvailable. Read before setIntent(null): clearing the intent changes this
+                // effect's key, and the next frame cancels the effect wherever it is suspended, which
+                // would lose a navigation waiting on these reads.
+                val localTrackingOn = viewModel.getLocalTrackingEnabled().first() == TRUE
+                val youTubeLoggedIn = viewModel.getYouTubeLoggedIn().first() == TRUE
                 viewModel.setIntent(null)
                 when (appPath) {
                     "watch" -> {
@@ -376,9 +405,38 @@ fun App(
                     "library" -> {
                         val type = data.getQueryParameter("type")
                         if (type.isNullOrBlank()) {
-                            navController.navigate(LibraryDestination)
+                            // simpmusic://library?tab=wrapped → the Library tab on one of its chips,
+                            // named as LibraryChipType stores them (a launch banner points at Wrapped).
+                            val tab = libraryTabOf(data)
+                            if (!isAppLinkAvailable(appPath, tab, localTrackingOn, youTubeLoggedIn)) {
+                                viewModel.makeToast(getString(Res.string.this_link_is_not_supported))
+                            } else {
+                                viewModel.requestLibraryTab(tab)
+                                navController.navigate(LibraryDestination)
+                            }
                         } else {
                             navController.navigate(LibraryDynamicPlaylistDestination(type = type))
+                        }
+                    }
+
+                    // simpmusic://analytics — added for the launch banners.
+                    "analytics" -> {
+                        if (isAppLinkAvailable(appPath, null, localTrackingOn, youTubeLoggedIn)) {
+                            navController.navigate(AnalyticsDestination)
+                        } else {
+                            viewModel.makeToast(getString(Res.string.this_link_is_not_supported))
+                        }
+                    }
+
+                    // simpmusic://taste — the AI taste card, which sits on Your library. A link of its
+                    // own rather than library?tab=your_library, so it can say that the card exists only
+                    // while local tracking is on.
+                    "taste" -> {
+                        if (isAppLinkAvailable(appPath, null, localTrackingOn, youTubeLoggedIn)) {
+                            viewModel.requestLibraryTab(LibraryChipType.YOUR_LIBRARY)
+                            navController.navigate(LibraryDestination)
+                        } else {
+                            viewModel.makeToast(getString(Res.string.this_link_is_not_supported))
                         }
                     }
 
@@ -451,10 +509,10 @@ fun App(
 
     LaunchedEffect(updateData) {
         val response = updateData ?: return@LaunchedEffect
-        // 语义比较而非字符串不等:老实现 getVersionName() 为空时 "v3.0.1"!="v" 恒真,
-        // 每次手动检查都会弹"有更新"(即使已是最新版)。tag 形如 v<major>.<minor>.<patch>,
-        // 解析失败(形状意外)时维持旧行为视为有更新,别把真更新吞掉
-        if (viewModel.showedUpdateDialog && isUpdateAvailable(response.tagName)) {
+        // Only a NEWER release is offered. This used to compare the tags for inequality, which told a
+        // build ahead of the latest release (dev, beta) to "update" back down to it, and told every
+        // F-Droid-channel user to update on each launch: that channel's tag carries no leading "v".
+        if (viewModel.showedUpdateDialog && VersionManager.isBehind(response.tagName)) {
             shouldShowUpdateDialog = true
         }
     }
@@ -538,7 +596,18 @@ fun App(
         Scaffold(
             // 全局点击触感:根布局旁观所有主窗口点击(Initial 通道不消费事件),
             // 弹窗/底部菜单是独立 Android 窗口,不经这里。详见 hapticTapFeedback。
-            modifier = Modifier.hapticTapFeedback(),
+            // 之下是上游的 userStarted 观察器(promo 横幅只在用户真实交互后出现)。
+            modifier =
+                Modifier.hapticTapFeedback().pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (!userStarted) {
+                            val type = awaitPointerEvent(PointerEventPass.Initial).type
+                            if (type == PointerEventType.Press || type == PointerEventType.Scroll) {
+                                userStarted = true
+                            }
+                        }
+                    }
+                },
             containerColor =
                 if (isDesktopShell) desktopWindow else MaterialTheme.colorScheme.background,
             bottomBar = {
@@ -548,9 +617,12 @@ fun App(
                         enter = fadeIn() + slideInHorizontally(),
                         exit = fadeOut(),
                     ) {
+                        // On Android both materials go through the folding bar, which draws the mini
+                        // player itself. Desktop keeps the always-open flat bar under its own one.
+                        val useFoldingBar = getPlatform() == Platform.Android || isLiquidGlassEnabled == TRUE
                         Column {
                             AnimatedVisibility(
-                                isShowMiniPlayer && isLiquidGlassEnabled == DataStoreManager.FALSE,
+                                isShowMiniPlayer && !useFoldingBar && isLiquidGlassEnabled == DataStoreManager.FALSE,
                                 enter = fadeIn() + slideInHorizontally(),
                                 exit = fadeOut(),
                             ) {
@@ -566,6 +638,7 @@ fun App(
                                             bottom = 4.dp,
                                         ),
                                     backdrop = backdrop,
+                                    navController = navController,
                                     onClick = {
                                         isShowNowPlaylistScreen = true
                                     },
@@ -575,7 +648,7 @@ fun App(
                                     },
                                 )
                             }
-                            if (isLiquidGlassEnabled == TRUE) {
+                            if (useFoldingBar) {
                                 LiquidGlassAppBottomNavigationBar(
                                     navController = navController,
                                     backdrop = backdrop,
@@ -595,6 +668,7 @@ fun App(
                                             viewModel.switchSource(source)
                                         }
                                     },
+                                    liquidGlass = isLiquidGlassEnabled == TRUE,
                                     reloadDestinationIfNeeded = { klass ->
                                         viewModel.reloadDestination(klass)
                                     },
@@ -710,6 +784,9 @@ fun App(
                                 CompositionLocalProvider(
                                     LocalAppContentPadding provides innerPadding,
                                     LocalAppBottomOverlayPadding provides bottomOverlayPadding,
+                                    LocalAppDialogOpen provides appDialogOpen,
+                                    LocalNowPlayingOpen provides isShowNowPlaylistScreen,
+                                    LocalUserStarted provides userStarted,
                                 ) {
                                     AppNavigationGraph(
                                         innerPadding = innerPadding,
@@ -767,6 +844,7 @@ fun App(
                                             .height(60.dp)
                                     },
                                     backdrop = backdrop,
+                                    navController = navController,
                                     onClick = {
                                         isShowNowPlaylistScreen = true
                                     },

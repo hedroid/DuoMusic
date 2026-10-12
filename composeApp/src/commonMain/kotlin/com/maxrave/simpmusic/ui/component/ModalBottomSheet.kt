@@ -132,6 +132,8 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.maxrave.data.io.readLocalImageBytes
 import com.maxrave.domain.data.entities.DownloadState
+import com.maxrave.domain.data.model.browse.album.Track
+import com.maxrave.domain.utils.toSongEntity
 import com.maxrave.domain.data.entities.LocalPlaylistEntity
 import com.maxrave.domain.data.entities.PlaylistEntity
 import com.maxrave.domain.data.entities.SongEntity
@@ -142,9 +144,12 @@ import com.maxrave.domain.data.model.searchResult.songs.Artist
 import com.maxrave.domain.data.model.searchResult.songs.Thumbnail
 import com.maxrave.domain.manager.DataStoreManager
 import com.maxrave.domain.mediaservice.handler.EndlessRadioLockKind
+import com.maxrave.domain.mediaservice.handler.AddToQueueBlock
 import com.maxrave.domain.mediaservice.handler.MediaPlayerHandler
 import com.maxrave.domain.mediaservice.handler.QueueData
+import com.maxrave.domain.mediaservice.handler.addToQueueBlock
 import com.maxrave.domain.repository.PlaylistRepository
+import com.maxrave.domain.repository.LocalPlaylistRepository
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.ui.text.input.ImeAction
 import com.maxrave.data.repository.NeteaseRepositoryImpl
@@ -186,6 +191,7 @@ import com.maxrave.simpmusic.ui.icon.FavoriteBorder
 import com.maxrave.simpmusic.ui.icon.KeyboardArrowDown
 import com.maxrave.simpmusic.ui.icon.KeyboardDoubleArrowDown
 import com.maxrave.simpmusic.ui.icon.KeyboardDoubleArrowUp
+import com.maxrave.simpmusic.ui.icon.SkipNext
 import com.maxrave.simpmusic.ui.icon.Lyrics
 import com.maxrave.simpmusic.ui.icon.LibraryMusic
 import com.maxrave.simpmusic.ui.icon.MyLocation
@@ -259,6 +265,8 @@ import simpmusic.composeapp.generated.resources.remove_download_title
 import simpmusic.composeapp.generated.resources.remove_download_message
 import simpmusic.composeapp.generated.resources.add_to_a_playlist
 import simpmusic.composeapp.generated.resources.add_to_queue
+import simpmusic.composeapp.generated.resources.add_to_queue_disabled_endless
+import simpmusic.composeapp.generated.resources.add_to_queue_disabled_radio
 import simpmusic.composeapp.generated.resources.album
 import simpmusic.composeapp.generated.resources.artists
 import simpmusic.composeapp.generated.resources.baseline_favorite_24
@@ -340,6 +348,8 @@ import simpmusic.composeapp.generated.resources.more
 import simpmusic.composeapp.generated.resources.move_down
 import simpmusic.composeapp.generated.resources.move_up
 import simpmusic.composeapp.generated.resources.netease
+import simpmusic.composeapp.generated.resources.move_to_play_next
+import simpmusic.composeapp.generated.resources.delete_from_queue
 import simpmusic.composeapp.generated.resources.no_album
 import simpmusic.composeapp.generated.resources.no_description
 import simpmusic.composeapp.generated.resources.no_playlist_found
@@ -1202,6 +1212,9 @@ fun InfoPlayerBottomSheet(
 @Composable
 fun QueueBottomSheet(
     onDismiss: () -> Unit,
+    navController: NavController,
+    /** Closes whatever screen hosts this sheet, before a row's sheet opens an artist or album page. */
+    onNavigateToOtherScreen: () -> Unit,
     sharedViewModel: SharedViewModel = koinInject(),
     musicServiceHandler: MediaPlayerHandler = koinInject<MediaPlayerHandler>(),
     dataStoreManager: DataStoreManager = koinInject(),
@@ -1221,9 +1234,8 @@ fun QueueBottomSheet(
             }
         }
     var overscrollJob by remember { mutableStateOf<Job?>(null) }
-    var shouldShowQueueItemBottomSheet by rememberSaveable { mutableStateOf(false) }
-    var clickMoreIndex by rememberSaveable { mutableIntStateOf(0) }
-    var clickMoreVideoId by rememberSaveable { mutableStateOf<String?>(null) }
+    // The row whose ⋯ was tapped, as its queue position and the track that was there.
+    var moreFor by remember { mutableStateOf<Pair<Int, Track>?>(null) }
     val screenDataState by sharedViewModel.nowPlayingScreenData.collectAsStateWithLifecycle()
     val songEntity by sharedViewModel.nowPlayingState.map { it?.songEntity }.collectAsState(null)
     val queueData by musicServiceHandler.queueData.collectAsStateWithLifecycle()
@@ -1335,10 +1347,6 @@ fun QueueBottomSheet(
             }
     }
 
-    LaunchedEffect(queue) {
-        Logger.w("QueueBottomSheet", "queue: $queue")
-    }
-
     DisposableEffect(Unit) {
         val currentSongIndex = musicServiceHandler.currentOrderIndex().takeIf { i -> i > -1 } ?: 0
         Logger.d("QueueBottomSheet", "currentSongIndex: $currentSongIndex")
@@ -1349,17 +1357,17 @@ fun QueueBottomSheet(
     }
 
     val showQueueItemBottomSheet: (Int) -> Unit = { index ->
-        clickMoreIndex = index
-        clickMoreVideoId = queue.getOrNull(index)?.videoId
-        shouldShowQueueItemBottomSheet = true
+        moreFor = queue.getOrNull(index)?.let { index to it }
     }
 
-    if (shouldShowQueueItemBottomSheet) {
-        QueueItemBottomSheet(
-            onDismiss = { shouldShowQueueItemBottomSheet = false },
-            index = clickMoreIndex,
-            videoId = clickMoreVideoId,
-            musicServiceHandler = musicServiceHandler,
+    // Composed before the queue's own sheet but entered later, on a tap, so it attaches on top.
+    moreFor?.let { (index, track) ->
+        NowPlayingBottomSheet(
+            onDismiss = { moreFor = null },
+            navController = navController,
+            song = track.toSongEntity(),
+            queuePosition = QueuePosition(index, track.videoId),
+            onNavigateToOtherScreen = onNavigateToOtherScreen,
         )
     }
 
@@ -1675,188 +1683,61 @@ fun QueueBottomSheet(
     }
 }
 
-private enum class QueueItemAction {
-    UP,
-    DOWN,
-    DELETE,
-}
+/** A queue row a song sheet was opened from: its position, and the track that sat there then. */
+data class QueuePosition(
+    val index: Int,
+    val videoId: String,
+)
 
+/**
+ * The rows only a queue track has: move it up, down or to play next, or take it out of the queue.
+ *
+ * They act by POSITION, and a radio trims its played history off the front while the sheet can be
+ * open, which moves every row. If the track is no longer at its position they do nothing rather
+ * than move or delete whatever slid into its place.
+ */
 @Composable
-@ExperimentalMaterial3Api
-fun QueueItemBottomSheet(
-    onDismiss: () -> Unit,
-    index: Int,
-    /** The track that was at [index] when this sheet opened; its actions only run if it still is. */
-    videoId: String?,
+private fun QueueItemActions(
+    position: QueuePosition,
+    onDone: () -> Unit,
     musicServiceHandler: MediaPlayerHandler = koinInject<MediaPlayerHandler>(),
 ) {
     val coroutineScope = rememberCoroutineScope()
-    val modelBottomSheetState =
-        rememberModalBottomSheetState(
-            skipPartiallyExpanded = true,
-        )
-    val hideModalBottomSheet: () -> Unit =
-        {
-            coroutineScope.launch {
-                modelBottomSheetState.hide()
-                onDismiss()
-            }
+    val index = position.index
+    val queueSize =
+        musicServiceHandler.queueData.value
+            ?.data
+            ?.listTracks
+            ?.size ?: 0
+    val current = musicServiceHandler.currentOrderIndex()
+    val act: (suspend () -> Unit) -> Unit = { action ->
+        val stillThere =
+            musicServiceHandler.queueData.value
+                ?.data
+                ?.listTracks
+                ?.getOrNull(index)
+                ?.videoId == position.videoId
+        if (stillThere) coroutineScope.launch { action() }
+        onDone()
+    }
+    if (index > 0) {
+        ActionButton(icon = SimpIcons.KeyboardDoubleArrowUp, text = Res.string.move_up) {
+            act { musicServiceHandler.moveItemUp(index) }
         }
-    val listAction =
-        listOf(
-            QueueItemAction.UP,
-            QueueItemAction.DOWN,
-            QueueItemAction.DELETE,
-        )
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = modelBottomSheetState,
-        containerColor = Color.Transparent,
-        contentColor = Color.Transparent,
-        dragHandle = null,
-        scrimColor = Color.Black.copy(alpha = .5f),
-        // sheet=独立窗口,根点击观察器看不到——这里挂同款旁观观察器(更多操作面板)
-        modifier = Modifier.hapticTapFeedback(),
-        contentWindowInsets = { WindowInsets(0, 0, 0, 0) },
-    ) {
-        Card(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .wrapContentHeight(),
-            shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp),
-            colors = CardDefaults.cardColors().copy(containerColor = rememberSurfaceDarkColors().container),
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Spacer(modifier = Modifier.height(5.dp))
-                Card(
-                    modifier =
-                        Modifier
-                            .width(60.dp)
-                            .height(4.dp),
-                    colors =
-                        CardDefaults.cardColors().copy(
-                            containerColor = rememberSurfaceDarkColors().handle,
-                        ),
-                    shape = RoundedCornerShape(50),
-                ) {}
-                Spacer(modifier = Modifier.height(5.dp))
-                LazyColumn {
-                    val canMoveUp =
-                        index > 0 &&
-                            index < (
-                                musicServiceHandler.queueData.value
-                                    ?.data
-                                    ?.listTracks
-                                    ?.size ?: 0
-                            )
-                    val canMoveDown =
-                        index >= 0 &&
-                            index < (
-                                musicServiceHandler.queueData.value
-                                    ?.data
-                                    ?.listTracks
-                                    ?.size ?: 0
-                            ) - 1
-                    items(listAction) { action ->
-                        val disable =
-                            when (action) {
-                                QueueItemAction.UP -> !canMoveUp
-                                QueueItemAction.DOWN -> !canMoveDown
-                                QueueItemAction.DELETE -> false
-                            }
-                        if (disable) return@items
-                        Box(
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        hideModalBottomSheet()
-                                        // These act by POSITION, and a radio trims its played history
-                                        // off the front while this sheet can be open, which moves every
-                                        // row. If the track is no longer at [index], do nothing rather
-                                        // than move or delete whatever slid into its place.
-                                        val stillThere =
-                                            musicServiceHandler.queueData.value
-                                                ?.data
-                                                ?.listTracks
-                                                ?.getOrNull(index)
-                                                ?.videoId == videoId
-                                        if (!stillThere) return@clickable
-                                        when (action) {
-                                            QueueItemAction.UP -> {
-                                                coroutineScope.launch {
-                                                    musicServiceHandler.moveItemUp(index)
-                                                }
-                                            }
-
-                                            QueueItemAction.DOWN -> {
-                                                coroutineScope.launch {
-                                                    musicServiceHandler.moveItemDown(index)
-                                                }
-                                            }
-
-                                            QueueItemAction.DELETE -> {
-                                                musicServiceHandler.removeMediaItem(index)
-                                            }
-                                        }
-                                    },
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier =
-                                    Modifier
-                                        .padding(20.dp)
-                                        .align(Alignment.CenterStart),
-                            ) {
-                                when (action) {
-                                    QueueItemAction.UP -> {
-                                        Image(
-                                            imageVector = SimpIcons.KeyboardDoubleArrowUp,
-                                            contentDescription = "Move up",
-                                            colorFilter = ColorFilter.tint(rememberSurfaceDarkColors().content),
-                                        )
-                                    }
-
-                                    QueueItemAction.DOWN -> {
-                                        Image(
-                                            imageVector = SimpIcons.KeyboardDoubleArrowDown,
-                                            contentDescription = "Move down",
-                                            colorFilter = ColorFilter.tint(rememberSurfaceDarkColors().content),
-                                        )
-                                    }
-
-                                    QueueItemAction.DELETE -> {
-                                        Image(
-                                            imageVector = SimpIcons.Delete,
-                                            contentDescription = "Delete",
-                                            colorFilter = ColorFilter.tint(rememberSurfaceDarkColors().content),
-                                        )
-                                    }
-                                }
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Text(
-                                    text =
-                                        stringResource(
-                                            when (action) {
-                                                QueueItemAction.UP -> Res.string.move_up
-                                                QueueItemAction.DOWN -> Res.string.move_down
-                                                QueueItemAction.DELETE -> Res.string.delete
-                                            },
-                                        ),
-                                    style = typo().labelSmall,
-                                )
-                            }
-                        }
-                    }
-                    item {
-                        EndOfModalBottomSheet()
-                    }
-                }
-            }
+    }
+    if (index < queueSize - 1) {
+        ActionButton(icon = SimpIcons.KeyboardDoubleArrowDown, text = Res.string.move_down) {
+            act { musicServiceHandler.moveItemDown(index) }
         }
+    }
+    // Hidden on the playing track and on the one already next: there is nowhere to move them.
+    if (current >= 0 && index != current && index != current + 1) {
+        ActionButton(icon = SimpIcons.SkipNext, text = Res.string.move_to_play_next) {
+            act { musicServiceHandler.moveItemToPlayNext(index) }
+        }
+    }
+    ActionButton(icon = SimpIcons.Delete, text = Res.string.delete_from_queue) {
+        act { musicServiceHandler.removeMediaItem(index) }
     }
 }
 
@@ -1892,6 +1773,9 @@ fun NowPlayingBottomSheet(
     onCloudDiskSongInfoChanged: ((Boolean) -> Unit)? = null,
     // 需要让宿主页面立即响应点赞状态变化时传入(例如红心歌单取消红心后剔除歌曲)
     onLikeChanged: ((Boolean) -> Unit)? = null,
+    /** Set when opened from a queue row: adds that row's move and delete actions at the top. */
+    /** Set when opened from a queue row: adds that row's move and delete actions at the top. */
+    queuePosition: QueuePosition? = null,
     dataStoreManager: DataStoreManager = koinInject<DataStoreManager>(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -2427,11 +2311,11 @@ fun NowPlayingBottomSheet(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.verticalScroll(rememberScrollState()),
                 ) {
-                    Spacer(modifier = Modifier.height(5.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     Card(
                         modifier =
                             Modifier
-                                .width(60.dp)
+                                .width(32.dp)
                                 .height(4.dp),
                         colors =
                             CardDefaults.cardColors().copy(
@@ -2439,13 +2323,12 @@ fun NowPlayingBottomSheet(
                             ),
                         shape = RoundedCornerShape(50),
                     ) {}
-                    Spacer(modifier = Modifier.height(5.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                     Row(
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .height(65.dp)
-                                .padding(10.dp),
+                                .padding(start = 20.dp, end = 20.dp, top = 6.dp, bottom = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         val thumb = uiState.songUIState.thumbnails
@@ -2461,18 +2344,18 @@ fun NowPlayingBottomSheet(
                             placeholder = rememberHolderPainter(),
                             error = rememberHolderPainter(),
                             contentDescription = null,
-                            contentScale = ContentScale.Inside,
+                            contentScale = ContentScale.Crop,
                             modifier =
                                 Modifier
                                     .align(Alignment.CenterVertically)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .size(60.dp),
+                                    .size(44.dp)
+                                    .clip(RoundedCornerShape(6.dp)),
                         )
-                        Spacer(modifier = Modifier.width(20.dp))
-                        Column(verticalArrangement = Arrangement.Center) {
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
                             Text(
                                 text = uiState.songUIState.title,
-                                style = typo().labelMedium,
+                                style = typo().labelSmall,
                                 // typo() bakes a colour into the style, computed from the app's own
                                 // scheme — on this always-dark sheet that reads as washed out next
                                 // to the ActionButton rows below, which take their colour from here.
@@ -2489,7 +2372,7 @@ fun NowPlayingBottomSheet(
                                     uiState.songUIState.listArtists
                                         .toListName()
                                         .connectArtists(),
-                                style = typo().bodyMedium,
+                                style = typo().bodySmall,
                                 color = rememberSurfaceDarkColors().subtitle,
                                 maxLines = 1,
                                 modifier =
@@ -2500,12 +2383,14 @@ fun NowPlayingBottomSheet(
                             )
                         }
                     }
-                    Spacer(modifier = Modifier.height(5.dp))
                     HorizontalDivider(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
                         thickness = 1.dp,
                     )
                     Spacer(modifier = Modifier.height(2.dp))
+                    if (queuePosition != null) {
+                        QueueItemActions(position = queuePosition, onDone = hideModalBottomSheet)
+                    }
                     Crossfade(targetState = onDelete != null) {
                         if (it) {
                             ActionButton(
@@ -2814,17 +2699,20 @@ fun NowPlayingBottomSheet(
                     }
                     // 播放页打开(song=null=自动指向当前播放曲)时这两行只剩"自我复制"效果:
                     // 当前曲本就在队列里,"下一首播放"=复制一份插到自己后面,"添加到队列"=
-                    // 原样追加到队尾。列表页 song 恒非空,不受影响
-                    if (song != null) {
+                    // 原样追加到队尾。列表页 song 恒非空,不受影响。
+                    // 队列行打开(queuePosition!=null)同理:上方的移动行已覆盖这两个动作。
+                    if (song != null && queuePosition == null) {
                         ActionButton(
                             icon = SimpIcons.PlayCircle,
                             text = Res.string.play_next,
                         ) {
                             viewModel.onUIEvent(NowPlayingBottomSheetUIEvent.PlayNext)
                         }
+                        val addToQueueBlock = rememberAddToQueueBlock()
                         ActionButton(
                             icon = SimpIcons.QueueMusic,
-                            text = Res.string.add_to_queue,
+                            text = addToQueueBlock.addToQueueLabel(),
+                            enable = addToQueueBlock == null,
                         ) {
                             viewModel.onUIEvent(NowPlayingBottomSheetUIEvent.AddToQueue)
                         }
@@ -3030,6 +2918,32 @@ fun NowPlayingBottomSheet(
         }
     }
 }
+
+/**
+ * Why Add to queue is unavailable for the queue playing now, or null when it is not; see
+ * [addToQueueBlock]. Each sheet reads it itself, so every Add to queue button follows the same rule
+ * without its screen having to pass anything in.
+ */
+@Composable
+fun rememberAddToQueueBlock(): AddToQueueBlock? {
+    val handler = koinInject<MediaPlayerHandler>()
+    val dataStoreManager = koinInject<DataStoreManager>()
+    val queueData by handler.queueData.collectAsState()
+    val endlessQueueFlow =
+        remember(dataStoreManager) {
+            dataStoreManager.endlessQueue.map { it == DataStoreManager.TRUE }
+        }
+    val endlessQueue by endlessQueueFlow.collectAsState(false)
+    return queueData.addToQueueBlock(endlessQueue)
+}
+
+/** The Add to queue label, with the reason in brackets while it is blocked. */
+fun AddToQueueBlock?.addToQueueLabel(): StringResource =
+    when (this) {
+        null -> Res.string.add_to_queue
+        AddToQueueBlock.RADIO -> Res.string.add_to_queue_disabled_radio
+        AddToQueueBlock.ENDLESS_QUEUE -> Res.string.add_to_queue_disabled_endless
+    }
 
 @Composable
 fun ActionButton(
@@ -4601,9 +4515,11 @@ fun PlaylistBottomSheet(
                 ) {}
                 Spacer(modifier = Modifier.height(5.dp))
                 if (onAddToQueue != null) {
+                    val addToQueueBlock = rememberAddToQueueBlock()
                     ActionButton(
                         icon = SimpIcons.QueueMusic,
-                        text = Res.string.add_to_queue,
+                        text = addToQueueBlock.addToQueueLabel(),
+                        enable = addToQueueBlock == null,
                     ) {
                         onAddToQueue()
                         hideModalBottomSheet()
@@ -4958,7 +4874,12 @@ fun LocalPlaylistBottomSheet(
                     ActionButton(icon = SimpIcons.AddPhotoAlternate, text = Res.string.edit_thumbnail) {
                         resultLauncher.launch()
                     }
-                    ActionButton(icon = SimpIcons.QueueMusic, text = Res.string.add_to_queue) {
+                    val addToQueueBlock = rememberAddToQueueBlock()
+                    ActionButton(
+                        icon = SimpIcons.QueueMusic,
+                        text = addToQueueBlock.addToQueueLabel(),
+                        enable = addToQueueBlock == null,
+                    ) {
                         onAddToQueue()
                     }
                     ActionButton(

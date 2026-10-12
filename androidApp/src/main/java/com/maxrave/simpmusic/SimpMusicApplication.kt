@@ -24,6 +24,7 @@ import com.maxrave.simpmusic.expect.CloudUploadStore
 import com.maxrave.simpmusic.expect.HapticFeedback
 import com.maxrave.simpmusic.expect.installNeteaseWatchmanTokenSource
 import com.maxrave.simpmusic.service.backup.AutoBackupScheduler
+import com.maxrave.simpmusic.utils.NetworkFirstInterceptor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -40,6 +41,7 @@ import org.koin.core.context.startKoin
 import org.koin.core.logger.Level
 import org.simpmusic.crashlytics.configCrashlytics
 import org.simpmusic.lastfm.configLastfm
+import java.io.File
 import java.lang.reflect.Field
 
 class SimpMusicApplication :
@@ -53,6 +55,8 @@ class SimpMusicApplication :
 
     override fun onCreate() {
         super.onCreate()
+        // First, so the rest of startup reaches the App log too (Settings → Developer option).
+        Logger.enableFileLogging(File(filesDir, "logs").path)
         configCrashlytics(this, BuildKonfig.sentryDsn)
         configLastfm(BuildKonfig.lastfmApiKey, BuildKonfig.lastfmSecret)
         startKoin {
@@ -63,6 +67,7 @@ class SimpMusicApplication :
                     applicationId = BuildConfig.APPLICATION_ID,
                     versionName = BuildConfig.VERSION_NAME,
                     platform = "Android ${Build.VERSION.RELEASE}",
+                    isDevBuild = BuildConfig.DEBUG,
                 ),
             )
             loadKoinModules(viewModelModule)
@@ -122,25 +127,30 @@ class SimpMusicApplication :
         Logger.w("Terminate", "Checking")
     }
 
-    override fun newImageLoader(context: PlatformContext): ImageLoader =
-        ImageLoader
-            .Builder(context)
-            .components {
-                add(
-                    OkHttpNetworkFetcherFactory(
-                        callFactory = {
-                            OkHttpClient()
-                        },
-                    ),
-                )
-            }.diskCachePolicy(CachePolicy.ENABLED)
-            .networkCachePolicy(CachePolicy.ENABLED)
-            .diskCache(
-                DiskCache
-                    .Builder()
-                    .directory(FileSystem.SYSTEM_TEMPORARY_DIRECTORY / "image_cache")
-                    .maxSizeBytes(512L * 1024 * 1024)
-                    .build(),
-            ).crossfade(true)
-            .build()
+    override fun newImageLoader(context: PlatformContext): ImageLoader {
+        lateinit var imageLoader: ImageLoader
+        imageLoader =
+            ImageLoader
+                .Builder(context)
+                .components {
+                    add(NetworkFirstInterceptor { imageLoader })
+                    add(
+                        OkHttpNetworkFetcherFactory(
+                            callFactory = {
+                                OkHttpClient()
+                            },
+                        ),
+                    )
+                }.diskCachePolicy(CachePolicy.ENABLED)
+                .networkCachePolicy(CachePolicy.ENABLED)
+                .diskCache(
+                    DiskCache
+                        .Builder()
+                        .directory(FileSystem.SYSTEM_TEMPORARY_DIRECTORY / "image_cache")
+                        .maxSizeBytes(512L * 1024 * 1024)
+                        .build(),
+                ).crossfade(true)
+                .build()
+        return imageLoader
+    }
 }

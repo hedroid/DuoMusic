@@ -6,11 +6,12 @@ interface FilePickerLauncher {
     fun launch()
 }
 
+/**
+ * Opens a chooser for one file of any type. [onResultUri] gets a content Uri on Android and a plain
+ * file path on Desktop — what restoreNative and readPickedFile open on each — or null.
+ */
 @Composable
-expect fun filePickerResult(
-    mimeType: String,
-    onResultUri: (String?) -> Unit,
-): FilePickerLauncher
+expect fun filePickerResult(onResultUri: (String?) -> Unit): FilePickerLauncher
 
 /** 多选文件(云盘批量上传用):Android=OpenMultipleDocuments;桌面 no-op 回空 */
 @Composable

@@ -23,6 +23,7 @@ actual fun MediaPlayerView(
     url: String,
     modifier: Modifier,
     cropToBounds: Boolean,
+    onFirstFrame: () -> Unit,
 ) {
     MediaPlayerView(
         modifier = modifier,
@@ -31,6 +32,7 @@ actual fun MediaPlayerView(
         url = url,
         screenSize = getScreenSizeInfo(),
         cropToBounds = cropToBounds,
+        onFirstFrame = onFirstFrame,
     )
 }
 
