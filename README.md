@@ -2,24 +2,41 @@
 
 <img src="https://raw.githubusercontent.com/maxrave-dev/SimpMusic/dev/fastlane/metadata/android/en-US/images/featureGraphic.png">
 
-<h1>SimpMusic 双源版</h1>
+# SimpMusic 双源版
 
-一个 FOSS 的双音源音乐客户端：在 [SimpMusic](https://github.com/maxrave-dev/SimpMusic)（YouTube Music）的基础上，
-完整接入了 **网易云音乐** 音源，并做了大量播放稳定性、性能与本地体验优化。
+**YouTube Music + 网易云音乐，一个 FOSS 客户端全都有。**
 
+在 [SimpMusic](https://github.com/maxrave-dev/SimpMusic) 的基础上完整接入网易云音乐音源，
+并做了大量播放稳定性、性能与本地体验优化。
+
+<p>
+<a href="https://github.com/hedroid/SimpMusic/releases"><img src="https://img.shields.io/github/v/release/hedroid/SimpMusic?label=%E5%8F%91%E7%89%88&logo=github" alt="release"></a>
 <a href="https://github.com/maxrave-dev/SimpMusic"><img src="https://img.shields.io/badge/%E4%B8%8A%E6%B8%B8-maxrave--dev%2FSimpMusic-blue" alt="upstream"></a>
 <a href="https://github.com/hedroid/SimpMusic"><img src="https://img.shields.io/github/stars/hedroid/SimpMusic?style=social" alt="stars"></a>
 <a href="https://github.com/cwuom/NeriPlayer"><img src="https://img.shields.io/badge/%E5%8F%82%E8%80%83%E9%A1%B9%E7%9B%AE-NeriPlayer-orange" alt="NeriPlayer"></a>
+</p>
+
+**[📥 下载最新版](#-下载)** · **[✨ 功能一览](#-功能一览)** · **[🛠 构建指南](#-构建)**
 
 </div>
 
 > **相关项目**
 > - 上游原版 SimpMusic（YouTube Music 客户端本体）：**https://github.com/maxrave-dev/SimpMusic**
 > - 本 fork：**https://github.com/hedroid/SimpMusic**（core 子模块在 [hedroid/SimpMusic-Core](https://github.com/hedroid/SimpMusic-Core)）
-> - 参考项目 NeriPlayer（多源流媒体 + 本地管理 + 自建同步的开源音乐播放器）：**https://github.com/cwuom/NeriPlayer**
+> - 参考项目 NeriPlayer（多源流媒体 + 本地管理 + 自建同步的开源音乐播放器）：**https://github.com/cwuom/NeriPlayer**，
 >   本 fork 的播放错误恢复、物理洗牌等多处设计参考了它的实现。
 
-## 截图
+## 📥 下载
+
+| | |
+|---|---|
+| **安装包** | [GitHub Releases](https://github.com/hedroid/SimpMusic/releases/latest)（`arm64-v8a` APK，每次发版附在资产里） |
+| **系统要求** | Android 12（API 31）及以上 |
+| **更新日志** | 见各 [Release 说明](https://github.com/hedroid/SimpMusic/releases) |
+
+> 下载目录改为「按歌手/专辑整理」的文件式存储（对文件管理器友好）；Sentry 等遥测已移除。
+
+## 📸 截图
 
 <p align="center">
 <img src="docs/screenshots/01-netease-home.png" width="230">
@@ -48,24 +65,45 @@
 <sub>网易搜索（热搜榜） · 长按搜索按钮切换音源（切源不打断播放） · YouTube Music 主页（双源并存）</sub>
 </p>
 
-## 与上游的核心差异
+## ✨ 功能一览
 
 ### 🎵 网易云音乐音源（本 fork 最大的增量）
 
+**浏览与发现**
+
 - **双音源并存**：长按底栏搜索按钮随时切换 YouTube Music / 网易云音乐；切源只切数据源，
   **不打断正在播放的音乐**（播放管线按歌曲 ID 形状路由，混源队列也能连续播放）。
-- **完整浏览链路**：网易主页（每日推荐 / 私人雷达 / 分类歌单）、搜索（热搜榜 + 歌曲/专辑/歌手/歌单分 tab、无限滚动）、
-  歌单 / 专辑 / 歌手详情页、分类页、排行榜、艺人「全部歌曲」页（热门 / 最新排序）、「相似歌曲」独立页。
+- **完整浏览链路**：网易主页（每日推荐 / 私人雷达 / 分类歌单 / 最新 MV / MV 总榜）、
+  搜索（热搜榜 + 歌曲/专辑/歌手/歌单/MV/电台分 tab、无限滚动）、歌单 / 专辑 / 歌手详情页、
+  分类页、排行榜、艺人「全部歌曲」页（热门 / 最新排序）、「相似歌曲」独立页。
 - **私人 FM 与红心电台**：红心电台走官方「心动模式」接口（红心歌单个性化推荐），FM 播完自动接续。
+- **网易播客**：播客发现页（分类 / 订阅 / 双榜单）、电台详情、订阅闭环、收听记忆全局续播、
+  单集互动（点赞 / 评论）。
+
+**视频与云盘**
+
+- **MV 全量支持**：歌曲菜单「看 MV」、MV 播放页（描述 / 评论 / 下载）、收藏 MV 页、
+  艺人视频页、主页 MV 货架与总榜二级页。
+- **网易云音乐云盘**：云盘详情页、歌曲批量上传（行内进度）、歌曲信息匹配 / 解除关联、
+  云盘歌曲管理与删除，云盘歌曲可直接加入队列播放。
+
+**收藏与歌单**
+
+- **收藏全面云端化**：红心 / 收藏歌单专辑 / 关注艺人都是云端账号状态，一处操作全端同步；
+  未登录时按钮置灰引导登录。
+- **自建歌单编辑**：改名 / 描述 / 标签（分类目录选择器）/ 封面上传 / 歌曲置顶，全套官方接口。
+- **本地歌单同步上云**：本地歌单一键同步为网易云端歌单（增量同步），所有云端写操作成功后
+  **本地即时回写**（事件总线 + 乐观更新，无需手动刷新）。
+- **评论**：网易歌曲 / 专辑 / 歌单 / MV / 播客评论——浏览、发布、回复、楼中楼、点赞。
+
+**播放品质**
+
+- **高音质**：网易 320k / 无损 FLAC 流播放，支持导出音频文件（FLAC/MP3 + 封面）到系统下载目录。
 - **歌词专线**：直接使用网易官方歌词（原文 / 人工翻译 / 官方罗马音），翻译质量优于 AI 翻译且不消耗 AI 配额。
-- **收藏全面云端化**：红心 / 收藏歌单专辑 / 关注艺人都是云端账号状态，一处操作全端同步；未登录时按钮置灰引导登录。
 - **灰歌处理**：无版权 / VIP 专属歌曲在列表中置灰显示，播放失败时按设置三档动作：自动跳过 / 暂停 /
   **自动匹配 YouTube Music 同名曲替换播放**（标题 + 艺人 + 时长择优，含防循环护栏）。
-- **高音质**：网易 320k / 无损 FLAC 流播放，支持导出音频文件（FLAC/MP3 + 封面）到系统下载目录。
 - **无尽队列与电台**：网易普通队列可开启无尽续播（播完自动续相似歌），电台按尾曲续批；
   队列页有「当前第几首」计数与浮动定位按钮。
-- **本地歌单同步上云**：本地歌单一键同步为网易云端歌单（增量同步），也可以在 app 内新建 / 管理 / 删除云端歌单，
-  所有云端写操作成功后**本地即时回写**（事件总线 + 乐观更新，无需手动刷新）。
 - **多选批量操作**：列表多选后批量点赞、批量添加到歌单、批量下载（双源各自执行，含未登录 / 混源门控提示）。
 
 ### ⚡ 播放稳定性与性能优化
@@ -75,25 +113,27 @@
 - **播放错误恢复重构**（参考 NeriPlayer）：重试尊重暂停意图、加载完成尊重中途暂停、ERROR 态按播放键原地重载、
   音频焦点交互计数防「暂停的歌自己复活」、取流失败退避重试。
 - **长音频静音 bug 修复**：分块截断导致 320k/FLAC 大文件只解码前段就静音，现网络流完整装载。
+- **下载重做**：下载改为文件式存储，目录按「歌手/专辑」整理，FLAC 写 Vorbis 注释、MV 落 Music 目录，
+  下载管理页七态分明，已下载内容离线稳定播放。
 - **封面与视觉**：播放页 / 详情页封面按 1080px 请求（原先被钉在 544px 导致模糊）；切歌封面零闪烁
   （pager 按页数据驱动）；歌词 stale-while-revalidate，切歌不再闪空。
 - **数字紧凑格式**：粉丝 / 播放 / 点赞等计数按语言习惯显示（中文万进制「17.5 万」，其它 K/M/B）。
 
 ### 🎨 UI / UX 细节
 
-- 队列页计数 + 浮动定位按钮（两种主题视图一致）。
 - **物理洗牌**：随机播放 = 队列物理重排（网易官方同款语义），通知栏随机按钮两态图标。
 - 触感反馈全局三档可调（含播放页 sheet、迷你条拉断切歌、封面翻页震感）。
 - Apple Music 主题横屏侧栏（35% 宽面板）compact 适配。
 - 下拉刷新静默化，指示器仅作「手势已受理」确认（≤600ms），不再陪跑全部网络请求。
 - 云端写操作失败有专属文案（如网易频控 405 专属提示，批量操作遇频控立即停止防止续期风控窗口）。
+- 应用内日志查看器（导出 / 暂停 / 筛选），问题排查不用连电脑。
 
 ### 🔇 相对上游隐藏 / 下线的功能
 
 出于「双源云端化」的设计取舍，部分上游功能在本 fork 中被隐藏或下线（本地歌单入口改为云端歌单、
 Discord 集成、导入播放列表等），完整清单与恢复方法见 [docs/HIDDEN_FEATURES.md](docs/HIDDEN_FEATURES.md)。
 
-## 构建
+## 🛠 构建
 
 ```bash
 git clone --recurse-submodules https://github.com/hedroid/SimpMusic.git
@@ -104,7 +144,7 @@ cd SimpMusic
 - Android 端为主要适配与验证平台（`com.maxrave.simpmusic.dev` 为 debug 包名）；桌面端沿用上游能力，网易源未做专门验证。
 - core 子模块：[hedroid/SimpMusic-Core](https://github.com/hedroid/SimpMusic-Core)（fork 自 [maxrave-dev/core](https://github.com/maxrave-dev/core)）。
 
-## 致谢
+## 🙏 致谢
 
 - **[maxrave-dev/SimpMusic](https://github.com/maxrave-dev/SimpMusic)** — 上游原版，本项目的基础。绝大部分功能（三主题播放页、
   SponsorBlock / Return YouTube Dislike、均衡器、Listen Together、桌面端等）由上游提供，请给上游一个 ⭐。
@@ -113,7 +153,7 @@ cd SimpMusic
 - [NeriPlayer](https://github.com/cwuom/NeriPlayer) — 播放稳定性与队列设计的参考实现。
 - 网易云音乐数据来自其公开 Web 接口，本应用仅作个人学习与自用客户端。
 
-## 法律声明
+## ⚖️ 法律声明
 
 本项目延续上游立场：仅供教育与个人使用的开源项目，不含任何商业行为；应用本身不托管、不上传、不分发任何音频或
 版权内容，所有流媒体内容分别来自 YouTube / YouTube Music 与网易云音乐的公开服务并归其版权方所有。请支持你喜欢的
