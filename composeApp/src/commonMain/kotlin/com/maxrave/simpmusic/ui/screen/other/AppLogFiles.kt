@@ -205,6 +205,9 @@ private val SECRETS =
         Regex("""((?:TRUE|FALSE)\t\d+\t[^\t\r\n]+\t)[^\t\r\n]+""") to "$1[redacted]",
         // A googlevideo URL carries the listener's IP, as ip=… or as an /ip/… path segment.
         Regex("""(?i)([?&/]ip[=/])[0-9a-f:.]+""") to "$1[redacted]",
+        // NetEase video CDN signatures (MV/playback links): without wsSecret the URL is inert,
+        // wsTime/authTime go with it so the redaction reads as a pair, not a leak of one half.
+        Regex("""(?i)([?&](?:wsSecret|wsTime|authSecret|authTime)=)[^&\s"']+""") to "$1[redacted]",
     )
 
 private fun redactSecrets(text: String): String = SECRETS.fold(text) { acc, (pattern, replacement) -> pattern.replace(acc, replacement) }

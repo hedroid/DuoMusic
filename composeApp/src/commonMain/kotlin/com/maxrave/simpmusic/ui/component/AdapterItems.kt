@@ -7,7 +7,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.focusable
@@ -292,6 +291,7 @@ fun MediaRow(
     subtitle: String? = null,
     headerThumbnail: String? = null,
     onHeaderClick: (() -> Unit)? = null,
+    onPlayAll: (() -> Unit)? = null,
     onMoreClick: (() -> Unit)? = null,
     titleColor: Color = MaterialTheme.colorScheme.onSurface,
     moreColor: Color = MaterialTheme.colorScheme.primary,
@@ -355,14 +355,11 @@ fun MediaRow(
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
-            if (onMoreClick != null) {
-                TextButton(
-                    onClick = onMoreClick,
-                    colors = ButtonDefaults.textButtonColors().copy(contentColor = moreColor),
-                ) {
-                    Text(stringResource(Res.string.more), style = typo().bodySmall)
-                }
-            }
+            ShelfTrailingButtons(
+                onPlayAll = onPlayAll,
+                onMoreClick = onMoreClick,
+                moreColor = moreColor,
+            )
         }
         LazyRow(
             state = lazyListState,
@@ -379,6 +376,83 @@ fun MediaRow(
                         .padding(horizontal = 16.dp),
                 scrollState = lazyListState,
                 flingBehavior = snapperFlingBehavior,
+            )
+        }
+    }
+}
+
+/**
+ * 横滑行头部的尾钮区:按 YTM HomeSectionHeader 的语义组装——"更多"(有二级页)与
+ * "Play all"(整队可播)按传入与否渲染,两者并存时 Play all 在前。
+ * 占位机制已拆(2026-10-13 三轮修订,用户:"有更多按钮那就是能跳转二级页的,要不就是
+ * 数据比较少不需要跳转")——按钮只在真能导航时出现;曾经的透明占位因 typo() 自带颜色
+ * 实际可见可点(点击无效果),连同概念一起移除。
+ */
+@Composable
+private fun ShelfTrailingButtons(
+    onPlayAll: (() -> Unit)?,
+    onMoreClick: (() -> Unit)?,
+    moreColor: Color,
+) {
+    if (onPlayAll != null) {
+        TextButton(
+            onClick = onPlayAll,
+            colors =
+                ButtonDefaults
+                    .textButtonColors()
+                    .copy(contentColor = moreColor),
+        ) {
+            Text(stringResource(Res.string.play_all), style = typo().bodySmall)
+        }
+    }
+    if (onMoreClick != null) {
+        TextButton(
+            onClick = onMoreClick,
+            colors =
+                ButtonDefaults
+                    .textButtonColors()
+                    .copy(contentColor = moreColor),
+        ) {
+            Text(stringResource(Res.string.more), style = typo().bodySmall)
+        }
+    }
+}
+
+/**
+ * 单行横滑行的标题行(体不是 LazyRow 的行——三行歌曲网格/网格行/分区标题共用):
+ * 标题 + [ShelfTrailingButtons],几何与 MediaRow 头部一致,让一页里两种行的
+ * 标题基线与尾钮位完全对齐。
+ */
+@Composable
+fun ShelfTitleRow(
+    title: String,
+    modifier: Modifier = Modifier,
+    onPlayAll: (() -> Unit)? = null,
+    onMoreClick: (() -> Unit)? = null,
+    titleColor: Color = MaterialTheme.colorScheme.onSurface,
+    moreColor: Color = MaterialTheme.colorScheme.primary,
+    horizontalPadding: Dp = 15.dp,
+    // 非空时整个尾钮区换成它——如新歌速递切地区时的小转圈,占住同一槽位
+    trailing: (@Composable () -> Unit)? = null,
+) {
+    Row(
+        modifier = modifier.padding(horizontal = horizontalPadding),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = title,
+            style = typo().headlineMedium,
+            color = titleColor,
+            maxLines = 1,
+            modifier = Modifier.weight(1f),
+        )
+        if (trailing != null) {
+            trailing()
+        } else {
+            ShelfTrailingButtons(
+                onPlayAll = onPlayAll,
+                onMoreClick = onMoreClick,
+                moreColor = moreColor,
             )
         }
     }
@@ -745,7 +819,7 @@ fun HomeItemContentPlaylist(
                     // One floor for every home card, so a row mixing them stays one height. A
                     // cell-filling card has no such row to match and its artwork is narrower than
                     // thumbSize, so the floor would only add empty space under every tile.
-                    .then(if (fillMaxWidth) Modifier else Modifier.heightIn(min = thumbSize + 76.dp)),
+                    .then(if (fillMaxWidth) Modifier else Modifier.heightIn(min = thumbSize + 56.dp)),
         ) {
             val thumb =
                 when (data) {
@@ -910,12 +984,13 @@ fun HomeItemContentPlaylist(
                     },
                 style = typo().titleSmall,
                 color = titleColor,
-                maxLines = 2,
+                // 卡下文本两行全静态省略(2026-10-13 七轮:主标题跑马灯"感觉有点乱"停用——卡族跑马灯整体退场)
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier =
                     textWidth
                         .wrapContentHeight(align = Alignment.CenterVertically)
-                        .padding(start = 10.dp, top = 8.dp),
+                    .padding(start = 10.dp, top = 8.dp),
             )
             Text(
                 text =
@@ -986,7 +1061,9 @@ fun HomeItemContentPlaylist(
                         }
 
                         is AlbumsResult -> {
-                            data.year
+                            // 副标签=歌手,缺失回退年份(2026-10-13 用户反馈"新碟上架
+                            // 卡片副标签怎么都显示年份"——官方 app 显示歌手)
+                            data.artists.toListName().connectArtists().ifBlank { data.year }
                         }
 
                         else -> {
@@ -1001,11 +1078,7 @@ fun HomeItemContentPlaylist(
                     textWidth
                         .wrapContentHeight(align = Alignment.CenterVertically)
                         .padding(start = 10.dp)
-                        .basicMarquee(
-                            initialDelayMillis = 2000,
-                            repeatDelayMillis = 2000,
-                            velocity = 25.dp,
-                        ),
+                        ,
             )
         }
     }
@@ -1080,11 +1153,6 @@ fun QuickPicksItem(
                             .wrapContentHeight(align = Alignment.CenterVertically)
                             .padding(
                                 bottom = 3.dp,
-                            ).basicMarquee(
-                                iterations = Int.MAX_VALUE,
-                                initialDelayMillis = 2000,
-                                repeatDelayMillis = 2000,
-                                velocity = 25.dp,
                             ),
                 )
                 LazyRow(verticalAlignment = Alignment.CenterVertically) {
@@ -1110,11 +1178,7 @@ fun QuickPicksItem(
                                 Modifier
                                     .fillMaxWidth()
                                     .wrapContentHeight(align = Alignment.CenterVertically)
-                                    .basicMarquee(
-                                        initialDelayMillis = 2000,
-                                        repeatDelayMillis = 2000,
-                                        velocity = 25.dp,
-                                    ),
+                                    ,
                         )
                     }
                 }
@@ -1153,7 +1217,7 @@ fun HomeItemSong(
         Column(
             modifier =
                 Modifier
-                    .then(if (fillMaxWidth) Modifier else Modifier.heightIn(min = 236.dp)),
+                    .then(if (fillMaxWidth) Modifier else Modifier.heightIn(min = 210.dp)),
         ) {
             val thumb =
                 data.thumbnails.lastOrNull()?.url?.let {
@@ -1190,13 +1254,13 @@ fun HomeItemSong(
                 text = data.title,
                 style = typo().titleSmall,
                 color = MaterialTheme.colorScheme.onSurface,
-                minLines = 2,
-                maxLines = 2,
+                // 卡下文本两行全静态省略(2026-10-13 七轮:主标题跑马灯"感觉有点乱"停用——卡族跑马灯整体退场)
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier =
                     textWidth
                         .wrapContentHeight(align = Alignment.CenterVertically)
-                        .padding(start = 10.dp, top = 8.dp),
+                    .padding(start = 10.dp, top = 8.dp),
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 AnimatedVisibility(visible = data.isExplicit == true) {
@@ -1224,11 +1288,7 @@ fun HomeItemSong(
                     modifier =
                         textWidth
                             .wrapContentHeight(align = Alignment.CenterVertically)
-                            .basicMarquee(
-                                initialDelayMillis = 2000,
-                                repeatDelayMillis = 2000,
-                                velocity = 25.dp,
-                            ).padding(start = 10.dp, top = 3.dp, bottom = 3.dp),
+                            .padding(start = 10.dp, top = 3.dp, bottom = 3.dp),
                 )
             }
         }
@@ -1265,7 +1325,7 @@ fun HomeItemVideo(
         Column(
             modifier =
                 Modifier
-                    .then(if (fillMaxWidth) Modifier else Modifier.heightIn(min = 236.dp)),
+                    .then(if (fillMaxWidth) Modifier else Modifier.heightIn(min = 210.dp)),
         ) {
             val thumb = data.thumbnails.lastOrNull()?.url
             Box(Modifier.align(Alignment.CenterHorizontally)) {
@@ -1296,16 +1356,18 @@ fun HomeItemVideo(
                 text = data.title,
                 style = typo().titleSmall,
                 color = titleColor,
-                minLines = 2,
-                maxLines = 2,
+                // 卡下文本两行全静态省略(2026-10-13 七轮:主标题跑马灯"感觉有点乱"停用——卡族跑马灯整体退场)
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier =
                     textWidth
                         .wrapContentHeight(align = Alignment.CenterVertically)
-                        .padding(start = 10.dp, top = 8.dp),
+                    .padding(start = 10.dp, top = 8.dp),
             )
             Row(
-                modifier = textWidth.padding(vertical = 2.dp),
+                // start=10 与标题同一边距(2026-10-13 用户反馈视频卡副标题没左对齐——
+                // 此前该行只有 vertical padding,副标题顶到卡左缘,比标题凸出 10dp)
+                modifier = textWidth.padding(start = 10.dp, top = 2.dp, end = 10.dp, bottom = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 // Ahead of the channel name, where YouTube Music puts it.
@@ -1327,11 +1389,7 @@ fun HomeItemVideo(
                         Modifier
                             .weight(1f)
                             .wrapContentHeight(align = Alignment.CenterVertically)
-                            .basicMarquee(
-                                initialDelayMillis = 2000,
-                                repeatDelayMillis = 2000,
-                                velocity = 25.dp,
-                            ),
+                            ,
                 )
             }
         }
@@ -1384,7 +1442,7 @@ fun HomeItemArtist(
         Column(
             modifier =
                 Modifier
-                    .then(if (fillMaxWidth) Modifier else Modifier.heightIn(min = 236.dp)),
+                    .then(if (fillMaxWidth) Modifier else Modifier.heightIn(min = 210.dp)),
         ) {
             val thumb = data.thumbnails.lastOrNull()?.url
             AsyncImage(
@@ -1412,14 +1470,15 @@ fun HomeItemArtist(
                 text = data.title,
                 style = typo().titleSmall,
                 color = titleColor,
-                minLines = 2,
-                maxLines = 2,
+                // 卡下文本两行全静态省略(2026-10-13 七轮:主标题跑马灯"感觉有点乱"停用——卡族跑马灯整体退场)
+                // (标准档:2s 间隔重复,非 Immediately——性能优先,不超宽零动画)
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center,
                 modifier =
                     textWidth
                         .wrapContentHeight(align = Alignment.CenterVertically)
-                        .padding(top = 8.dp),
+                    .padding(top = 8.dp),
             )
             Text(
                 text = data.description?.takeIf { it.isNotBlank() }.orEmpty(),
@@ -1431,11 +1490,7 @@ fun HomeItemArtist(
                 modifier =
                     textWidth
                         .wrapContentHeight(align = Alignment.CenterVertically)
-                        .basicMarquee(
-                            initialDelayMillis = 2000,
-                            repeatDelayMillis = 2000,
-                            velocity = 25.dp,
-                        ),
+                        ,
             )
         }
     }
@@ -1570,11 +1625,7 @@ fun ItemVideoChart(
                             Modifier
                                 .width(210.dp)
                                 .wrapContentHeight(align = Alignment.CenterVertically)
-                                .basicMarquee(
-                                    initialDelayMillis = 2000,
-                                    repeatDelayMillis = 2000,
-                                    velocity = 25.dp,
-                                ).padding(vertical = 3.dp),
+                                .padding(vertical = 3.dp),
                     )
                 }
             }
@@ -1679,11 +1730,7 @@ fun ItemArtistChart(
                     modifier =
                         Modifier
                             .wrapContentHeight(align = Alignment.CenterVertically)
-                            .basicMarquee(
-                                initialDelayMillis = 2000,
-                                repeatDelayMillis = 2000,
-                                velocity = 25.dp,
-                            ),
+                            ,
                     )
                 }
             }
@@ -1787,11 +1834,7 @@ fun ItemTrackChart(
                         Modifier
                             .fillMaxWidth()
                             .wrapContentHeight(align = Alignment.CenterVertically)
-                            .basicMarquee(
-                                initialDelayMillis = 2000,
-                                repeatDelayMillis = 2000,
-                                velocity = 25.dp,
-                            ),
+                            ,
                 )
             }
         }

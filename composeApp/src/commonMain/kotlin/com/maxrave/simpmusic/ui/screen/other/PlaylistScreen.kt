@@ -1190,15 +1190,8 @@ fun PlaylistScreen(
                                                         },
                                                     )
                                                 }
-                                                // 网易官方标签(编辑歌单信息可改;YT 歌单恒空不渲染)
-                                                if (data.tags.isNotEmpty()) {
-                                                    Text(
-                                                        text = "${stringResource(Res.string.playlist_tags)}: ${data.tags.joinToString(" · ")}",
-                                                        color = Color.White.copy(alpha = 0.59f),
-                                                        style = typo().bodySmall,
-                                                        modifier = Modifier.padding(top = 4.dp),
-                                                    )
-                                                }
+                                                // 标签只在沉浸头"歌单•年份"下渲染一处(2026-10-13
+                                                // 用户反馈描述下重复显示,此处副本删除)
                                                 Text(
                                                     text =
                                                         if (data.isRadio) {

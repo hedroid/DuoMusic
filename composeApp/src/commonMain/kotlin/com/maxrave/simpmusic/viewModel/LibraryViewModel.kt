@@ -287,7 +287,13 @@ class LibraryViewModel(
                     // 进库默认选第一个可见 chip(2026-09-20 定序:网易云 → YT → 排行榜)。
                     // 不再恢复持久化选中——持久化值没有其它读者,选中记忆与"点库回到
                     // 第一个分区"的需求冲突;运行中登出网易的回落由下面的 collect 兜底。
-                    setCurrentScreen(defaultLibraryChip())
+                    // 深链请求挂起时让位:simpmusic://library?tab= 的目标 chip 由库页的
+                    // 消费 effect 落定——请求在导航前设置、先于本 VM 创建,同步读无竞态;
+                    // 这里再写默认会与深链落定竞速,冷启动互相覆盖(初始 YOUR_LIBRARY 的
+                    // 回落协程同理,见 LibraryScreen 回落 effect 的让位门)。
+                    if (sharedViewModel.libraryTabRequest.value == null) {
+                        setCurrentScreen(defaultLibraryChip())
+                    }
                 }
             val accountThumbJob =
                 launch {

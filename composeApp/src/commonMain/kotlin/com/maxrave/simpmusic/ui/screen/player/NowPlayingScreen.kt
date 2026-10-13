@@ -96,6 +96,7 @@ import com.maxrave.domain.data.model.browse.album.Track
 import com.maxrave.domain.utils.toSongEntity
 import com.maxrave.simpmusic.ui.component.NowPlayingBottomSheet
 import com.maxrave.simpmusic.ui.component.QueueBottomSheet
+import com.maxrave.simpmusic.ui.component.queueRowIsCloudDisk
 import com.maxrave.simpmusic.ui.component.QueuePosition
 import com.maxrave.simpmusic.ui.component.VoteLyricsDialog
 import com.maxrave.simpmusic.ui.icon.KeyboardArrowDown
@@ -1105,7 +1106,16 @@ fun NowPlayingScreenContent(
             onDismiss = { queueMoreFor = null },
             navController = navController,
             song = track.toSongEntity(),
-            queuePosition = QueuePosition(index, track.videoId),
+            queuePosition =
+                QueuePosition(
+                    index,
+                    track.videoId,
+                    artworkQueue.getOrNull(index - 1)?.videoId,
+                    artworkQueue.getOrNull(index + 1)?.videoId,
+                ),
+            // 云盘队列行身份与队列弹窗同口径(见 queueRowIsCloudDisk);播放页当前曲
+            // 菜单另有整套出处判定,这里只是队列行入口,不重复那套
+            isCloudDiskSong = queueRowIsCloudDisk(queueDataState, track),
             onNavigateToOtherScreen = { onDismiss() },
         )
     }

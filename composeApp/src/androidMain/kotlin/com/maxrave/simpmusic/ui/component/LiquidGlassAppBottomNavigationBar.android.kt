@@ -318,13 +318,6 @@ actual fun LiquidGlassAppBottomNavigationBar(
                             contentAlignment = Alignment.Center,
                         ) {
                             BottomNavScreen.Search.icon()
-                            SourceSwitchMenu(
-                                expanded = showSourceMenu,
-                                onDismiss = { showSourceMenu = false },
-                                selectedSource = selectedSource,
-                                neteaseLoggedIn = neteaseLoggedIn,
-                                onSourceSelected = onSourceSelected,
-                            )
                         }
                     } else {
                         FlatTabBar(
@@ -339,15 +332,6 @@ actual fun LiquidGlassAppBottomNavigationBar(
                             onClick = { selectTab(BottomNavScreen.Search.ordinal) },
                             onLongPress = { showSourceMenu = true },
                             switchSourceLabel = stringResource(Res.string.switch_music_source),
-                            content = {
-                                SourceSwitchMenu(
-                                    expanded = showSourceMenu,
-                                    onDismiss = { showSourceMenu = false },
-                                    selectedSource = selectedSource,
-                                    neteaseLoggedIn = neteaseLoggedIn,
-                                    onSourceSelected = onSourceSelected,
-                                )
-                            },
                         )
                     }
                 },
@@ -401,6 +385,25 @@ actual fun LiquidGlassAppBottomNavigationBar(
                     viewModel.isServiceRunning = false
                 },
             )
+        }
+        // The search FAB is placed through an animated custom Layout and can temporarily be
+        // unplaced while the bar folds. Keep the popup anchored to this stable outer Box instead:
+        // an already visible menu must retain a live hit target across page/scroll relayouts.
+        if (showSourceMenu) {
+            Box(
+                Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = BarEdgePadding)
+                    .size(SearchSize),
+            ) {
+                SourceSwitchMenu(
+                    expanded = true,
+                    onDismiss = { showSourceMenu = false },
+                    selectedSource = selectedSource,
+                    neteaseLoggedIn = neteaseLoggedIn,
+                    onSourceSelected = onSourceSelected,
+                )
+            }
         }
     }
 }

@@ -105,7 +105,12 @@ import com.maxrave.simpmusic.ui.icon.ArrowBackIosNew
 import com.maxrave.simpmusic.ui.icon.KeyboardArrowDown
 import com.maxrave.simpmusic.ui.icon.ReceiptLong
 import com.maxrave.simpmusic.ui.icon.SimpIcons
+import com.maxrave.domain.data.model.taste.TasteProfile
+import com.maxrave.simpmusic.ui.component.taste.ShareTasteSheet
+import com.maxrave.simpmusic.ui.component.taste.TasteCard
+import com.maxrave.simpmusic.viewModel.TasteUiState
 import com.maxrave.simpmusic.ui.navigation.destination.home.RecentlySongsDestination
+import com.maxrave.simpmusic.ui.navigation.destination.home.SettingsDestination
 import com.maxrave.simpmusic.ui.navigation.destination.home.WrappedDestination
 import com.maxrave.simpmusic.ui.navigation.destination.library.LibraryDynamicPlaylistDestination
 import com.maxrave.simpmusic.ui.navigation.destination.list.AlbumDestination
@@ -116,6 +121,7 @@ import com.maxrave.simpmusic.ui.theme.typo
 import com.maxrave.simpmusic.viewModel.AnalyticsUiState
 import com.maxrave.simpmusic.viewModel.AnalyticsViewModel
 import com.maxrave.simpmusic.viewModel.SharedViewModel
+import com.maxrave.simpmusic.viewModel.TasteViewModel
 import com.maxrave.simpmusic.viewModel.SongSelectionViewModel
 import com.maxrave.simpmusic.viewModel.WrappedUiState
 import com.maxrave.simpmusic.viewModel.WrappedViewModel
@@ -186,6 +192,12 @@ fun AnalyticsScreen(
     // this year's own figures to say what is waiting, so there is no cheaper question to ask —
     // and the banner must be absent, not empty, when the year is too thin to fill a reel.
     val wrappedState by wrappedViewModel.uiState.collectAsStateWithLifecycle()
+    // AI 品味卡片(上游 2.3.0 特性):上游挂在"您的库"分区,fork 没有该分区——改挂
+    // 听歌分析页:双源可达,且与卡片同样以 localTrackingEnabled 为前提(VM 自门控,
+    // 关追踪时 Hidden 不渲染)。simpmusic://taste 深链也指向本页。
+    val tasteViewModel: TasteViewModel = koinViewModel()
+    val tasteState by tasteViewModel.uiState.collectAsStateWithLifecycle()
+    var sharingTaste by remember { mutableStateOf<TasteProfile?>(null) }
     val playingTrack by sharedViewModel.nowPlayingState.map { it?.songEntity?.videoId ?: it?.track?.videoId }.collectAsState(null)
 
     // Which header is used depends on the window's aspect ratio alone, exactly as on Album and
@@ -391,6 +403,23 @@ fun AnalyticsScreen(
                 }
             }
 
+            if (tasteState != TasteUiState.Hidden) {
+                item {
+                    TasteCard(
+                        state = tasteState,
+                        onGenerate = tasteViewModel::generate,
+                        onOpenSettings = { navController.navigate(SettingsDestination) },
+                        onShare = { sharingTaste = it },
+                        modifier =
+                            Modifier.padding(
+                                start = if (isPortrait) CONTENT_INSET else LANDSCAPE_GUTTER + CONTENT_INSET,
+                                end = if (isPortrait) CONTENT_INSET else LANDSCAPE_GUTTER + CONTENT_INSET,
+                                bottom = 12.dp,
+                            ),
+                    )
+                }
+            }
+
             if (isPortrait) {
                 item { QuickFactsSection(uiState, CONTENT_INSET, 2) }
                 item {
@@ -527,6 +556,13 @@ fun AnalyticsScreen(
                 uiState = uiState,
                 backdrop = headerBackdrop,
                 onPick = { analyticsViewModel.setDayRange(it) },
+            )
+        }
+
+        sharingTaste?.let { profile ->
+            ShareTasteSheet(
+                profile = profile,
+                onDismiss = { sharingTaste = null },
             )
         }
 

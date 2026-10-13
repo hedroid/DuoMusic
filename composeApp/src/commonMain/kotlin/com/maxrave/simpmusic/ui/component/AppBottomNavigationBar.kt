@@ -73,7 +73,7 @@ fun AppBottomNavigationBar(
 ) {
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     // `ordinal` identifies a tab, it is NOT the position — Mix for you and Analytics sit before
-    // Library here while keeping the ordinal they were declared with, so that the numbering stays
+    // Library here while keeping the ordinal each was declared with, so that the numbering stays
     // stable whether or not those tabs are present.
     val bottomNavScreens =
         listOfNotNull(
@@ -104,6 +104,15 @@ fun AppBottomNavigationBar(
         ) {
             selectedIndex = BottomNavScreen.Home.ordinal
         }
+    }
+    // Programmatic navigation (launcher shortcuts, deep links) swaps the destination without
+    // going through selectTab, so the highlight must follow the back stack. Only top-level
+    // tab routes match — deeper screens leave the highlight where the last tab tap put it.
+    LaunchedEffect(currentBackStackEntry) {
+        val hierarchy = currentBackStackEntry?.destination?.hierarchy ?: return@LaunchedEffect
+        bottomNavScreens
+            .firstOrNull { screen -> hierarchy.any { it.hasRoute(screen.destination::class) } }
+            ?.let { selectedIndex = it.ordinal }
     }
     val selectTab: (BottomNavScreen) -> Unit = { screen ->
         // 底栏 tab 的点击震感:根触感观察器的事件链到不了 bottomBar slot(实测既有边界)

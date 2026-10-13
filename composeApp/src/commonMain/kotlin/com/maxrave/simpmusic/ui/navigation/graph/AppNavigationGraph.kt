@@ -15,10 +15,22 @@ import com.maxrave.simpmusic.ui.navigation.destination.home.AnalyticsDestination
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.maxrave.domain.source.MusicSource
+import com.maxrave.simpmusic.ui.navigation.destination.home.NeteaseHQDestination
+import com.maxrave.simpmusic.ui.navigation.destination.home.NeteaseMvGridDestination
+import com.maxrave.simpmusic.ui.navigation.destination.home.NeteaseRadarDestination
+import com.maxrave.simpmusic.ui.navigation.destination.home.NeteaseNewAlbumsDestination
+import com.maxrave.simpmusic.ui.navigation.destination.home.NeteaseRadioListDestination
 import com.maxrave.simpmusic.ui.navigation.destination.home.NeteaseTagDestination
+import com.maxrave.simpmusic.ui.navigation.destination.home.NeteaseToplistDestination
+import com.maxrave.simpmusic.ui.screen.home.NeteaseHQScreen
+import com.maxrave.simpmusic.ui.screen.home.NeteaseNewAlbumsScreen
 import com.maxrave.simpmusic.ui.screen.home.NeteaseHomeScreen
 import com.maxrave.simpmusic.ui.screen.home.NeteaseMixScreen
+import com.maxrave.simpmusic.ui.screen.home.NeteaseArtistVideosScreen
+import com.maxrave.simpmusic.ui.screen.home.NeteaseMvGridScreen
+import com.maxrave.simpmusic.ui.screen.home.NeteaseRadarScreen
 import com.maxrave.simpmusic.ui.screen.home.NeteaseTagScreen
+import com.maxrave.simpmusic.ui.screen.home.NeteaseToplistScreen
 import com.maxrave.simpmusic.viewModel.SharedViewModel
 import org.koin.compose.koinInject
 import androidx.navigation.toRoute
@@ -33,6 +45,7 @@ import com.maxrave.simpmusic.ui.screen.home.HomeScreen
 import com.maxrave.simpmusic.ui.screen.home.analytics.AnalyticsScreen
 import com.maxrave.simpmusic.ui.screen.home.wrapped.WrappedScreen
 import com.maxrave.simpmusic.ui.screen.library.LibraryScreen
+import com.maxrave.simpmusic.ui.screen.library.NeteaseRadioListScreen
 import com.maxrave.simpmusic.ui.screen.library.MixForYouScreen
 import com.maxrave.simpmusic.ui.screen.other.SearchScreen
 import com.maxrave.simpmusic.ui.screen.player.FullscreenPlayer
@@ -86,6 +99,57 @@ fun AppNavigationGraph(
             NeteaseTagScreen(
                 navController = navController,
                 tag = entry.toRoute<NeteaseTagDestination>().tag,
+            )
+        }
+        composable<NeteaseHQDestination> { entry ->
+            NeteaseHQScreen(
+                navController = navController,
+                title = entry.toRoute<NeteaseHQDestination>().title,
+            )
+        }
+        composable<NeteaseToplistDestination> { entry ->
+            NeteaseToplistScreen(
+                navController = navController,
+                title = entry.toRoute<NeteaseToplistDestination>().title,
+            )
+        }
+        composable<NeteaseMvGridDestination> { entry ->
+            val data = entry.toRoute<NeteaseMvGridDestination>()
+            if (data.source == com.maxrave.simpmusic.viewModel.NeteaseMvGridSource.ARTIST) {
+                NeteaseArtistVideosScreen(
+                    navController = navController,
+                    artistId = data.artistId,
+                    artistName = data.artistName,
+                )
+            } else {
+                NeteaseMvGridScreen(
+                    navController = navController,
+                    source = data.source,
+                    artistId = data.artistId,
+                    title = data.title,
+                )
+            }
+        }
+        composable<NeteaseRadarDestination> { entry ->
+            NeteaseRadarScreen(
+                navController = navController,
+                title = entry.toRoute<NeteaseRadarDestination>().title,
+            )
+        }
+        composable<NeteaseNewAlbumsDestination> { entry ->
+            val data = entry.toRoute<NeteaseNewAlbumsDestination>()
+            NeteaseNewAlbumsScreen(
+                navController = navController,
+                title = data.title,
+                initialArea = data.area,
+            )
+        }
+        composable<NeteaseRadioListDestination> { entry ->
+            val data = entry.toRoute<NeteaseRadioListDestination>()
+            NeteaseRadioListScreen(
+                navController = navController,
+                source = data.source,
+                title = data.title,
             )
         }
         composable<SearchDestination> {

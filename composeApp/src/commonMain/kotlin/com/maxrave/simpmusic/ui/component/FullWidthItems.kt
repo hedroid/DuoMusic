@@ -68,7 +68,9 @@ import com.maxrave.domain.data.entities.DownloadState
 import com.maxrave.domain.data.entities.LocalPlaylistEntity
 import com.maxrave.domain.data.entities.PlaylistEntity
 import com.maxrave.domain.data.entities.PodcastsEntity
+import com.maxrave.common.NETEASE_MV_MEDIA_ID_PREFIX
 import com.maxrave.domain.data.entities.SongEntity
+import com.maxrave.domain.utils.MusicVideoType
 import com.maxrave.domain.data.model.browse.album.Track
 import com.maxrave.domain.data.model.searchResult.albums.AlbumsResult
 import com.maxrave.domain.data.model.searchResult.artists.ArtistsResult
@@ -112,6 +114,21 @@ import kotlin.math.roundToInt
 // rememberActualPlaying 提升到了 PlaybackIndicators.kt(下载管理行也要同款两态指示)
 
 /**
+ * 该行是否视频曲目(MV/视频歌):网易 MV=NETEASE_MV_ 哨兵或 resultType=mv;YT 视频=
+ * videoType 为非 ATV 的 MUSIC_VIDEO_TYPE_*(MusicVideoType.isVideoSong)。视频行缩略图
+ * 槽高与歌曲行一致 48dp、宽按 16:9 等比放大(用户 2026-10-13 四轮定稿,不裁剪)。
+ */
+private fun isVideoRowTrack(
+    track: Track?,
+    songEntity: SongEntity?,
+): Boolean {
+    val id = track?.videoId ?: songEntity?.videoId ?: ""
+    if (id.startsWith(NETEASE_MV_MEDIA_ID_PREFIX)) return true
+    if (track?.resultType == "mv") return true
+    return MusicVideoType.isVideoSong(track?.videoType ?: songEntity?.videoType)
+}
+
+/**
  * This is the song item in the playlist or other places.
  *
  * Multi-selection is opt-in per screen: pass [onLongClick] to let a long press start it, then
@@ -144,8 +161,13 @@ fun SongFullWidthItems(
     // 无版权/下架(网易灰歌,privilege.st 判定):标题+艺人整体降透明度;行保留可点——
     // 点击仍会尝试播放,失败由"无版权歌曲动作"设置接管(跳过/暂停/回退 YT)。
     // 2026-09-25 上游合并曾丢掉这三行(d225d53f 重排行内部),按 bda1aab5 原样恢复。
+    // 按源门控(2026-10-13,用户"艺人页喜欢的歌曲 YT 全灰"):灰歌是网易独有概念,
+    // YT/云盘哨兵/MV 一律不参与置灰——本地行 isAvailable 是冻结快照,只有网易数字 id
+    // 才有"版权态"语义(YT 行历史遗留 false 不再误伤)。
+    val unavailableId = songEntity?.videoId ?: track?.videoId
     val unavailable =
-        songEntity?.isAvailable == false || (songEntity == null && track?.isAvailable == false)
+        unavailableId?.toLongOrNull() != null &&
+            (songEntity?.isAvailable == false || (songEntity == null && track?.isAvailable == false))
     val titleColor = if (unavailable) contentColor.copy(alpha = 0.4f) else contentColor
     val dimmedSubtitleColor = if (unavailable) subtitleColor.copy(alpha = 0.4f) else subtitleColor
     val maxOffset = 360f
@@ -281,8 +303,17 @@ fun SongFullWidthItems(
                         Spacer(modifier = Modifier.width(12.dp))
                     }
                 }
+                // 视频行缩略图(2026-10-13 四轮定稿):高与歌曲行一致(48dp,上下占位同
+                // 歌曲卡),宽按 16:9 等比放大(~85dp)——完整画面不裁剪;推翻三轮的
+                // "同宽 48 高 27"与二轮的裁方两版
+                val videoThumb = isVideoRowTrack(track, songEntity)
                 Box(
-                    modifier = Modifier.size(48.dp),
+                    modifier =
+                        if (videoThumb) {
+                            Modifier.height(48.dp).aspectRatio(16f / 9f)
+                        } else {
+                            Modifier.size(48.dp)
+                        },
                     contentAlignment = Alignment.Center,
                 ) {
                     // The slot shows on the current row; whether the bars animate follows the
@@ -316,7 +347,10 @@ fun SongFullWidthItems(
                                 placeholder = coverFallbackPainter ?: rememberHolderPainter(),
                                 error = coverFallbackPainter ?: rememberHolderPainter(),
                                 contentDescription = null,
-                                contentScale = ContentScale.FillWidth,
+                                // Crop:方源零变化;16:9 视频源填满 48dp 方槽(2026-10-13 用户
+                                // "视频卡片宽度以音乐卡片为基准统一"——FillWidth 只填宽,视频行
+                                // 缩略图缩成 48×27 横带浮在槽里,与歌曲行的满槽方图宽度观感不一)
+                                contentScale = ContentScale.Crop,
                                 alpha = if (unavailable) 0.4f else 1f,
                                 modifier =
                                     Modifier
@@ -487,11 +521,11 @@ fun SuggestItems(
                             placeholder = rememberHolderPainter(),
                             error = rememberHolderPainter(),
                             contentDescription = null,
-                            contentScale = ContentScale.FillWidth,
+                            // 同 SongFullWidthItems:Crop 填满 40dp 方槽(视频源不再缩成横带)
+                            contentScale = ContentScale.Crop,
                             modifier =
                                 Modifier
-                                    .wrapContentHeight()
-                                    .fillMaxWidth()
+                                    .fillMaxSize()
                                     .clip(RoundedCornerShape(4.dp)),
                         )
                     }
@@ -642,7 +676,8 @@ fun PlaylistFullWidthItems(
                     placeholder = rememberHolderPainter(),
                     error = rememberHolderPainter(),
                     contentDescription = null,
-                    contentScale = ContentScale.FillWidth,
+                    // 同 SongFullWidthItems:Crop 填满槽位(方源无视觉变化)
+                    contentScale = ContentScale.Crop,
                     modifier =
                         Modifier
                             .fillMaxSize()

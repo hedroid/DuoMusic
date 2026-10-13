@@ -72,18 +72,32 @@ import androidx.navigation.NavController
 import com.maxrave.simpmusic.ui.component.ItemArtistChart
 import com.maxrave.simpmusic.ui.component.rememberHolderPainter
 import com.maxrave.simpmusic.extension.isScrollingUp
+import com.maxrave.simpmusic.extension.scrollReportingEffect
 import com.maxrave.simpmusic.ui.component.Chip
 import com.maxrave.simpmusic.ui.component.EndOfPage
 import com.maxrave.simpmusic.ui.component.HomeItemContentPlaylist
 import com.maxrave.simpmusic.ui.component.HomeItemSong
+import com.maxrave.simpmusic.ui.component.HomeItemVideo
 import com.maxrave.simpmusic.ui.component.MoodMomentAndGenreHomeItem
 import com.maxrave.simpmusic.ui.component.HomeShimmer
+import com.maxrave.simpmusic.ui.component.NowPlayingBottomSheet
+import com.maxrave.simpmusic.ui.component.ShelfTitleRow
 import com.maxrave.simpmusic.ui.icon.PlaylistRemove
 import com.maxrave.simpmusic.ui.icon.SimpIcons
+import com.maxrave.simpmusic.ui.component.MediaRow
+import com.maxrave.simpmusic.ui.navigation.destination.home.HomeDestination
+import com.maxrave.simpmusic.ui.navigation.destination.home.NeteaseHQDestination
+import com.maxrave.simpmusic.ui.navigation.destination.home.NeteaseMvGridDestination
+import com.maxrave.simpmusic.ui.navigation.destination.home.NeteaseNewAlbumsDestination
 import com.maxrave.simpmusic.ui.navigation.destination.home.NeteaseTagDestination
+import com.maxrave.simpmusic.ui.navigation.destination.home.NeteaseToplistDestination
 import com.maxrave.simpmusic.ui.navigation.destination.list.PlaylistDestination
 import com.maxrave.simpmusic.ui.theme.typo
 import com.maxrave.simpmusic.viewModel.NeteaseHomeViewModel
+import com.maxrave.simpmusic.viewModel.NeteaseMvGridSource
+import com.maxrave.simpmusic.viewModel.SharedViewModel
+import com.maxrave.domain.utils.toSongEntity
+import com.maxrave.domain.utils.toTrack
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import simpmusic.composeapp.generated.resources.Res
@@ -105,29 +119,48 @@ fun NeteaseHomeScreen(
     viewModel: NeteaseHomeViewModel = koinInject(),
     navController: NavController,
 ) {
+    // 上游启动横幅(远端配置 PromoBanner)已在 fork 整体移除——内容是 maxrave 的公告
+    // 渠道,两个主页(YTM/网易)都不带(与博客/X 引流同口径)。
     val sharedViewModel: com.maxrave.simpmusic.viewModel.SharedViewModel = koinInject()
     val state by viewModel.state.collectAsStateWithLifecycle()
     val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
     val accountInfo by viewModel.accountInfo.collectAsStateWithLifecycle()
     val scrollState = rememberLazyListState()
+    // 位移粒度滚动上报(库页同款 scrollReportingEffect,含贴底回吸兜底;index-only
+    // 旧上报把末端钳制回吸读成上滑致底栏振荡——2026-10-13 混合页回归案,两页同修)
+    scrollState.scrollReportingEffect(onScrolling)
+    // 顶栏标题行显隐仍用方向态(上游同款;只管标题不管底栏上报)
     val isScrollingUp by scrollState.isScrollingUp()
     val pullToRefreshState = rememberPullToRefreshState()
     val chipRowState = rememberScrollState()
     var topAppBarHeightPx by remember { mutableIntStateOf(0) }
+    // 视频卡/歌曲卡长按=歌曲菜单(YT 主页同款;MV 行经 NETEASE_MV_ 哨兵自动换 MV 语义行)
+    var menuTrack by remember {
+        mutableStateOf<com.maxrave.domain.data.model.browse.album.Track?>(null)
+    }
+    menuTrack?.let { track ->
+        NowPlayingBottomSheet(
+            onDismiss = { menuTrack = null },
+            song = track.toSongEntity(),
+            navController = navController,
+        )
+    }
 
     // VM 是进程级 single,数据驻留整进程;每次本页重组(含 tab 切回)交给 VM 检测跨天,
     // 跨天则静默刷新一轮(行保持内容原位替换),同一天内零重拉
     LaunchedEffect(Unit) { viewModel.onScreenShown() }
 
-    LaunchedEffect(scrollState) {
-        snapshotFlow { scrollState.firstVisibleItemIndex }
-            .collect {
-                if (it <= 1) {
-                    onScrolling(true)
-                } else {
-                    onScrolling(isScrollingUp)
-                }
+    // 切源跳主页+刷新的落点(2026-10-13):消费与 YT 主页同一信号,静默刷新(行原地替换)
+    val reloadDestination by sharedViewModel.reloadDestination.collectAsStateWithLifecycle()
+    LaunchedEffect(reloadDestination) {
+        if (reloadDestination == HomeDestination::class) {
+            if (scrollState.firstVisibleItemIndex > 1) {
+                scrollState.animateScrollToItem(0)
+            } else {
+                viewModel.refresh()
             }
+            sharedViewModel.reloadDestinationDone()
+        }
     }
 
     Box(
@@ -193,6 +226,8 @@ fun NeteaseHomeScreen(
                             navController = navController,
                             newAlbumsArea = state.newAlbumsArea,
                             onPlayMv = { sharedViewModel.playMv(it) },
+                            onSongLongClick = { menuTrack = it.toTrack() },
+                            onMvLongClick = { menuTrack = it },
                         )
                     }
                 }
@@ -264,7 +299,8 @@ fun NeteaseHomeScreen(
     }
 }
 
-/** 一行内容:歌单卡跳歌单页,歌曲卡播放 */
+/** 一行内容:歌单卡跳歌单页,歌曲卡播放。标题行走 ShelfTitleRow——尾钮位(更多/占位)
+ *  与 MediaRow 头部同几何,页内所有行标题右缘对齐(2026-10-13 用户定案)。 */
 @Composable
 private fun NeteaseHomeRow(
     title: String,
@@ -273,14 +309,16 @@ private fun NeteaseHomeRow(
     onSongClick: (com.maxrave.domain.data.model.home.Content) -> Unit,
 ) {
     Column(Modifier.padding(horizontal = 15.dp)) {
-        Text(
-            text = title,
-            style = typo().headlineMedium,
-            color = MaterialTheme.colorScheme.onBackground,
-        )
         val songContents = contents.filterNotNull().filter { it.videoId != null }
+        // 更多按钮只在真能跳二级页时显示(三轮修订,占位已拆)
+        ShelfTitleRow(
+            title = title,
+            horizontalPadding = 0.dp,
+            titleColor = MaterialTheme.colorScheme.onBackground,
+        )
         if (songContents.isNotEmpty()) {
-            // 歌曲行:3 行紧凑卡网格(120dp 方图+两行小字,避免大卡被行高裁切)
+            // 歌曲行:3 行紧凑卡网格(120dp 方图+两行小字,避免大卡被行高裁切)。
+            // 横向 4dp=每日推荐歌单行同款封面间距;纵向 8dp 维持原三行节奏
             val gridState = rememberLazyGridState()
             LazyHorizontalGrid(
                 rows = GridCells.Fixed(3),
@@ -289,6 +327,8 @@ private fun NeteaseHomeRow(
                         .padding(top = 8.dp)
                         .height(460.dp),
                 state = gridState,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 items(songContents, key = { it.videoId ?: it.title }) { content ->
                     NeteaseSongCard(
@@ -367,63 +407,38 @@ private fun NeteaseCategorySections(
 
 
 
-/** 主页 MV 卡:16:9 横图 + 标题/艺人两行小字(与歌曲卡同视觉档,仅画幅不同) */
-@Composable
-private fun NeteaseMvCard(
-    mv: com.maxrave.domain.data.model.browse.album.Track,
-    onPlay: () -> Unit,
-) {
-    Column(
-        modifier =
-            Modifier
-                .width(172.dp)
-                .padding(4.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .clickable(onClick = onPlay),
-    ) {
-        AsyncImage(
-            model = mv.thumbnails?.lastOrNull()?.url,
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(16f / 9f)
-                    .clip(RoundedCornerShape(8.dp)),
-        )
-        Text(
-            text = mv.title,
-            style = typo().bodySmall,
-            color = MaterialTheme.colorScheme.onBackground,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = 4.dp),
-        )
-        Text(
-            text = mv.artists?.joinToString { it.name } ?: "",
-            style = typo().bodySmall,
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
-}
+/** MV Track → HomeItemVideo 的 Content(主页 MV 行与 MV 二级页共用的视频卡映射,
+ *  与艺人页 MV 货架同一映射形状) */
+internal fun com.maxrave.domain.data.model.browse.album.Track.toVideoContent(): com.maxrave.domain.data.model.home.Content =
+    com.maxrave.domain.data.model.home.Content(
+        album = null,
+        artists = artists,
+        description = null,
+        isExplicit = isExplicit,
+        playlistId = null,
+        browseId = null,
+        thumbnails = thumbnails ?: emptyList(),
+        title = title,
+        videoId = videoId,
+        views = views,
+    )
 
 /** 网格/单行通用紧凑歌曲卡:方图 + 标题/艺人两行小字。cardWidth 默认 96dp(3 行网格用),
  *  FM 单行(主页歌单行样式)传 120dp。NeteaseMixScreen(私人FM)同包复用,勿改回 private。
- *  onTrash 非空时图上叠垃圾桶角标(仅 FM 卡用;主页/每日推荐不传,视觉零变化)。 */
+ *  onTrash 非空时图上叠垃圾桶角标(仅 FM 卡用;主页/每日推荐不传,视觉零变化)。
+ *  卡片不带外层 padding——行内间距统一由容器 spacedBy 提供(2026-10-12 用户定案:
+ *  对齐主页"每日推荐歌单"行的 4dp 封面间距),文本行自带 4dp 起始边距。 */
 @Composable
 internal fun NeteaseSongCard(
     content: com.maxrave.domain.data.model.home.Content,
     onClick: () -> Unit,
     onTrash: (() -> Unit)? = null,
-    cardWidth: androidx.compose.ui.unit.Dp = 96.dp,
+    cardWidth: androidx.compose.ui.unit.Dp = 88.dp,
 ) {
     Column(
         modifier =
             Modifier
                 .width(cardWidth)
-                .padding(4.dp)
                 .clip(RoundedCornerShape(8.dp))
                 .clickable(onClick = onClick),
     ) {
@@ -469,9 +484,13 @@ internal fun NeteaseSongCard(
             text = content.title,
             style = typo().titleSmall,
             color = MaterialTheme.colorScheme.onSurface,
+            // 卡下文本两行全静态省略(2026-10-13 七轮:主标题跑马灯"感觉有点乱"再停——
+            // 副标题上一轮已静态,标题这轮也停,跑马灯在卡族整体退场)
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = 4.dp),
+            modifier =
+                Modifier
+                    .padding(start = 4.dp, top = 4.dp),
         )
         Text(
             text = content.artists?.joinToString(", ") { it.name }.orEmpty(),
@@ -479,6 +498,9 @@ internal fun NeteaseSongCard(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
+            modifier =
+                Modifier
+                    .padding(start = 4.dp),
         )
     }
 }
@@ -501,10 +523,10 @@ internal fun NeteaseArtistRow(
     val snapperFlingBehavior =
         rememberSnapFlingBehavior(SnapLayoutInfoProvider(lazyGridState = lazyGridState))
     Column(Modifier.padding(horizontal = horizontalPadding)) {
-        Text(
-            text = title,
-            style = typo().headlineMedium,
-            color = MaterialTheme.colorScheme.onBackground,
+        ShelfTitleRow(
+            title = title,
+            horizontalPadding = 0.dp,
+            titleColor = MaterialTheme.colorScheme.onBackground,
         )
         Column(
             Modifier
@@ -548,7 +570,9 @@ internal fun NeteaseArtistRow(
 
 /** 新碟上架行:YT 主页同款 HomeItemContentPlaylist(160dp 方卡,一屏两列),
  *  点击进专辑页(M6 数字 ID 同页路由)。area 非空时显示地区 chips(分区缓存即时切换);
- *  库页"您的网易云"收藏的专辑分区复用(不带地区 chips,长按取消收藏)。 */
+ *  库页"您的网易云"收藏的专辑分区复用(不带地区 chips,长按取消收藏)。
+ *  previewCount 非空时限量展示+"更多"进二级页(2026-10-13 用户定案:主页一级页数量要控制,
+ *  更多按钮门控=条目多于预览数,未达标也保留占位——ShelfTitleRow 内建)。 */
 @Composable
 internal fun NeteaseAlbumRow(
     title: String,
@@ -558,12 +582,15 @@ internal fun NeteaseAlbumRow(
     onAreaSelect: ((String) -> Unit)? = null,
     onAlbumLongClick: ((com.maxrave.domain.data.model.searchResult.albums.AlbumsResult) -> Unit)? = null,
     horizontalPadding: Dp = 15.dp,
+    previewCount: Int? = null,
+    onMoreClick: (() -> Unit)? = null,
 ) {
     Column(Modifier.padding(horizontal = horizontalPadding)) {
-        Text(
-            text = title,
-            style = typo().headlineMedium,
-            color = MaterialTheme.colorScheme.onBackground,
+        ShelfTitleRow(
+            title = title,
+            horizontalPadding = 0.dp,
+            titleColor = MaterialTheme.colorScheme.onBackground,
+            onMoreClick = onMoreClick,
         )
         if (area != null && onAreaSelect != null) {
             NewAlbumAreaChips(selected = area) { onAreaSelect(it) }
@@ -572,7 +599,7 @@ internal fun NeteaseAlbumRow(
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             modifier = Modifier.padding(top = 8.dp),
         ) {
-            items(albums, key = { it.browseId }) { album ->
+            items(albums.let { if (previewCount != null) it.take(previewCount) else it }, key = { it.browseId }) { album ->
                 HomeItemContentPlaylist(
                     onClick = {
                         navController.navigate(
@@ -587,6 +614,10 @@ internal fun NeteaseAlbumRow(
     }
 }
 
+// 主页"有更多入口"的行(精品歌单/排行榜)横滑预览数量(用户 2026-10-12 定案:
+// YTM 式"显示几个+更多进二级页";160dp 卡一屏约 2.3 张,8 张≈3 屏)
+private const val HOME_ROW_PREVIEW_COUNT = 8
+
 /** 行槽位:按行状态渲染占位或内容。Loading 占位被组合即触发拉取(滚到才加载)。
  *  占位高度对齐真实行高,内容落地不跳滚动位置。 */
 @Composable
@@ -597,6 +628,8 @@ private fun NeteaseHomeRowSlot(
     navController: NavController,
     newAlbumsArea: String,
     onPlayMv: (com.maxrave.domain.data.model.browse.album.Track) -> Unit,
+    onSongLongClick: (com.maxrave.domain.data.model.home.Content) -> Unit,
+    onMvLongClick: (com.maxrave.domain.data.model.browse.album.Track) -> Unit,
 ) {
     when (ui) {
         is NeteaseHomeViewModel.RowUi.Loading -> {
@@ -621,37 +654,77 @@ private fun NeteaseHomeRowSlot(
         is NeteaseHomeViewModel.RowUi.Ready -> {
             when (val content = ui.content) {
                 is NeteaseHomeViewModel.RowContent.Feed ->
-                    NeteaseHomeRow(
-                        title = content.item.title,
-                        contents = content.item.contents,
-                        navController = navController,
-                        onSongClick = viewModel::playSong,
-                    )
-
-                is NeteaseHomeViewModel.RowContent.ChartRow ->
-                    Column(Modifier.padding(horizontal = 15.dp)) {
-                        Text(
-                            text = content.chart.listChartItem.firstOrNull()?.title ?: "排行榜",
-                            style = typo().headlineMedium,
-                            color = MaterialTheme.colorScheme.onBackground,
+                    if (row == NeteaseHomeViewModel.Row.RADAR_SONGS) {
+                        // 私人雷达 = 混合页"每日推荐"同款 hero 轮播(用户 2026-10-13 三轮
+                        // 定稿,推翻二轮 Quick picks 紧凑网格):大卡居中+窄邻卡+卡上叠字,
+                        // 头部 Play all;无更多按钮(整队内容都在轮播里)
+                        val radarSongs =
+                            content.item.contents
+                                .filterNotNull()
+                                .filter { it.videoId != null }
+                        NeteaseDailySection(
+                            title = content.item.title,
+                            contents = radarSongs,
+                            onPlayAll = { viewModel.playSectionFrom(radarSongs, row.title) },
+                            onPlayIndex = { index -> viewModel.playSectionFrom(radarSongs, row.title, index) },
                         )
-                        LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            modifier = Modifier.padding(top = 8.dp),
+                    } else if (row == NeteaseHomeViewModel.Row.HQ) {
+                        // 精品歌单:YTM 式限量横滑 + 头部"更多"进二级页(游标分页网格);
+                        // 门控=条目多于预览数(对齐 YTM moreEndpoint 服务端语义)
+                        MediaRow(
+                            title = content.item.title,
+                            horizontalPadding = 15.dp,
+                            onMoreClick =
+                                if (content.item.contents.filterNotNull().size > HOME_ROW_PREVIEW_COUNT) {
+                                    { navController.navigate(NeteaseHQDestination(title = row.title)) }
+                                } else {
+                                    null
+                                },
                         ) {
                             items(
-                                content.chart.listChartItem.firstOrNull()?.playlists ?: emptyList(),
-                                key = { it.id },
+                                content.item.contents.filterNotNull().take(HOME_ROW_PREVIEW_COUNT),
+                                key = { "${it.playlistId ?: it.title}" },
                             ) { pl ->
                                 HomeItemContentPlaylist(
                                     onClick = {
-                                        navController.navigate(
-                                            PlaylistDestination(playlistId = pl.id),
-                                        )
+                                        pl.playlistId?.let { id ->
+                                            navController.navigate(PlaylistDestination(playlistId = id))
+                                        }
                                     },
                                     data = pl,
                                 )
                             }
+                        }
+                    } else {
+                        NeteaseHomeRow(
+                            title = content.item.title,
+                            contents = content.item.contents,
+                            navController = navController,
+                            onSongClick = viewModel::playSong,
+                        )
+                    }
+
+                is NeteaseHomeViewModel.RowContent.ChartRow ->
+                    // 排行榜:YTM 式限量横滑 + 头部"更多"进二级页(完整榜单网格)
+                    MediaRow(
+                        title = content.chart.listChartItem.firstOrNull()?.title ?: row.title,
+                        horizontalPadding = 15.dp,
+                        onMoreClick = {
+                            navController.navigate(NeteaseToplistDestination(title = row.title))
+                        },
+                    ) {
+                        items(
+                            (content.chart.listChartItem.firstOrNull()?.playlists ?: emptyList()).take(HOME_ROW_PREVIEW_COUNT),
+                            key = { it.id },
+                        ) { pl ->
+                            HomeItemContentPlaylist(
+                                onClick = {
+                                    navController.navigate(
+                                        PlaylistDestination(playlistId = pl.id),
+                                    )
+                                },
+                                data = pl,
+                            )
                         }
                     }
 
@@ -665,12 +738,22 @@ private fun NeteaseHomeRowSlot(
 
                 is NeteaseHomeViewModel.RowContent.AlbumsRow ->
                     if (row == NeteaseHomeViewModel.Row.NEW_ALBUMS) {
+                        // 新碟上架:一级页限量展示(2026-10-13 用户定案)+更多进二级页
+                        // (顶栏带"新碟上架"标签+地区 chips+分页网格)
                         NeteaseAlbumRow(
                             title = row.title,
                             albums = content.list,
                             navController = navController,
                             area = newAlbumsArea,
                             onAreaSelect = viewModel::loadNewAlbumsArea,
+                            previewCount = HOME_ROW_PREVIEW_COUNT,
+                            onMoreClick =
+                                if (content.list.size > HOME_ROW_PREVIEW_COUNT) {
+                                    // 跳二级页保持当前选中地区(2026-10-13 四轮用户反馈)
+                                    { navController.navigate(NeteaseNewAlbumsDestination(title = row.title, area = newAlbumsArea)) }
+                                } else {
+                                    null
+                                },
                         )
                     } else {
                         NeteaseAlbumRow(
@@ -680,22 +763,47 @@ private fun NeteaseHomeRowSlot(
                         )
                     }
 
-                is NeteaseHomeViewModel.RowContent.MvRow ->
-                    Column(Modifier.padding(horizontal = 15.dp)) {
-                        Text(
-                            text = row.title,
-                            style = typo().headlineMedium,
-                            color = MaterialTheme.colorScheme.onBackground,
-                        )
-                        LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            modifier = Modifier.padding(top = 8.dp),
-                        ) {
-                            items(content.list, key = { it.videoId }) { mv ->
-                                NeteaseMvCard(mv = mv, onPlay = { onPlayMv(mv) })
+                is NeteaseHomeViewModel.RowContent.MvRow -> {
+                    // MV 行统一 YT 主页视频卡(HomeItemVideo,16:9/160dp 高);最新 MV/MV 总榜
+                    // YTM 式限量+头部"更多"进二级页,个人推荐(服务端仅 2-3 条)全量无更多
+                    var onMoreClick: (() -> Unit)? = null
+                    var limited = false
+                    when (row) {
+                        NeteaseHomeViewModel.Row.MV -> {
+                            limited = true
+                            onMoreClick = {
+                                navController.navigate(
+                                    NeteaseMvGridDestination(source = NeteaseMvGridSource.FIRST, title = row.title),
+                                )
                             }
                         }
+                        NeteaseHomeViewModel.Row.MV_TOPLIST -> {
+                            limited = true
+                            onMoreClick = {
+                                navController.navigate(
+                                    NeteaseMvGridDestination(source = NeteaseMvGridSource.TOPLIST, title = row.title),
+                                )
+                            }
+                        }
+                        else -> {}
                     }
+                    MediaRow(
+                        title = row.title,
+                        horizontalPadding = 15.dp,
+                        onMoreClick = onMoreClick,
+                    ) {
+                        items(
+                            content.list.let { if (limited) it.take(HOME_ROW_PREVIEW_COUNT) else it },
+                            key = { it.videoId },
+                        ) { mv ->
+                            HomeItemVideo(
+                                onClick = { onPlayMv(mv) },
+                                onLongClick = { onMvLongClick(mv) },
+                                data = mv.toVideoContent(),
+                            )
+                        }
+                    }
+                }
 
                 is NeteaseHomeViewModel.RowContent.SectionsRow ->
                     NeteaseCategorySections(
@@ -745,26 +853,26 @@ private fun RowPlaceholder(
     }
 }
 
-/** 占位高度对齐真实行高:歌单/榜单/歌手/专辑行 ~250dp,歌曲三行网格 460dp,分类区块更高 */
+/** 占位高度对齐真实行高:歌单/榜单/歌手/专辑/雷达(单行 160 卡)行 ~250dp,歌曲三行网格 460dp,分类区块更高 */
 private fun NeteaseHomeViewModel.Row.placeholderHeight(): androidx.compose.ui.unit.Dp =
     when (this) {
-        NeteaseHomeViewModel.Row.RADAR_SONGS,
-        NeteaseHomeViewModel.Row.NEW_SONGS,
-        -> 460.dp
+        NeteaseHomeViewModel.Row.NEW_SONGS -> 460.dp
         NeteaseHomeViewModel.Row.SECTIONS -> 640.dp
         else -> 250.dp
     }
 
-/** 新碟上架地区 chips(ALL/华语/欧美/韩语/日语),命中分区缓存即时切换 */
+/** 新碟上架地区 chips(ALL/华语/欧美/韩语/日语),命中分区缓存即时切换;
+ *  新碟上架二级页复用(internal,同包)——两处选中态语义一致 */
 @Composable
-private fun NewAlbumAreaChips(
+internal fun NewAlbumAreaChips(
     selected: String,
+    modifier: Modifier = Modifier,
     onSelect: (String) -> Unit,
 ) {
     val areas = listOf("ALL" to "全部", "ZH" to "华语", "EA" to "欧美", "KR" to "韩语", "JP" to "日语")
     Row(
         modifier =
-            Modifier
+            modifier
                 .horizontalScroll(rememberScrollState())
                 .padding(top = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),

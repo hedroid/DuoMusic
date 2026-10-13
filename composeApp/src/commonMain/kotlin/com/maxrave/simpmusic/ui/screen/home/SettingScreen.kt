@@ -216,8 +216,8 @@ import simpmusic.composeapp.generated.resources.ai_api_key_message
 import simpmusic.composeapp.generated.resources.back
 import simpmusic.composeapp.generated.resources.ai_provider
 import simpmusic.composeapp.generated.resources.anonymous
-import simpmusic.composeapp.generated.resources.app_log
-import simpmusic.composeapp.generated.resources.app_log_description
+import simpmusic.composeapp.generated.resources.app_log_settings_title
+import simpmusic.composeapp.generated.resources.app_log_settings_description
 import simpmusic.composeapp.generated.resources.app_name
 import simpmusic.composeapp.generated.resources.developer_option
 import simpmusic.composeapp.generated.resources.audio
@@ -1539,13 +1539,7 @@ fun SettingScreen(
             }
         }
         item(key = "netease") {
-            Column {
-                Text(
-                    text = stringResource(Res.string.netease),
-                    style = typo().labelMedium,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    modifier = Modifier.padding(vertical = 8.dp),
-                )
+            SettingGroup(title = stringResource(Res.string.netease)) {
                 SettingItem(
                     title = stringResource(Res.string.netease_account),
                     subtitle = stringResource(Res.string.manage_your_netease_account),
@@ -2390,29 +2384,7 @@ fun SettingScreen(
             }
         }
         item(key = "sponsor_block") {
-            SettingGroup(
-                title = stringResource(Res.string.sponsorBlock),
-                // The project's note sits under the card, where a grouped list keeps its explanations.
-                footer = {
-                    val beforeUrl = stringResource(Res.string.sponsor_block_intro).substringBefore("https://sponsor.ajay.app/")
-                    val afterUrl = stringResource(Res.string.sponsor_block_intro).substringAfter("https://sponsor.ajay.app/")
-                    Text(
-                        buildAnnotatedString {
-                            append(beforeUrl)
-                            withLink(
-                                LinkAnnotation.Url(
-                                    "https://sponsor.ajay.app/",
-                                    TextLinkStyles(style = SpanStyle(color = MaterialTheme.colorScheme.primary)),
-                                ),
-                            ) {
-                                append("https://sponsor.ajay.app/")
-                            }
-                            append(afterUrl)
-                        },
-                        style = typo().bodySmall,
-                    )
-                },
-            ) {
+            SettingGroup(title = stringResource(Res.string.sponsorBlock)) {
                 SettingItem(
                     title = stringResource(Res.string.enable_sponsor_block),
                     subtitle = stringResource(Res.string.skip_sponsor_part_of_video),
@@ -2466,13 +2438,7 @@ fun SettingScreen(
         }
         if (getPlatform() == Platform.Android) {
         item(key = "downloads") {
-            Column {
-                Text(
-                    text = stringResource(Res.string.download_settings_section),
-                    style = typo().labelMedium,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    modifier = Modifier.padding(vertical = 8.dp),
-                )
+            SettingGroup(title = stringResource(Res.string.download_settings_section)) {
                 // 文件式下载(2026-10):统一三档音质(旧 downloadQuality/neteaseDownloadQuality
                 // 两项已删,值经 audioDownloadQuality 读时惰性迁移)
                 SettingItem(
@@ -3141,8 +3107,8 @@ fun SettingScreen(
         item(key = "developer_option") {
             SettingGroup(title = stringResource(Res.string.developer_option)) {
                 SettingItem(
-                    title = stringResource(Res.string.app_log),
-                    subtitle = stringResource(Res.string.app_log_description),
+                    title = stringResource(Res.string.app_log_settings_title),
+                    subtitle = stringResource(Res.string.app_log_settings_description),
                     onClick = {
                         navController.navigate(AppLogDestination)
                     },

@@ -134,6 +134,7 @@ import com.maxrave.simpmusic.ui.icon.PersonAdd
 import com.maxrave.simpmusic.ui.icon.Sensors
 import com.maxrave.simpmusic.ui.icon.Shuffle
 import com.maxrave.simpmusic.ui.icon.SimpIcons
+import com.maxrave.simpmusic.ui.navigation.destination.home.NeteaseMvGridDestination
 import com.maxrave.simpmusic.ui.navigation.destination.library.LibraryDynamicPlaylistDestination
 import com.maxrave.simpmusic.ui.navigation.destination.list.AlbumDestination
 import com.maxrave.simpmusic.ui.navigation.destination.list.ArtistDestination
@@ -146,6 +147,7 @@ import com.maxrave.simpmusic.ui.utils.toHiResArtworkUrl
 import com.maxrave.simpmusic.ui.utils.artistShareLink
 import com.maxrave.simpmusic.viewModel.ArtistScreenState
 import com.maxrave.simpmusic.viewModel.ArtistViewModel
+import com.maxrave.simpmusic.viewModel.NeteaseMvGridSource
 import com.maxrave.simpmusic.viewModel.SharedViewModel
 import com.maxrave.simpmusic.viewModel.SongSelectionViewModel
 import dev.chrisbanes.haze.HazeInput
@@ -993,13 +995,30 @@ private fun ArtistSections(
         }
 
         // 网易艺人 MV 货架(/artist/mvs;YT 艺人恒空即隐藏):点击=单 MV 队列起播
-        // (NETEASE_MV_ 哨兵),不走歌曲装载路径
+        // (NETEASE_MV_ 哨兵),不走歌曲装载路径。行名"视频"对齐 YTM(2026-10-12),
+        // 更多=艺人视频二级页(全量分页网格)
         val artistMvs by viewModel.artistMvs.collectAsStateWithLifecycle()
         AnimatedVisibility(artistMvs.isNotEmpty()) {
             MediaRow(
-                title = stringResource(Res.string.mv),
+                title = stringResource(Res.string.videos),
                 titleColor = Color.White,
+                moreColor = Color.White,
                 horizontalPadding = 20.dp,
+                onMoreClick = {
+                    val artistId = state.data.channelId?.toLongOrNull()
+                    if (artistId != null) {
+                        navController.navigate(
+                            NeteaseMvGridDestination(
+                                source = NeteaseMvGridSource.ARTIST,
+                                artistId = artistId,
+                                title = getStringBlocking(Res.string.videos),
+                                artistName = state.data.title ?: "",
+                            ),
+                        )
+                    } else {
+                        viewModel.makeToast(getStringBlocking(Res.string.error))
+                    }
+                },
             ) {
                 items(artistMvs) { mv ->
                     HomeItemVideo(

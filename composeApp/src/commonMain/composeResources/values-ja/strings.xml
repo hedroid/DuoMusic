@@ -353,6 +353,8 @@
     <string name="play_video_instead_of_audio_warning">この操作によりプレイヤーのキャッシュが削除されます。続行しますか？</string>
     <string name="quality_video">画質</string>
     <string name="add_to_queue">キューに追加</string>
+    <string name="add_to_queue_disabled_radio">キューに追加（ラジオ再生中）</string>
+    <string name="add_to_queue_disabled_endless">キューに追加（エンドレスキュー中）</string>
     <string name="added_to_queue">キューに追加しました</string>
     <string name="already_in_queue">既にキューにあります</string>
     <string name="new_release">新作</string>
@@ -658,6 +660,7 @@
     <string name="no_playlist_found">プレイリストが見つかりません。最初に作成してください</string>
     <string name="login_required_short">%1$s にログインしてください</string>
     <string name="login_netease_first">先に网易云音乐にログインしてください</string>
+    <string name="switch_source_failed">音源の切り替えに失敗しました。もう一度お試しください</string>
     <string name="backup_frequency">バックアップ頻度</string>
     <string name="daily">毎日</string>
     <string name="weekly">毎週</string>
@@ -914,8 +917,8 @@
     <string name="download_artist_album_folder_description_off">Music/SimpMusic に保存</string>
     <string name="download_no_space">ストレージ容量が不足しているためダウンロードできません</string>
     <!-- アクセシビリティ：アイコンのみのコントロールのラベル (UI-CR-07) -->
-    <string name="play">再生</string>
     <string name="pause">一時停止</string>
+    <string name="play">再生</string>
     <string name="previous_song">前の曲</string>
     <string name="next_song">次の曲</string>
     <string name="switch_music_source">音源を切り替える</string>

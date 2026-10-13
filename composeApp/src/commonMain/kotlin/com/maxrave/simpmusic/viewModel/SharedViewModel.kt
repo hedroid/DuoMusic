@@ -33,7 +33,6 @@ import com.maxrave.domain.data.model.download.DownloadProgress
 import com.maxrave.domain.data.model.intent.GenericIntent
 import com.maxrave.domain.data.model.metadata.Line
 import com.maxrave.domain.data.model.metadata.Lyrics
-import com.maxrave.domain.data.model.promo.Promo
 import com.maxrave.domain.data.model.streams.TimeLine
 import com.maxrave.domain.data.model.update.UpdateData
 import com.maxrave.domain.data.player.GenericCastState
@@ -85,9 +84,6 @@ import io.ktor.utils.io.readAvailable
 import com.maxrave.simpmusic.expect.ui.toByteArray
 import com.maxrave.simpmusic.getPlatform
 import com.maxrave.simpmusic.utils.VersionManager
-import com.maxrave.simpmusic.utils.decodePromos
-import com.maxrave.simpmusic.utils.shownPromoIds
-import com.maxrave.simpmusic.utils.withShownPromo
 import com.maxrave.simpmusic.viewModel.base.BaseViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -118,6 +114,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import org.jetbrains.compose.resources.getString
 import org.koin.core.component.inject
 import org.simpmusic.lastfm.completeLogin
@@ -136,6 +133,7 @@ import simpmusic.composeapp.generated.resources.Res
 import simpmusic.composeapp.generated.resources.added_to_queue
 import simpmusic.composeapp.generated.resources.already_in_queue
 import simpmusic.composeapp.generated.resources.login_netease_first
+import simpmusic.composeapp.generated.resources.switch_source_failed
 import simpmusic.composeapp.generated.resources.update_check_failed
 import simpmusic.composeapp.generated.resources.added_to_youtube_liked
 import simpmusic.composeapp.generated.resources.error
@@ -270,8 +268,10 @@ class SharedViewModel(
             if (source == com.maxrave.domain.source.MusicSource.NETEASE.name) neteaseThumb.trim() else (ytThumb ?: "").trim()
         }.stateIn(viewModelScope, SharingStarted.Eagerly, "")
 
-    fun setSelectedSource(source: com.maxrave.domain.source.MusicSource) {
-        viewModelScope.launch { dataStoreManager.setSelectedSource(source.name) }
+    /** 真等待落盘的 suspend 写(勿改回 fire-and-forget:切源超时兜底要量到真实完成,
+     *  2026-10-12 CR#1)。全仓唯一调用方是 switchSource。 */
+    suspend fun setSelectedSource(source: com.maxrave.domain.source.MusicSource) {
+        dataStoreManager.setSelectedSource(source.name)
     }
 
     /**
@@ -281,19 +281,65 @@ class SharedViewModel(
      * 也保留,跨源残留在下次启动时由 core mayBeRestoreQueue 的跨源守卫(恢复曲 ID 形状≠当前源
      * 则跳过)兜住。同源重复调用无副作用。
      */
-    fun switchSource(source: com.maxrave.domain.source.MusicSource) {
+    fun switchSource(
+        source: com.maxrave.domain.source.MusicSource,
+        onSwitched: (Boolean) -> Unit = {},
+    ) {
         Logger.w("SRCPROBE", "switchSource -> $source (current=${selectedSource.value})")
+        // 真机 release 诊断(2026-10-13 用户"不能切网易音源"):三星 ROM 静音 kermit,
+        // android.util.Log 直写 logcat 保底——安装新包复现时 adb logcat -s SRCPROBE 即读
+        android.util.Log.w(
+            "SRCPROBE",
+            "switchSource -> $source (current=${selectedSource.value}, neteaseLoggedIn=${neteaseLoggedIn.value})",
+        )
         if (selectedSource.value == source.name) return
         viewModelScope.launch {
-            // 网易未登录选网易源:不切换,toast 引导登录(菜单项保持可点,别毫无反应)
-            if (source == com.maxrave.domain.source.MusicSource.NETEASE &&
-                dataStoreManager.neteaseCookie.first().isBlank()
-            ) {
+            // 网易未登录选网易源:不切换,toast 引导登录(菜单项保持可点,别毫无反应)。
+            // 判定优先用 Eagerly StateFlow 的内存快照——已登录用户零 DataStore 挂起读,
+            // 共享 IO 池被打满时也不受影响(2026-10-12 真机无代理卡死案)。快照为 false
+            // 时再挂起读一次核实:登录成功回调与 stateIn 传播有竞态窗口,cookie 已落盘
+            // 而快照仍是初始 false(2026-10-12 CR#3),不核实会把登录后的自动切源
+            // 误拦成"请先登录"。
+            // 核实读加 2s 上限(2026-10-13 真机日志定案:DataStore 卡死时该读永不返回,
+            // 切源协程静默悬挂——超时只保了写段,守卫段裸奔;25 次切换全无下文无 toast)。
+            // 超时按"已登录"放行,把判定交回写段的 5s 超时+toast,不再无声失败。
+            val cookiePresent =
+                withTimeoutOrNull(2_000) {
+                    dataStoreManager.neteaseCookie.first().isNotBlank()
+                } ?: true
+            if (source == com.maxrave.domain.source.MusicSource.NETEASE && !neteaseLoggedIn.value && !cookiePresent) {
                 Logger.w("SRCPROBE", "switchSource blocked: netease not logged in")
+                android.util.Log.w("SRCPROBE", "switchSource blocked: netease not logged in")
                 makeToast(getString(Res.string.login_netease_first))
+                onSwitched(false)
                 return@launch
             }
-            setSelectedSource(source)
+            // 写盘限时兜底:直接 await suspend 写的真实完成(CR#1:经 launch 包装时超时
+            // 块只量到 launch 返回,真实落盘卡住也不会触发),超时 toast 反馈而非无声失败
+            val written = withTimeoutOrNull(5_000) {
+                setSelectedSource(source)
+                true
+            }
+            android.util.Log.w(
+                "SRCPROBE",
+                "switchSource write result: written=$written, selectedSource now=${selectedSource.value}",
+            )
+            if (written != true && selectedSource.value != source.name) {
+                Logger.w("SRCPROBE", "switchSource write timed out: $source")
+                android.util.Log.w("SRCPROBE", "switchSource write timed out: $source")
+                makeToast(getString(Res.string.switch_source_failed))
+                onSwitched(false)
+            } else {
+                // CR 复核:写盘成功≠UI 已见——selectedSource 是 DataStore collect 驱动的
+                // StateFlow,回调抢在流翻转前导航的话,旧源主页会先消费刷新信号(切了
+                // 白切)。等到流真正翻到新源再放行,且**不设上限**(CR 三复核:设上限的
+                // 超时分支无论报不报错,都会让"写盘成功却不导航"的落点不一致复活)——
+                // 写盘成功后流必翻转(DataStore 已提交,collect 是唯一通路),真卡死是
+                // app 级故障,导航与否已无所谓。快速连切时前一个等待者可能等不到自己的
+                // 目标值,协程静默悬挂无副作用(回调不触发,后到者导航)。
+                selectedSource.first { it == source.name }
+                onSwitched(true)
+            }
         }
     }
 
@@ -1365,35 +1411,6 @@ class SharedViewModel(
     }
 
     fun getString(key: String): String? = runBlocking { dataStoreManager.getString(key).first() }
-
-    /**
-     * The `promos` block the last config fetch saved, as it changes. Every DataStore write re-emits
-     * the whole settings file (the playback position is saved every few seconds), so only a change
-     * to this block's own text gets through.
-     */
-    fun cachedPromos(): Flow<List<Promo>> =
-        dataStoreManager
-            .getString(Promo.cacheKey(appIdentity.isDevBuild))
-            .distinctUntilChanged()
-            .map(::decodePromos)
-
-    /** The ids of the launch banners this app version has already shown. */
-    suspend fun shownPromos(): Set<String> =
-        shownPromoIds(
-            stored = dataStoreManager.getString(Promo.shownKey(appIdentity.isDevBuild)).first(),
-            appVersion = VersionManager.getVersionName(),
-        )
-
-    /** Each banner once per app version, however it was closed. */
-    fun markPromoShown(id: String) {
-        viewModelScope.launch {
-            val key = Promo.shownKey(appIdentity.isDevBuild)
-            dataStoreManager.putString(
-                key,
-                withShownPromo(dataStoreManager.getString(key).first(), VersionManager.getVersionName(), id),
-            )
-        }
-    }
 
     // A Library tab asked for from outside the Library screen (a deep link); the screen selects it
     // the next time it composes and clears the request.
@@ -2869,6 +2886,18 @@ class SharedViewModel(
 
     fun reloadDestination(destination: KClass<*>) {
         _reloadDestination.value = destination
+    }
+
+    /** 切源后的统一落点(用户 2026-10-13 定案,替代 2026-09-22"留当前页"):切到主页 tab
+     *  (底栏同款导航参数,save/restore 状态)并触发主页刷新信号——YT 主页消费
+     *  reloadDestination 滚顶+重拉,网易主页同款消费走 refresh()。 */
+    fun navigateHomeAndRefresh(navController: androidx.navigation.NavHostController) {
+        navController.navigate(com.maxrave.simpmusic.ui.navigation.destination.home.HomeDestination) {
+            popUpTo(navController.graph.startDestinationId) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
+        reloadDestination(com.maxrave.simpmusic.ui.navigation.destination.home.HomeDestination::class)
     }
 
     fun reloadDestinationDone() {

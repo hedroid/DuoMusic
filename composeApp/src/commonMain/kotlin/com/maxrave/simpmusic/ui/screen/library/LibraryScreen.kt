@@ -72,7 +72,6 @@ import coil3.request.crossfade
 import com.maxrave.common.LibraryChipType
 import com.maxrave.domain.source.MusicSource
 import com.maxrave.domain.data.entities.SongEntity
-import com.maxrave.domain.data.model.taste.TasteProfile
 import com.maxrave.domain.utils.LocalResource
 import com.maxrave.logger.Logger
 import com.maxrave.simpmusic.Platform
@@ -88,7 +87,6 @@ import com.maxrave.simpmusic.ui.component.LibraryItem
 import com.maxrave.simpmusic.ui.component.LibraryItemState
 import com.maxrave.simpmusic.ui.component.LibraryItemType
 import com.maxrave.simpmusic.ui.component.LibraryTilingBox
-import com.maxrave.simpmusic.ui.component.taste.ShareTasteSheet
 import com.maxrave.simpmusic.ui.component.taste.TasteCard
 import com.maxrave.simpmusic.ui.component.ListenTogetherIconButton
 import com.maxrave.simpmusic.ui.component.RippleIconButton
@@ -106,12 +104,12 @@ import com.maxrave.simpmusic.viewModel.NeteasePodcastViewModel
 import com.maxrave.simpmusic.ui.navigation.destination.home.SettingsDestination
 import com.maxrave.simpmusic.viewModel.SongSelectionViewModel
 import com.maxrave.simpmusic.viewModel.TasteUiState
-import com.maxrave.simpmusic.viewModel.TasteViewModel
 import dev.chrisbanes.haze.HazeInput
 import dev.chrisbanes.haze.blur.hazeBlur
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.jetbrains.compose.resources.getString
@@ -192,14 +190,8 @@ fun LibraryScreen(
     // 网易云播客 chip 页 VM(Koin single:数据随 single 存活,tab 往返零重拉)
     val neteasePodcastViewModel: NeteasePodcastViewModel = koinViewModel()
 
-    val libraryOverview by viewModel.libraryOverview.collectAsStateWithLifecycle()
-
     val selectionState = rememberSongSelectionState()
     val selectionViewModel: SongSelectionViewModel = koinViewModel()
-    val tasteViewModel: TasteViewModel = koinViewModel()
-    // Held here rather than inside the list item, so the sheet does not close if its card scrolls
-    // out of composition behind it.
-    var sharingTaste by remember { mutableStateOf<TasteProfile?>(null) }
     var showSelectionSheet by rememberSaveable { mutableStateOf(false) }
     var showSelectionAddToPlaylist by rememberSaveable { mutableStateOf(false) }
     val allSelectedDownloaded by selectionViewModel.allSelectedDownloaded.collectAsStateWithLifecycle()
@@ -303,6 +295,35 @@ fun LibraryScreen(
             (neteaseChip && neteaseChipsVisible) || (ytChip && ytChipsVisible) ||
                 (!neteaseChip && !ytChip)
         }
+    // simpmusic://library?tab=… 深链要去的 chip:一次性消费,不可见就静默忽略保持当前。
+    // 可见性判定在 effect 内 combine 三条门控流取真值——组合级 state 在重组首帧是
+    // initialValue:false,直接判会把已登录用户的冷启动深链目标 chip 当"不可见"错杀
+    // 并把一次性请求清掉(与上方回落判定同款约束,见其注释)。
+    val libraryTabRequest by sharedViewModel.libraryTabRequest.collectAsStateWithLifecycle()
+    LaunchedEffect(libraryTabRequest) {
+        val requested = libraryTabRequest ?: return@LaunchedEffect
+        val (netease, yt, source) =
+            combine(
+                viewModel.neteaseLoggedIn,
+                viewModel.youtubeLoggedIn,
+                viewModel.selectedSource,
+            ) { n, y, s -> Triple(n, y, s) }
+                // 空串=selectedSource 镜像首值未落地(DataStore 键恒有非空默认),等重发
+                .first { (_, _, s) -> s.isNotEmpty() }
+        val applicable =
+            when (requested) {
+                LibraryChipType.NETEASE_PLAYLIST, LibraryChipType.NETEASE_PODCAST ->
+                    netease && source == MusicSource.NETEASE.name
+                LibraryChipType.YOUTUBE_MUSIC_PLAYLIST, LibraryChipType.CHART ->
+                    yt && source != MusicSource.NETEASE.name
+                LibraryChipType.DOWNLOADED_PLAYLIST -> true
+                // YOUR_LIBRARY/WRAPPED/旧混源值:已下线,不切;真值下的不可见是终局,
+                // 同样消费——请求不留到用户登录后突然跳转
+                else -> false
+            }
+        if (applicable) viewModel.setCurrentScreen(requested)
+        sharedViewModel.requestLibraryTab(null)
+    }
     // 选中 chip 必须可见(UI-CR-15):程序性变化(回落弹回/切源/登出重定向/深滚动位恢复)
     // 之后把选中项滚入视野——完全可见时不动,避免与用户手点可见 chip 的滚动打架。
     // 可见性也作 key:chip 集合增删会让同一选中项的 index 平移(如网易两 chip 插到前面)。
@@ -327,7 +348,11 @@ fun LibraryScreen(
     // "您的网易云"选中误弹回下载管理(2026-09-30 回归);combine 的首个 emission
     // 保证判定时三条门控全是真值。已下线 enum(YOUR_LIBRARY/WRAPPED/混源旧值等)
     // 走 else 分支同样在此回落,下方 load effect 的重定向分支已并入本处。
-    LaunchedEffect(currentFilter) {
+    // 让位门:深链请求挂起期间不写——冷启动三写者(VM 默认写/本回落/深链消费)竞速
+    // 会互相覆盖,深链目标是权威值,消费前回落不得抢写;请求清掉(含"目标不可见被
+    // 忽略"的情形,此时 VM 默认写也让了位、选中停在初始 YOUR_LIBRARY)后 key 变化
+    // 重启本 effect,从真值正常回落。
+    LaunchedEffect(currentFilter, libraryTabRequest) {
         val filter = currentFilter
         combine(
             viewModel.neteaseLoggedIn,
@@ -339,6 +364,7 @@ fun LibraryScreen(
                 // 恒有非空默认),此时不做判定,等真值落地 combine 重发——否则网易
                 // 用户首进库页会被空串当 YT 侧误判。
                 if (source.isEmpty()) return@collect
+                if (libraryTabRequest != null) return@collect
                 val neteaseVisible = netease && source == MusicSource.NETEASE.name
                 val ytVisible = yt && source != MusicSource.NETEASE.name
                 val visible =
@@ -619,9 +645,6 @@ fun LibraryScreen(
             LibraryChipType.WRAPPED -> Unit
             else -> Unit
         }
-    }
-    sharingTaste?.let { profile ->
-        ShareTasteSheet(profile = profile, onDismiss = { sharingTaste = null })
     }
     val coroutineScope = rememberCoroutineScope()
     if (showAddSheet) {

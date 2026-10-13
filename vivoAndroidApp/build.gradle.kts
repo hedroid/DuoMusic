@@ -28,7 +28,9 @@ android {
 
     defaultConfig {
         applicationId = "com.spotify.music"
-        minSdk = 26
+        // Fork ships Android 12+ only (main app's minSdk 31 decision — dex STORED packaging);
+        // upstream's 26 came in with this module and is not a level we test or support.
+        minSdk = 31
         targetSdk = 36
         versionCode =
             libs.versions.version.code

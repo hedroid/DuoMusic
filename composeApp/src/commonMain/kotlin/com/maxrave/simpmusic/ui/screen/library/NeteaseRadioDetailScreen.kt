@@ -153,13 +153,15 @@ fun NeteaseRadioDetailScreen(
                 )
             }
             stickyHeader {
-                Row(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            // 吸顶行必须有实底:滚动时节目从下面穿过,透底会叠影
-                            .background(MaterialTheme.colorScheme.surface)
-                            .padding(start = 15.dp, end = 7.dp, top = 10.dp, bottom = 10.dp),
+                    Row(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                // 吸顶行必须有实底:滚动时节目从下面穿过,透底会叠影。
+                                // 用 background 而非 surface:页面底就是 Scaffold 的 background,
+                                // 任何主题下两者都严格同色(用户 2026-10-13 反馈该行与上下突兀)
+                                .background(MaterialTheme.colorScheme.background)
+                                .padding(start = 15.dp, end = 7.dp, top = 10.dp, bottom = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(

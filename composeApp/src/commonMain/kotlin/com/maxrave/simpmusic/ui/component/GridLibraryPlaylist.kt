@@ -55,7 +55,7 @@ import com.maxrave.domain.data.type.PlaylistType
 import com.maxrave.domain.utils.LocalResource
 import com.maxrave.logger.Logger
 import com.maxrave.simpmusic.extension.angledGradientBackground
-import com.maxrave.simpmusic.extension.isScrollingUp
+import com.maxrave.simpmusic.extension.scrollReportingEffect
 import com.maxrave.simpmusic.ui.icon.Add
 import com.maxrave.simpmusic.ui.icon.SimpIcons
 import com.maxrave.simpmusic.ui.navigation.destination.list.AlbumDestination
@@ -126,18 +126,10 @@ internal inline fun <reified T> GridLibraryPlaylist(
     noinline onReload: () -> Unit,
 ) {
     Logger.w("GridLibraryPlaylist", "Generic Type: ${T::class.simpleName}")
-    val isScrollingUp by state.isScrollingUp()
-
-    LaunchedEffect(state) {
-        snapshotFlow { state.firstVisibleItemIndex }
-            .collect {
-                if (it <= 1) {
-                    onScrolling.invoke(true)
-                } else {
-                    onScrolling.invoke(isScrollingUp)
-                }
-            }
-    }
+    // 位移粒度滚动上报(库页同款 scrollReportingEffect,含贴底回吸兜底):旧 index-only+
+    // isScrollingUp 把末端钳制回吸读成上滑,底栏/迷你条贴底来回跳(YT 混合页同病,
+    // 2026-10-13 网易混合页回归案后全仓统一收口)
+    state.scrollReportingEffect(onScrolling)
     val pullToRefreshState = rememberPullToRefreshState()
     PullToRefreshBox(
         modifier = Modifier.fillMaxSize(),

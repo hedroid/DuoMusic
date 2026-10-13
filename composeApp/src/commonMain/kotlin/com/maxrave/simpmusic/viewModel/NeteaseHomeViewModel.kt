@@ -268,4 +268,29 @@ class NeteaseHomeViewModel(
         )
         loadMediaItem(track, Config.SONG_CLICK)
     }
+
+    /** 私人雷达"Play all"(2026-10-13 用户反馈对齐 YTM 语义):整队 RADIO、播完即止,
+     *  不挂电台哨兵——混合页 NeteaseMixViewModel.playSectionFrom 同款形状
+     *  (RADIO_CLICK+index 才会把整队装进 player,SONG_CLICK 只装点击那首)。 */
+    fun playSectionFrom(
+        contents: List<Content>,
+        name: String,
+        index: Int = 0,
+    ) {
+        val tracks = contents.map { it.toTrack() }
+        val first = tracks.getOrNull(index) ?: return
+        viewModelScope.launch {
+            setQueueData(
+                QueueData.Data(
+                    listTracks = ArrayList(tracks),
+                    firstPlayedTrack = first,
+                    playlistId = null,
+                    playlistName = name,
+                    playlistType = PlaylistType.RADIO,
+                    continuation = null,
+                ),
+            )
+            loadMediaItem(first, Config.RADIO_CLICK, index)
+        }
+    }
 }

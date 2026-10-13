@@ -291,8 +291,8 @@ fun NotificationItem(
             }
             Spacer(modifier = Modifier.height(10.dp))
         }
-        // 时间行尾随品牌原色源标识(用户 2026-09-25 定案:双源各推各的,靠它分"重复"还是两源);
-        // 图标尺寸=时间字体的字号换算,不引入第二套尺寸
+        // 时间行品牌原色源标识在文案前(用户 2026-10-12:图标从行尾时间后挪到时间前;
+        // 双源各推各的,靠它分"重复"还是两源);图标尺寸=时间字体的字号换算,不引入第二套尺寸
         Row(
             modifier =
                 Modifier
@@ -301,11 +301,6 @@ fun NotificationItem(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             val timeStyle = typo().titleSmall
-            Text(
-                text = notification.time.formatTimeAgo(),
-                style = timeStyle,
-            )
-            Spacer(modifier = Modifier.padding(start = 4.dp))
             val netease = notification.channelId.toLongOrNull() != null
             Icon(
                 imageVector =
@@ -322,6 +317,11 @@ fun NotificationItem(
                             timeStyle.fontSize.toDp()
                         },
                     ),
+            )
+            Spacer(modifier = Modifier.padding(start = 4.dp))
+            Text(
+                text = notification.time.formatTimeAgo(),
+                style = timeStyle,
             )
         }
     }

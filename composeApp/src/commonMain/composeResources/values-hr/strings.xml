@@ -300,6 +300,8 @@
     <string name="play_video_instead_of_audio_warning">This action will delete player cache. Nastavi?</string>
     <string name="quality_video">Video Kvaliteta</string>
     <string name="add_to_queue">Dodaj to queue</string>
+    <string name="add_to_queue_disabled_radio">Dodaj u red (radio se reproducira)</string>
+    <string name="add_to_queue_disabled_endless">Dodaj u red (beskonačni red aktivan)</string>
     <string name="added_to_queue">Dodajed to queue</string>
     <string name="new_release">Nevo izdanje</string>
     <string name="music_video">Music video</string>
@@ -841,4 +843,5 @@
     <string name="month_full_dec">December</string>
     <string name="delete_video_title">Izbrisati video?</string>
     <string name="delete_video_message">Preuzeta video datoteka bit će uklonjena. Možete je ponovno preuzeti u svakom trenutku.</string>
+    <string name="play">Play</string>
 </resources>

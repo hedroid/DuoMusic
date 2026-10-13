@@ -308,6 +308,8 @@
     <string name="play_video_instead_of_audio_warning">Den här åtgärden raderar spelarens cache. Vill du fortsätta?</string>
     <string name="quality_video">Videokvalitet</string>
     <string name="add_to_queue">Lägg till i kön</string>
+    <string name="add_to_queue_disabled_radio">Lägg till i kön (radio spelas)</string>
+    <string name="add_to_queue_disabled_endless">Lägg till i kön (oändlig kö på)</string>
     <string name="added_to_queue">Har lagts till i kön</string>
     <string name="new_release">Nytt släpp</string>
     <string name="music_video">Musikvideo</string>
@@ -886,4 +888,5 @@
     <string name="modified_build_message">Du använder en inofficiell kopia av SimpMusic som har ändrats eller paketerats om av någon annan. Den kan inte användas. Hämta den officiella versionen från simpmusic.org.</string>
     <string name="delete_video_title">Ta bort videon?</string>
     <string name="delete_video_message">Den nedladdade videofilen tas bort. Du kan ladda ner den igen när som helst.</string>
+    <string name="play">Play</string>
 </resources>

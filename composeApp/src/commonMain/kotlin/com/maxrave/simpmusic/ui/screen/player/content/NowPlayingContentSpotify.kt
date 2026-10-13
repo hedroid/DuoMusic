@@ -1009,14 +1009,26 @@ fun NowPlayingContentSpotify(
                                                 .height(32.dp)
                                                 .fillMaxWidth()
                                                 .padding(horizontal = 20.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically,
                                     ) {
                                         // Info + Cast Buttons (Left)
-                                        Box(modifier = Modifier.weight(1f)) {
-                                            Row(
-                                                modifier = Modifier.align(Alignment.CenterStart),
-                                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                                verticalAlignment = Alignment.CenterVertically,
+                                        // weight(fill = false) keeps a long device name from shoving the
+                                        // playlist/queue buttons off the end of this SpaceBetween row.
+                                        Row(
+                                            modifier = Modifier.weight(1f, fill = false),
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                        ) {
+                                            IconButton(
+                                                modifier =
+                                                    Modifier
+                                                        .size(24.dp)
+                                                        .aspectRatio(1f)
+                                                        .clip(CircleShape),
+                                                onClick = {
+                                                    actions.onShowInfo()
+                                                },
                                             ) {
                                                 Icon(imageVector = SimpIcons.Info, tint = Color.White, contentDescription = "")
                                             }
@@ -1054,12 +1066,10 @@ fun NowPlayingContentSpotify(
                                             }
                                         }
 
-                                        Box(modifier = Modifier.weight(1f)) {
-                                            Row(
-                                                modifier = Modifier.align(Alignment.CenterEnd),
-                                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                                verticalAlignment = Alignment.CenterVertically,
-                                            ) {
+                                        Row(
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                        ) {
                                                 // Add to Playlist Button (Right)
                                                 IconButton(
                                                     modifier =
@@ -1100,7 +1110,6 @@ fun NowPlayingContentSpotify(
                                                     )
                                                 }
                                             }
-                                        }
                                     }
                                 }
                                 this@Column.AnimatedVisibility(

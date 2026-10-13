@@ -26,6 +26,7 @@ import com.maxrave.simpmusic.expect.installNeteaseWatchmanTokenSource
 import com.maxrave.simpmusic.service.backup.AutoBackupScheduler
 import com.maxrave.simpmusic.utils.NetworkFirstInterceptor
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
@@ -71,6 +72,13 @@ class SimpMusicApplication :
                 ),
             )
             loadKoinModules(viewModelModule)
+        }
+        // app log 暂停态恢复(DataStore 持久,2026-10-13 用户反馈"暂停后重启 app 又是打开
+        // 状态"):Logger.fileLoggingEnabled 是进程内 @Volatile,重启即归位 true——启动读一次
+        // 存储,暂停过就重新关掉文件记录(异步读,别阻塞主线程——DataStore actor 卡死前科)
+        applicationScope.launch {
+            Logger.fileLoggingEnabled =
+                dataStoreManager.appLogFileLoggingPaused.first() != DataStoreManager.Values.TRUE
         }
         // 网易 eapi 反作弊 token(易盾 Watchman)生成器:headless WebView 懒初始化,
         // 生成失败自动降级纯 eapi——装不上也绝不能影响启动

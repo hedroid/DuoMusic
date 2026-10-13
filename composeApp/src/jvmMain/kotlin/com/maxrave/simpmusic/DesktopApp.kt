@@ -213,6 +213,14 @@ fun runDesktopApp(args: Array<String> = emptyArray()) {
         )
         loadKoinModules(viewModelModule)
     }
+    // app log 暂停态恢复(同 Android,2026-10-13):启动读一次存储,Koin 已就绪
+    runCatching {
+        val dataStoreManager = org.koin.core.context.GlobalContext.get().get<com.maxrave.domain.manager.DataStoreManager>()
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+            com.maxrave.logger.Logger.fileLoggingEnabled =
+                dataStoreManager.appLogFileLoggingPaused.first() != com.maxrave.domain.manager.DataStoreManager.Values.TRUE
+        }
+    }
 
     val language =
         runBlocking {

@@ -57,6 +57,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.maxrave.domain.manager.DataStoreManager
 import com.maxrave.logger.Logger
 import com.maxrave.simpmusic.Platform
 import com.maxrave.simpmusic.expect.copyToClipboard
@@ -92,23 +93,24 @@ import multiplatform.network.cmptoast.ToastGravity
 import multiplatform.network.cmptoast.showToast
 import org.jetbrains.compose.resources.Font
 import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
 import simpmusic.composeapp.generated.resources.Res
-import simpmusic.composeapp.generated.resources.all
 import simpmusic.composeapp.generated.resources.app_log
-import simpmusic.composeapp.generated.resources.copied_to_clipboard
-import simpmusic.composeapp.generated.resources.error
+import simpmusic.composeapp.generated.resources.log_copied_to_clipboard
 import simpmusic.composeapp.generated.resources.log_empty
 import simpmusic.composeapp.generated.resources.log_errors
 import simpmusic.composeapp.generated.resources.log_export_failed
 import simpmusic.composeapp.generated.resources.log_hide_stack_trace
+import simpmusic.composeapp.generated.resources.log_level_error
 import simpmusic.composeapp.generated.resources.log_level_info
 import simpmusic.composeapp.generated.resources.log_level_warn
 import simpmusic.composeapp.generated.resources.log_live
 import simpmusic.composeapp.generated.resources.log_no_stack_trace
 import simpmusic.composeapp.generated.resources.log_paused
 import simpmusic.composeapp.generated.resources.log_search_hint
+import simpmusic.composeapp.generated.resources.log_share
 import simpmusic.composeapp.generated.resources.log_stack_trace_lines
-import simpmusic.composeapp.generated.resources.share
+import simpmusic.composeapp.generated.resources.log_tab_all
 import simpmusic.composeapp.generated.resources.space_mono_regular
 
 private val POLL_INTERVAL = 1.seconds
@@ -139,7 +141,22 @@ fun AppLogScreen(
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var minLevel by rememberSaveable { mutableStateOf('I') }
     var query by rememberSaveable { mutableStateOf("") }
-    var paused by rememberSaveable { mutableStateOf(false) }
+    // 暂停态从 Logger 单例反推(2026-10-13 用户反馈"暂停后重进,状态还是开始")——
+    // rememberSaveable 只在进程内配置变更/进程死亡恢复时保留,导航返回再进入会重建,
+    // 恒从 false 起步;而 fileLoggingEnabled 是进程级真值,按钮与它脱节就是"假开始"。
+    var paused by rememberSaveable { mutableStateOf(!Logger.fileLoggingEnabled) }
+    val dataStoreManager: DataStoreManager = koinInject()
+    // 暂停态持久化(2026-10-13 用户反馈"暂停后重启 app 又是打开状态"):Logger 的
+    // @Volatile 随进程归位,saveable 也救不了用户主动重启——落 DataStore,双端启动时
+    // 读回;页面内以存储流为准(首帧先按 Logger 现值渲染,流到达即校正),按钮翻转
+    // 即时生效+异步落盘,流回放同值幂等
+    LaunchedEffect(Unit) {
+        dataStoreManager.appLogFileLoggingPaused.collect { stored ->
+            val persisted = stored == DataStoreManager.Values.TRUE
+            paused = persisted
+            Logger.fileLoggingEnabled = !persisted
+        }
+    }
     // Clearing hides what came before instead of deleting it: the writer keeps the file open.
     var clearedAt by rememberSaveable { mutableLongStateOf(0L) }
     // Android Studio's "Scroll to the End": a mode that keeps the newest line in view as lines
@@ -215,9 +232,9 @@ fun AppLogScreen(
         if (tab == 0 && stickToBottom && shownLines.isNotEmpty()) logListState.scrollToItem(shownLines.size)
     }
 
-    val copied = stringResource(Res.string.copied_to_clipboard)
+    val copied = stringResource(Res.string.log_copied_to_clipboard)
     val exportFailed = stringResource(Res.string.log_export_failed)
-    val shareTitle = stringResource(Res.string.share)
+    val shareTitle = stringResource(Res.string.log_share)
     val copy = { line: LogLine ->
         copyToClipboard("App log", line.render())
         showToast(copied, ToastGravity.Bottom)
@@ -248,14 +265,27 @@ fun AppLogScreen(
                 actions = {
                     // Android Studio's Logcat toolbar, in its order: clear, pause, restart, stick.
                     RippleIconButton(SimpIcons.Delete, tint = onSurface) {
+                        // 真删文件(2026-10-13 用户反馈"点删除下次进来日志还在"):旧实现只把
+                        // 视图过滤器拨到当前时刻,文件原样、重进全回来
+                        Logger.clearLogFiles()
                         clearedAt = nowEpochMillis()
+                        appTail.reset()
+                        errorTail.reset()
+                        appLines = emptyList()
+                        errorLines = emptyList()
                     }
                     RippleIconButton(if (paused) SimpIcons.PlayArrow else SimpIcons.Pause, tint = onSurface) {
+                        // 暂停=真正停止落盘(2026-10-13 用户反馈"点停止还继续记录"):翻
+                        // 文件记录总开关,写入器在 isLoggable 拦截;恢复继续记录;落盘跨重启
                         paused = !paused
+                        Logger.fileLoggingEnabled = !paused
+                        scope.launch { dataStoreManager.setAppLogFileLoggingPaused(paused) }
                     }
                     RippleIconButton(SimpIcons.RestartAlt, tint = onSurface) {
                         clearedAt = 0L
                         paused = false
+                        Logger.fileLoggingEnabled = true
+                        scope.launch { dataStoreManager.setAppLogFileLoggingPaused(false) }
                         stickToBottom = true
                         restarts++
                     }
@@ -397,7 +427,7 @@ private fun LogTabs(
             onClick = { onSelect(0) },
             selectedContentColor = MaterialTheme.colorScheme.onSurface,
             unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            text = { Text(stringResource(Res.string.all), style = typo().titleSmall, color = LocalContentColor.current) },
+            text = { Text(stringResource(Res.string.log_tab_all), style = typo().titleSmall, color = LocalContentColor.current) },
         )
         Tab(
             selected = selected == 1,
@@ -466,7 +496,7 @@ private fun LevelChips(
     listOf(
         'I' to stringResource(Res.string.log_level_info),
         'W' to stringResource(Res.string.log_level_warn),
-        'E' to stringResource(Res.string.error),
+        'E' to stringResource(Res.string.log_level_error),
     ).forEach { (level, label) ->
         Chip(isSelected = selected == level, text = label) { onSelect(level) }
     }

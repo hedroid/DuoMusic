@@ -10,9 +10,13 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -37,12 +41,17 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.carousel.CarouselItemDrawInfo
+import androidx.compose.material3.carousel.HorizontalCenteredHeroCarousel
+import androidx.compose.material3.carousel.rememberCarouselState
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
@@ -52,9 +61,11 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -63,6 +74,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
@@ -70,16 +82,19 @@ import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.maxrave.domain.data.model.home.Content
-import com.maxrave.simpmusic.extension.isScrollingUp
+import com.maxrave.simpmusic.extension.scrollReportingEffect
+import com.maxrave.simpmusic.extension.smoothScrimBrush
 import com.maxrave.simpmusic.ui.component.Chip
 import com.maxrave.simpmusic.ui.component.EndOfPage
 import com.maxrave.simpmusic.ui.component.HomeShimmer
+import com.maxrave.simpmusic.ui.component.ShelfTitleRow
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import com.maxrave.simpmusic.ui.icon.SimpIcons
 import com.maxrave.simpmusic.ui.icon.PeopleAlt
 import com.maxrave.simpmusic.ui.icon.Favorite
 import com.maxrave.simpmusic.ui.icon.Pause
 import com.maxrave.simpmusic.ui.icon.PlayArrow
+import com.maxrave.simpmusic.ui.theme.ForceDarkContent
 import com.maxrave.simpmusic.ui.theme.typo
 import com.maxrave.simpmusic.ui.utils.toHiResArtworkUrl
 import com.maxrave.simpmusic.viewModel.NeteaseMixViewModel
@@ -93,6 +108,7 @@ import simpmusic.composeapp.generated.resources.personal_fm_pause
 import simpmusic.composeapp.generated.resources.personal_fm_resume
 import simpmusic.composeapp.generated.resources.personal_fm_start
 import simpmusic.composeapp.generated.resources.personal_fm_subtitle
+import simpmusic.composeapp.generated.resources.play_all
 import simpmusic.composeapp.generated.resources.retry
 
 /**
@@ -120,20 +136,12 @@ fun NeteaseMixScreen(
     val expressLoading by viewModel.expressLoading.collectAsStateWithLifecycle()
     val playback by viewModel.playbackState.collectAsStateWithLifecycle()
     val scrollState = rememberLazyListState()
-    val isScrollingUp by scrollState.isScrollingUp()
+    // 位移粒度滚动上报(库页同款 scrollReportingEffect,含 canScrollForward 贴底回吸兜底):
+    // 旧 index-only+isScrollingUp 上报在贴底 fling 时把末端钳制回吸读成上滑,
+    // 底栏/迷你条来回跳(2026-10-13 用户反馈回归;库页 544a7e99/bae1c760 同病同修)
+    scrollState.scrollReportingEffect(onScrolling)
     val pullToRefreshState = rememberPullToRefreshState()
     var topAppBarHeightPx by remember { mutableIntStateOf(0) }
-
-    LaunchedEffect(scrollState) {
-        snapshotFlow { scrollState.firstVisibleItemIndex }
-            .collect {
-                if (it <= 1) {
-                    onScrolling(true)
-                } else {
-                    onScrolling(isScrollingUp)
-                }
-            }
-    }
 
     Box(
         Modifier
@@ -256,44 +264,52 @@ fun NeteaseMixScreen(
                                 }
                             }
                             if (dailyContents.isNotEmpty()) {
-                                // 每日推荐 30 首:主页只放了推荐歌单,这批歌是本页增量
-                                item(key = "daily-header") {
-                                    SectionHeader("每日推荐")
-                                }
-                                item(key = "daily-grid") {
-                                    FmSongGrid(contents = dailyContents) { index ->
-                                        viewModel.playSectionFrom(dailyContents, index, "每日推荐")
-                                    }
+                                // 每日推荐:YTM"每日发现"同款 hero 轮播+播放全部(2026-10-12 用户定案,
+                                // 替代原三行紧凑网格;30 首全量入轮播,点中间卡从该曲整队起播)
+                                item(key = "daily-section") {
+                                    NeteaseDailySection(
+                                        title = "每日推荐",
+                                        contents = dailyContents,
+                                        onPlayAll = { viewModel.playSectionFrom(dailyContents, 0, "每日推荐") },
+                                        onPlayIndex = { index ->
+                                            viewModel.playSectionFrom(dailyContents, index, "每日推荐")
+                                        },
+                                    )
                                 }
                             }
                             if (expressContents.isNotEmpty() || expressLoading) {
-                                // 新歌速递:编辑性新歌(与主页"推荐新歌"个性化不同源),地区 chips
-                                item(key = "express-header") {
-                                    // 外层别再加水平 padding:SectionHeader 自带 15dp,叠加会把
-                                    // 标题缩进 30dp、与其它分区标题错位
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    ) {
-                                        SectionHeader("新歌速递")
-                                        if (expressLoading) {
-                                            CircularProgressIndicator(
-                                                modifier = Modifier.size(18.dp),
-                                                strokeWidth = 2.dp,
-                                            )
-                                        }
-                                    }
-                                }
-                                item(key = "express-chips") {
-                                    ExpressAreaChips(
-                                        selected = expressArea,
-                                        enabled = !expressLoading,
-                                    ) { area -> viewModel.loadExpress(area) }
-                                }
-                                if (expressContents.isNotEmpty()) {
-                                    item(key = "express-grid") {
-                                        FmSongGrid(contents = expressContents) { index ->
-                                            viewModel.playSectionFrom(expressContents, index, "新歌速递")
+                                // 新歌速递:编辑性新歌(与主页"推荐新歌"个性化不同源),地区 chips。
+                                // 标题→chips→网格统一 8dp(2026-10-13 用户反馈与主页"新碟上架"
+                                // 距离不一致:此前 header/chips 是独立 LazyColumn 项吃 20dp 项距,
+                                // 现三项合并一项,节奏与主页行内 8dp 对齐);切地区的小转圈占
+                                // 尾钮槽位(ShelfTitleRow trailing),与其它行的占位同位
+                                item(key = "express-section") {
+                                    Column {
+                                        ShelfTitleRow(
+                                            title = "新歌速递",
+                                            titleColor = MaterialTheme.colorScheme.onBackground,
+                                            // 切地区小转圈占尾钮槽(transient)
+                                            trailing =
+                                                if (expressLoading) {
+                                                    {
+                                                        CircularProgressIndicator(
+                                                            modifier = Modifier.size(18.dp),
+                                                            strokeWidth = 2.dp,
+                                                        )
+                                                    }
+                                                } else {
+                                                    null
+                                                },
+                                        )
+                                        ExpressAreaChips(
+                                            selected = expressArea,
+                                            enabled = !expressLoading,
+                                            modifier = Modifier.padding(top = 8.dp),
+                                        ) { area -> viewModel.loadExpress(area) }
+                                        if (expressContents.isNotEmpty()) {
+                                            FmSongGrid(contents = expressContents, topPadding = 8.dp) { index ->
+                                                viewModel.playSectionFrom(expressContents, index, "新歌速递")
+                                            }
                                         }
                                     }
                                 }
@@ -380,9 +396,11 @@ fun NeteaseMixScreen(
     }
 }
 
-/** 每日推荐三行紧凑卡网格(与主页歌曲行同款) */
+/** 每日推荐/新歌速递三行紧凑卡网格(与主页歌曲行同款;横向 4dp=每日推荐歌单行基准,纵向 8dp 原节奏) */
 @Composable
-private fun FmSongGrid(    contents: List<Content>,
+private fun FmSongGrid(
+    contents: List<Content>,
+    topPadding: androidx.compose.ui.unit.Dp = 0.dp,
     onPlay: (index: Int) -> Unit,
 ) {
     val gridState = rememberLazyGridState()
@@ -391,8 +409,11 @@ private fun FmSongGrid(    contents: List<Content>,
         modifier =
             Modifier
                 .padding(horizontal = 15.dp)
+                .padding(top = topPadding)
                 .height(460.dp),
         state = gridState,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         gridItemsIndexed(contents, key = { _, content -> content.videoId ?: content.title }) { index, content ->
             NeteaseSongCard(
@@ -403,9 +424,9 @@ private fun FmSongGrid(    contents: List<Content>,
     }
 }
 
-/** 单行两列横滑卡(主页"每日推荐歌单"行同款排版,190dp 大卡)。FM 用完整形态:
- *  滑到尾自动拉下一批(onLoadMore)+卡带垃圾桶角标;最近在听复用排版,两个参数
- *  传 null 即无角标无增量(数据一次到位)。 */
+/** 单行两列横滑卡(主页"每日推荐歌单"行同款 160dp 卡,2026-10-12 用户定案全仓统一该尺寸)。
+ *  FM 用完整形态:滑到尾自动拉下一批(onLoadMore)+卡带垃圾桶角标;最近在听复用排版,
+ *  两个参数传 null 即无角标无增量(数据一次到位)。 */
 @Composable
 private fun FmSongRow(
     contents: List<Content>,
@@ -444,7 +465,7 @@ private fun FmSongRow(
     }
     LazyRow(
         state = rowState,
-        modifier = Modifier.padding(horizontal = 11.dp),
+        modifier = Modifier.padding(horizontal = 15.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         itemsIndexed(contents, key = { _, content -> content.videoId ?: content.title }) { index, content ->
@@ -452,8 +473,8 @@ private fun FmSongRow(
                 content = content,
                 onClick = { onPlay(index) },
                 onTrash = onTrash?.let { trash -> { trash(content) } },
-                // 190dp ≈ 一屏两列(主页歌单行同款的双列视觉),横滑翻页
-                cardWidth = 190.dp,
+                // 160dp=主页"每日推荐歌单"行同款卡尺寸(2026-10-12 全仓统一)
+                cardWidth = 160.dp,
             )
         }
         if (loadingMore) {
@@ -461,8 +482,7 @@ private fun FmSongRow(
                 Box(
                     modifier =
                         Modifier
-                            .width(190.dp)
-                            .padding(4.dp),
+                            .width(160.dp),
                     contentAlignment = Alignment.Center,
                 ) {
                     CircularProgressIndicator(
@@ -492,6 +512,12 @@ private fun HeartRadioCard(
                 .padding(horizontal = 15.dp)
                 .clip(RoundedCornerShape(16.dp))
                 .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                // 描边(用户 2026-10-12):低对比填充容器在浅色主题下边界发虚,outlineVariant 细线勾出轮廓
+                .border(
+                    width = 1.dp,
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                    shape = RoundedCornerShape(16.dp),
+                )
                 .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -613,28 +639,130 @@ private fun FmHeroCard(
     }
 }
 
-/** 分区标题(每日推荐/最近在听等) */
+/** 分区标题(最近在听等):走 ShelfTitleRow——尾钮位(更多/占位)与 MediaRow 头部同几何 */
 @Composable
 private fun SectionHeader(title: String) {
-    Text(
-        text = title,
-        style = typo().headlineMedium,
-        color = MaterialTheme.colorScheme.onBackground,
-        modifier = Modifier.padding(horizontal = 15.dp),
-    )
+    ShelfTitleRow(title = title, titleColor = MaterialTheme.colorScheme.onBackground)
 }
+
+/** 宽窗口(平板/桌面)hero 轮播阈值:与 YTM 主页 HomeDiscoverSection 同款 */
+private const val DAILY_WIDE_LAYOUT_MIN_DP = 600
+
+/** 每日推荐/私人雷达共用 hero 轮播(YTM"每日发现"HomeDiscoverSection 同款):一张大卡
+ *  居中+窄邻卡,卡上叠歌名/艺人;点邻卡=带回中间,点中间卡=从该曲整队起播,头部
+ *  "播放全部"=从第 1 首起播。2026-10-13 三轮:私人雷达对齐本形态(用户定稿),title 参数化。 */
+@OptIn(
+    androidx.compose.material3.ExperimentalMaterial3Api::class,
+    androidx.compose.foundation.ExperimentalFoundationApi::class,
+)
+@Composable
+internal fun NeteaseDailySection(
+    title: String,
+    contents: List<Content>,
+    onPlayAll: () -> Unit,
+    onPlayIndex: (Int) -> Unit,
+) {
+    val state = rememberCarouselState { contents.size }
+    val scope = rememberCoroutineScope()
+    Column(Modifier.padding(horizontal = 15.dp)) {
+        // 头部走 ShelfTitleRow(分区可见即有数据=播放全部的显示语义,与 YTM playAllEndpoint
+        // 数据驱动同构;按钮色维持本页原 onSurface)
+        ShelfTitleRow(
+            title = title,
+            horizontalPadding = 0.dp,
+            titleColor = MaterialTheme.colorScheme.onBackground,
+            moreColor = MaterialTheme.colorScheme.onSurface,
+            onPlayAll = onPlayAll,
+        )
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val wide = maxWidth >= DAILY_WIDE_LAYOUT_MIN_DP.dp
+            val heroWidth = maxWidth * (if (wide) 0.6f else 0.74f)
+            HorizontalCenteredHeroCarousel(
+                state = state,
+                maxItemWidth = heroWidth,
+                itemSpacing = 8.dp,
+                contentPadding = PaddingValues(horizontal = 10.dp),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(if (wide) 400.dp else heroWidth * 1.1f),
+            ) { index ->
+                val song = contents[index]
+                val info = carouselItemDrawInfo
+                // 邻卡只带回中间;中间卡才是可播的
+                val play: () -> Unit = {
+                    if (info.isHero()) onPlayIndex(index) else scope.launch { state.animateScrollToItem(index) }
+                }
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .maskClip(RoundedCornerShape(28.dp))
+                        .clickable { play() },
+                ) {
+                    AsyncImage(
+                        model = song.thumbnails.lastOrNull()?.url,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .background(
+                                smoothScrimBrush(
+                                    from = Color.Transparent,
+                                    to = Color.Black.copy(alpha = 0.78f),
+                                    startFraction = 0.45f,
+                                ),
+                            ),
+                    )
+                    // 遮罩恒深色,文字用 force-dark 样式(HomeDiscoverSection 同款)
+                    ForceDarkContent {
+                        Column(
+                            Modifier
+                                .align(Alignment.BottomStart)
+                                .padding(start = 20.dp, end = 64.dp, bottom = 20.dp),
+                        ) {
+                            Text(
+                                text = song.title,
+                                style = if (wide) typo().titleLarge else typo().headlineMedium,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                text = song.artists?.joinToString(", ") { it.name }.orEmpty(),
+                                style = typo().bodyMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// 0 while the item sits in a narrow neighbour slot, 1 once it is the full-size middle card.
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+private fun CarouselItemDrawInfo.heroFraction(): Float =
+    if (maxSize <= minSize) 1f else ((size - minSize) / (maxSize - minSize)).coerceIn(0f, 1f)
+
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+private fun CarouselItemDrawInfo.isHero(): Boolean = heroFraction() > 0.9f
 
 /** 新歌速递地区 chips(网易原生 areaId);切换期间禁用防连点 */
 @Composable
 private fun ExpressAreaChips(
     selected: Int,
     enabled: Boolean,
+    modifier: Modifier = Modifier,
     onSelect: (area: Int) -> Unit,
 ) {
     val areas = listOf(0 to "全部", 7 to "华语", 96 to "欧美", 8 to "日语", 16 to "韩语")
     Row(
         modifier =
-            Modifier
+            modifier
                 .horizontalScroll(rememberScrollState())
                 .padding(horizontal = 11.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),

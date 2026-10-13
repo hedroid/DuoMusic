@@ -25,9 +25,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -89,12 +91,6 @@ import org.koin.compose.viewmodel.koinViewModel
 
 private val RowGap = 10.dp
 
-// The thumbnail height a justified row aims for; rows land a little above or below it.
-private val TargetThumbnailHeight = 180.dp
-
-// The home cards' own 10dp start + 10dp end padding, outside the thumbnail.
-private val CardHorizontalPadding = 20.dp
-
 // The width a mood button asks for, as the old grid's cells did.
 private val MoodCellWidth = 170.dp
 
@@ -117,7 +113,7 @@ fun BrowseScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val hazeState = rememberHazeState()
-    val listState = rememberLazyListState()
+    val listState = rememberLazyGridState()
     // Mix for you's bar rule: transparent only while pixel 0 is on screen.
     val isAtTop by remember {
         derivedStateOf { listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0 }
@@ -207,66 +203,74 @@ fun BrowseScreen(
                 when (state) {
                     is BrowseUIState.Success -> {
                         BoxWithConstraints(Modifier.fillMaxSize()) {
-                            val cardRows =
-                                remember(state.page.contents, maxWidth) {
-                                    justifyRows(state.page.contents, maxWidth)
-                                }
+                            // 心情/氛围条目的列数(内容网格自管列,Adaptive 按宽自适应)
                             val moodColumns = maxOf(1, ((maxWidth + RowGap) / (MoodCellWidth + RowGap)).toInt())
-                            val moodRows =
-                                remember(state.page.moods, moodColumns) {
-                                    state.page.moods.chunked(moodColumns)
-                                }
-                            LazyColumn(
-                                state = listState,
-                                modifier = Modifier.fillMaxSize(),
-                                // Padding rather than a spacer item, so the first item is a real row and
-                                // the glow hands off once a row has scrolled by, as on Mix for you.
-                                contentPadding = PaddingValues(top = innerPadding.calculateTopPadding() + 64.dp),
-                                verticalArrangement = Arrangement.spacedBy(RowGap),
-                            ) {
-                                items(moodRows) { row ->
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(RowGap),
-                                    ) {
-                                        row.forEach { mood ->
-                                            Box(Modifier.weight(1f)) {
-                                                MoodMomentAndGenreHomeItem(
-                                                    title = mood.title,
-                                                    stripeColor = mood.stripeColor,
-                                                    fillMaxWidth = true,
-                                                ) {
-                                                    navController.navigate(MoodDestination(mood.params))
+                        // 内容网格与网易标签分类页(NeteaseTagScreen)同款:Adaptive 160dp 方卡、
+                        // 15dp 页边、4dp 横距/8dp 纵距(用户 2026-10-12 定案,弃逐行等高混排)。
+                        LazyVerticalGrid(
+                            state = listState,
+                            columns = GridCells.Adaptive(minSize = 160.dp),
+                            modifier = Modifier.fillMaxSize(),
+                            // Padding rather than a spacer item, so the first item is a real row and
+                            // the glow hands off once a row has scrolled by, as on Mix for you.
+                            contentPadding = PaddingValues(
+                                start = 15.dp,
+                                end = 15.dp,
+                                top = innerPadding.calculateTopPadding() + 64.dp,
+                                bottom = 8.dp,
+                            ),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            if (state.page.moods.isNotEmpty()) {
+                                // 心情/氛围条目:整行跨列,moods 自管列布局(保留旧观感)
+                                item(key = "moods", span = { GridItemSpan(maxLineSpan) }) {
+                                    Column(verticalArrangement = Arrangement.spacedBy(RowGap)) {
+                                        state.page.moods.chunked(moodColumns).forEach { row ->
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.spacedBy(RowGap),
+                                            ) {
+                                                row.forEach { mood ->
+                                                    Box(Modifier.weight(1f)) {
+                                                        MoodMomentAndGenreHomeItem(
+                                                            title = mood.title,
+                                                            stripeColor = mood.stripeColor,
+                                                            fillMaxWidth = true,
+                                                        ) {
+                                                            navController.navigate(MoodDestination(mood.params))
+                                                        }
+                                                    }
+                                                }
+                                                repeat(moodColumns - row.size) {
+                                                    Spacer(Modifier.weight(1f))
                                                 }
                                             }
                                         }
-                                        repeat(moodColumns - row.size) {
-                                            Spacer(Modifier.weight(1f))
-                                        }
                                     }
-                                }
-                                items(cardRows) { row ->
-                                    Row(horizontalArrangement = Arrangement.spacedBy(RowGap)) {
-                                        row.forEach { card ->
-                                            Box(Modifier.width(card.width)) {
-                                                HomeContentCard(
-                                                    temp = card.content,
-                                                    navController = navController,
-                                                    viewModel = viewModel,
-                                                    onLongClick = {
-                                                        track = it.toTrack()
-                                                        bottomSheetShow = true
-                                                    },
-                                                    fillMaxWidth = true,
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                                item {
-                                    EndOfPage()
                                 }
                             }
+                            itemsIndexed(
+                                state.page.contents,
+                                key = { index, content ->
+                                    "${content.playlistId ?: content.browseId ?: content.videoId}-$index"
+                                },
+                            ) { _, content ->
+                                HomeContentCard(
+                                    temp = content,
+                                    navController = navController,
+                                    viewModel = viewModel,
+                                    onLongClick = {
+                                        track = it.toTrack()
+                                        bottomSheetShow = true
+                                    },
+                                    fillMaxWidth = true,
+                                )
+                            }
+                            item(key = "end", span = { GridItemSpan(maxLineSpan) }) {
+                                EndOfPage()
+                            }
+                        }
                         }
                     }
 
@@ -344,60 +348,3 @@ fun BrowseScreen(
     }
 }
 
-private data class JustifiedCard(
-    val content: Content,
-    val width: Dp,
-)
-
-/**
- * Packs [contents] into rows that fill [rowWidth] exactly, each card keeping its own thumbnail shape,
- * so every thumbnail in a row is the same height and the number of cards per row follows the shapes
- * in it. A row closes when the next card would take its height below [TargetThumbnailHeight] —
- * with or without that card, whichever lands closer. The last row keeps the target height instead
- * of stretching to fill.
- */
-// ponytail: greedy one-pass line breaking; a globally balanced break (Knuth–Plass style) only if
-// uneven row heights ever show.
-private fun justifyRows(
-    contents: List<Content>,
-    rowWidth: Dp,
-): List<List<JustifiedCard>> {
-    val target = TargetThumbnailHeight.value
-    val rows = mutableListOf<List<JustifiedCard>>()
-    var current = emptyList<Pair<Content, Float>>()
-
-    // The thumbnail height at which these cards exactly fill the row.
-    fun heightOf(row: List<Pair<Content, Float>>): Float {
-        val fixed = CardHorizontalPadding.value * row.size + RowGap.value * (row.size - 1)
-        return ((rowWidth.value - fixed) / row.sumOf { it.second.toDouble() }.toFloat()).coerceAtLeast(1f)
-    }
-
-    fun close(
-        row: List<Pair<Content, Float>>,
-        height: Float,
-    ) {
-        rows.add(row.map { (content, ratio) -> JustifiedCard(content, (CardHorizontalPadding.value + ratio * height).dp) })
-    }
-
-    for (content in contents) {
-        val candidate = current + (content to content.homeCardAspectRatio())
-        val height = heightOf(candidate)
-        when {
-            height > target -> {
-                current = candidate
-            }
-
-            current.isNotEmpty() && heightOf(current) - target < target - height -> {
-                close(current, heightOf(current))
-                current = listOf(candidate.last())
-            }
-
-            else -> {
-                close(candidate, height)
-                current = emptyList()
-            }
-        }
-    }
-    if (current.isNotEmpty()) close(current, minOf(target, heightOf(current)))
-    return rows
-}

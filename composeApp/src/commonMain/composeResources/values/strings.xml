@@ -377,8 +377,8 @@
     <string name="play_video_instead_of_audio_warning">This action will delete player cache. Continue?</string>
     <string name="quality_video">Video Quality</string>
     <string name="add_to_queue">Add to queue</string>
-    <string name="add_to_queue_disabled_radio">Add to queue (disabled while a radio or mix is playing)</string>
-    <string name="add_to_queue_disabled_endless">Add to queue (disabled when endless queue is enabled)</string>
+    <string name="add_to_queue_disabled_radio">Add to queue (radio playing)</string>
+    <string name="add_to_queue_disabled_endless">Add to queue (endless queue on)</string>
     <string name="added_to_queue">Added to queue</string>
     <string name="already_in_queue">Already in the queue</string>
     <string name="new_release">New release</string>
@@ -700,6 +700,7 @@
     <string name="no_playlist_found">No playlists found — create one first</string>
     <string name="login_required_short">Log in to %1$s to use this</string>
     <string name="login_netease_first">Please log in to NetEase Music first</string>
+    <string name="switch_source_failed">Couldn\'t switch the music source, please try again</string>
     <string name="list_all_cookies_of_this_page">List all cookies of this page</string>
     <string name="copied_to_clipboard">Copied to clipboard</string>
     <string name="update_channel">Update channel</string>
@@ -1030,7 +1031,7 @@
     <string name="cloud_action_failed_netease">Couldn't update your NetEase account</string>
     <string name="need_login_toast">Sign in to use favorites</string>
     <string name="mixed_source_selection">Mixes music sources — cannot add</string>
-    <string name="favorite_mvs">Favorite MVs</string>
+    <string name="favorite_mvs">Favorite videos</string>
     <string name="cloud_disk">Cloud Disk</string>
     <string name="cloud_upload_waiting">Waiting to upload</string>
     <string name="cloud_comments_unavailable">Can't comment on cloud disk songs</string>
@@ -1057,7 +1058,7 @@
     <string name="upload_to_cloud_disk">Upload songs to cloud disk</string>
     <string name="cloud_disk_capacity">%1$s of %2$s used</string>
     <string name="cloud_upload_read_failed">Could not read the selected file</string>
-    <string name="no_favorite_mvs">No favorite MVs yet</string>
+    <string name="no_favorite_mvs">No favorite videos yet</string>
     <string name="mv_saved_to_download">MV saved to Download</string>
     <string name="mv_count_short">%1$s videos</string>
     <string name="mv_partial_loaded">Loaded %1$s MVs; the rest could not be loaded, continuing with what is available</string>
@@ -1245,8 +1246,8 @@
     <string name="download_artist_album_folder_description_off">Save under Music/SimpMusic</string>
     <string name="download_no_space">Not enough storage to download</string>
     <!-- Accessibility labels for icon-only controls (UI-CR-07) -->
-    <string name="play">Play</string>
     <string name="pause">Pause</string>
+    <string name="play">Play</string>
     <string name="previous_song">Previous song</string>
     <string name="next_song">Next song</string>
     <string name="switch_music_source">Switch music source</string>
@@ -1305,6 +1306,16 @@
     <string name="developer_option">Developer option</string>
     <string name="app_log">App log</string>
     <string name="app_log_description">View, filter and export the app's log</string>
+    <!-- 设置页开发者选项行专用(与页面标题分键:app log 页面文案刻意全英文不翻译,2026-10-13
+         用户定案;app_log 本体保持英文-only 给页面顶栏用,本键对 zh 提供翻译) -->
+    <string name="app_log_settings_title">App log</string>
+    <string name="app_log_settings_description">View, filter and export the app's log</string>
+    <!-- App log 页专属文案:英文-only(2026-10-13 用户定案"app log 页的文案全不翻译"),
+         不加任何 locale 翻译,也不用会被本地化的共享键(All/Error/Share/Copied) -->
+    <string name="log_tab_all">All</string>
+    <string name="log_level_error">Error</string>
+    <string name="log_copied_to_clipboard">Copied to clipboard</string>
+    <string name="log_share">Share</string>
     <string name="log_errors">Errors</string>
     <string name="log_search_hint">Search tag or message</string>
     <string name="log_level_info">Info</string>

@@ -43,7 +43,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalTextStyle
@@ -99,6 +98,7 @@ import com.maxrave.simpmusic.extension.artworkScrimBrush
 import com.maxrave.simpmusic.extension.barBlurStyle
 import com.maxrave.simpmusic.extension.getScreenSizeInfo
 import com.maxrave.simpmusic.extension.toImmersiveBackground
+import com.maxrave.simpmusic.ui.utils.toHiResArtworkUrl
 import com.maxrave.simpmusic.ui.component.ActionButton
 import com.maxrave.simpmusic.ui.component.BatchDownloadConfirmDialog
 import com.maxrave.simpmusic.ui.component.CenterLoadingBox
@@ -259,7 +259,9 @@ fun MvListScreen(
     }
 
     val paletteState = rememberPaletteState()
-    val headerCover = mvs.firstOrNull()?.thumbnails?.lastOrNull()?.url
+    // 封面升档 toHiResArtworkUrl(16:9 小图→w960-h540/网易 param 保比例宽 1080):
+    // 头图槽位 ~1080 物理像素,源 544/240 上采样即糊(2026-10-13 用户"封面模糊")
+    val headerCover = mvs.firstOrNull()?.thumbnails?.lastOrNull()?.url?.toHiResArtworkUrl()
     val mutedPaletteBg = paletteState.palette.toImmersiveBackground()
     var bitmap by remember { mutableStateOf<ImageBitmap?>(null) }
     // 防滚动回收重放:同封面只生成一次调色板(歌单页同款护栏)
@@ -291,6 +293,7 @@ fun MvListScreen(
                             item(contentType = "header") {
                                 ImmersiveMvHeader(
                                     coverUrl = headerCover,
+                                    title = stringResource(Res.string.favorite_mvs),
                                     authorName = accountName,
                                     paletteBg = mutedPaletteBg,
                                     onBack = navController::navigateUp,
@@ -354,6 +357,7 @@ fun MvListScreen(
                                             )
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Text(
+                                                // 播放按钮文字不翻译,保持 Play/Pause(用户 2026-10-13 定案)
                                                 text = if (isThisPlaying) "Pause" else "Play",
                                                 color = Color.Black,
                                                 style = typo().labelLarge,
@@ -420,24 +424,17 @@ fun MvListScreen(
                                 )
                             }
                         }
-                        itemsIndexed(filteredMvs, key = { _, mv -> mv.videoId }) { index, mv ->
-                            Column(modifier = Modifier.animateItem()) {
-                                MvPlaylistRow(
-                                    title = mv.title,
-                                    artist = mv.artists?.joinToString { it.name } ?: "",
-                                    coverUrl = mv.thumbnails?.lastOrNull()?.url,
-                                    isPlaying = mv.videoId == playingTrack && isPlaying,
-                                    onClick = { sharedViewModel.playMv(mv) },
-                                    onMore = { menuTarget = mv },
-                                )
-                                if (index < filteredMvs.size - 1) {
-                                    HorizontalDivider(
-                                        modifier = Modifier.padding(start = 128.dp, end = 16.dp),
-                                        thickness = 0.5.dp,
-                                        color = Color.White.copy(alpha = 0.12f),
-                                    )
-                                }
-                            }
+                        itemsIndexed(filteredMvs, key = { _, mv -> mv.videoId }) { _, mv ->
+                            // 行=YTM 歌单页同款 SongFullWidthItems(48dp 方形封面+Lottie 播放指示,
+                            // 2026-10-13 用户定稿对齐,替换旧 104x58 16:9 自绘行)
+                            com.maxrave.simpmusic.ui.component.SongFullWidthItems(
+                                forceDark = true,
+                                isPlaying = mv.videoId == playingTrack && isPlaying,
+                                track = mv,
+                                onMoreClickListener = { menuTarget = mv },
+                                onClickListener = { sharedViewModel.playMv(mv) },
+                                modifier = Modifier.animateItem(),
+                            )
                         }
                         item(contentType = "footer") {
                             when {
@@ -686,26 +683,29 @@ fun MvListScreen(
     }
 }
 
-/**
- * 沉浸式头图(PlaylistScreen 竖屏分支同构):封面+底部渐隐+标题+液态玻璃顶栏。
- * 高度按 16:9 封面比例(wDP*9/16)而非半屏——歌曲头图是方形图 Crop 铺满半屏,
- * MV 封面是 16:9 宽幅,半屏区域前景只占中段、顶栏浮在空白上失去沉浸感;
- * 缩到 16:9 后封面铺满头部,返回/搜索按钮压在封面上(与歌曲页同感受)。
- * 双层保留:同图 Crop+blur 垫底,前景 Fit(非 16:9 原图如 1.91:1 也完整)。
- */
+/** MV 列表页共用沉浸头(MvListScreen/艺人视频页):封面+渐隐+标题+作者+液态玻璃顶栏。
+ *  高度按 16:9 封面比例(wDP*9/16)而非半屏——歌曲头图是方形图 Crop 铺满半屏,
+ *  MV 封面是 16:9 宽幅,半屏区域前景只占中段、顶栏浮在空白上失去沉浸感;
+ *  缩到 16:9 后封面铺满头部,返回/搜索按钮压在封面上(与歌曲页同感受)。
+ *  双层保留:同图 Crop+blur 垫底,前景 Fit(非 16:9 原图如 1.91:1 也完整)。
+ *  onMore=null 时顶栏药丸只留搜索(艺人视频页无列表级动作)。 */
 @Composable
-private fun ImmersiveMvHeader(
+internal fun ImmersiveMvHeader(
     coverUrl: String?,
+    title: String,
     authorName: String,
     paletteBg: Color,
     onBack: () -> Unit,
     onSearch: () -> Unit,
-    onMore: () -> Unit,
+    onMore: (() -> Unit)?,
     onBitmap: (ImageBitmap?) -> Unit,
 ) {
     val screenInfo = getScreenSizeInfo()
     val artworkBackdrop = rememberBackdrop(Color.Black)
-    val headerHeight = screenInfo.wDP * 9 / 16
+    // 头高=半屏 + 前景 Crop 全宽铺满(YTM 歌单页 PlaylistScreen 同款,2026-10-13 用户
+    // 定稿"顶部封面对齐 YTM"):旧 wDP*9/16+Fit 在源比例稍偏时左右露边=视觉"更窄",
+    // 半屏 Crop 无论源比例恒满宽
+    val headerHeight = screenInfo.hDP / 2f
     Box(
         modifier =
             Modifier
@@ -742,12 +742,10 @@ private fun ImmersiveMvHeader(
             AsyncImage(
                 model = coverUrl,
                 contentDescription = null,
-                contentScale = ContentScale.Fit,
+                // Crop 全宽铺满(PlaylistScreen 头图同款);旧 Fit 对非严格 16:9 源左右露边
+                contentScale = ContentScale.Crop,
                 placeholder = rememberHolderPainter(isVideo = true),
                 error = rememberHolderPainter(isVideo = true),
-                // 贴底不居中:图下缘=头部底缘,直接伸进 scrim 渐变带(歌曲页封面同构),
-                // 封面原色平滑渐隐进列表背景——居中的话超宽图下缘悬在半空,与按钮
-                // 区之间隔一条"图→模糊带→渐变带"的断层(用户实测"泾渭分明")
                 modifier =
                     Modifier
                         .fillMaxSize()
@@ -773,7 +771,7 @@ private fun ImmersiveMvHeader(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
-                    text = stringResource(Res.string.favorite_mvs),
+                    text = title,
                     style = typo().titleLarge,
                     color = Color.White,
                     maxLines = 2,
@@ -823,71 +821,12 @@ private fun ImmersiveMvHeader(
                 IconButton(onClick = onSearch) {
                     Icon(SimpIcons.Search, null, tint = Color.White)
                 }
-                IconButton(onClick = onMore) {
-                    Icon(SimpIcons.MoreVert, contentDescription = "More", tint = Color.White)
+                if (onMore != null) {
+                    IconButton(onClick = onMore) {
+                        Icon(SimpIcons.MoreVert, contentDescription = "More", tint = Color.White)
+                    }
                 }
             }
-        }
-    }
-}
-
-/** MV 行(歌单行同构):16:9 封面+标题/艺人两行+三点;播放中标题转主题色 */
-@Composable
-private fun MvPlaylistRow(
-    title: String,
-    artist: String,
-    coverUrl: String?,
-    isPlaying: Boolean,
-    onClick: () -> Unit,
-    onMore: () -> Unit,
-) {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onClick)
-                .padding(horizontal = 12.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        AsyncImage(
-            model = coverUrl,
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            placeholder = rememberHolderPainter(isVideo = true),
-            error = rememberHolderPainter(isVideo = true),
-            modifier =
-                Modifier
-                    .size(width = 104.dp, height = 58.dp)
-                    .clip(RoundedCornerShape(8.dp)),
-        )
-        Column(
-            modifier =
-                Modifier
-                    .weight(1f)
-                    .padding(start = 12.dp),
-        ) {
-            Text(
-                text = title,
-                style = typo().titleSmall,
-                color =
-                    if (isPlaying) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        Color.White
-                    },
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = artist,
-                style = typo().bodySmall,
-                color = Color.White.copy(alpha = 0.7f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        IconButton(onClick = onMore) {
-            Icon(SimpIcons.MoreVert, contentDescription = "More", tint = Color.White)
         }
     }
 }
@@ -895,7 +834,7 @@ private fun MvPlaylistRow(
 /** 顶栏三点菜单(PlaylistBottomSheet 同壳):添加到队列 / 下载全部 */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun MvListMenuSheet(
+internal fun MvListMenuSheet(
     onDismiss: () -> Unit,
     onAddToQueue: () -> Unit,
     onDownloadAll: () -> Unit,

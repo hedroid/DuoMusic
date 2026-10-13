@@ -1,7 +1,7 @@
 [versions]
 # App version
-version-name = "3.6.1"
-version-code = "68"
+version-name = "3.8.0"
+version-code = "70"
 
 android = "9.4.1"
 kotlin = "2.4.20"
@@ -232,6 +232,7 @@ uri = { module = "com.eygraber:uri-kmp", version.ref = "uri" }
 androidx-lifecycle-viewmodelCompose = { module = "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
 androidx-lifecycle-runtimeCompose = { module = "org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle" }
 kotlinx-coroutinesSwing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "coroutines-android" }
+kotlinx-coroutinesCore = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutines-android" }
 cmptoast = { module = "network.chaintech:cmptoast", version.ref = "cmptoast" }
 native-tray = { module = "dev.nucleusframework:composenativetray", version.ref = "tray" }
 # SingleInstanceManager moved here from the tray in 2.0; the tray only pulls it at runtime.

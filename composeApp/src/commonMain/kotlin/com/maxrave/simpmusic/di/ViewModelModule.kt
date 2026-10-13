@@ -22,7 +22,13 @@ import com.maxrave.simpmusic.viewModel.NeteaseMixViewModel
 import com.maxrave.simpmusic.viewModel.NeteasePodcastCategoryViewModel
 import com.maxrave.simpmusic.viewModel.NeteasePodcastViewModel
 import com.maxrave.simpmusic.viewModel.NeteaseRadioDetailViewModel
+import com.maxrave.simpmusic.viewModel.NeteaseHqViewModel
+import com.maxrave.simpmusic.viewModel.NeteaseNewAlbumsViewModel
 import com.maxrave.simpmusic.viewModel.NeteaseTagViewModel
+import com.maxrave.simpmusic.viewModel.NeteaseToplistViewModel
+import com.maxrave.simpmusic.viewModel.NeteaseMvViewModel
+import com.maxrave.simpmusic.viewModel.NeteaseRadarViewModel
+import com.maxrave.simpmusic.viewModel.NeteaseRadioListViewModel
 import com.maxrave.simpmusic.viewModel.MoodViewModel
 import com.maxrave.simpmusic.viewModel.MoreAlbumsViewModel
 import com.maxrave.simpmusic.viewModel.MoreSongsViewModel
@@ -184,6 +190,38 @@ val viewModelModule =
         }
         viewModel {
             NeteaseTagViewModel(
+                get(),
+            )
+        }
+        viewModel {
+            NeteaseHqViewModel(
+                get(),
+            )
+        }
+        viewModel {
+            NeteaseToplistViewModel(
+                get(),
+            )
+        }
+        viewModel {
+            NeteaseNewAlbumsViewModel(
+                get(),
+            )
+        }
+        // MV/私人雷达/播客电台列表二级页:各自 backstack entry 私有(entry-scoped,参数经 load() 注入)
+        viewModel {
+            NeteaseMvViewModel(
+                get(),
+                get(),
+            )
+        }
+        viewModel {
+            NeteaseRadarViewModel(
+                get(),
+            )
+        }
+        viewModel {
+            NeteaseRadioListViewModel(
                 get(),
             )
         }

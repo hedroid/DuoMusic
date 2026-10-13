@@ -84,9 +84,6 @@ import com.maxrave.simpmusic.ui.component.AppNavigationRail
 import com.maxrave.simpmusic.ui.component.LiquidGlassAppBottomNavigationBar
 import com.maxrave.simpmusic.ui.component.LocalAppBottomOverlayPadding
 import com.maxrave.simpmusic.ui.component.LocalAppContentPadding
-import com.maxrave.simpmusic.ui.component.LocalAppDialogOpen
-import com.maxrave.simpmusic.ui.component.LocalNowPlayingOpen
-import com.maxrave.simpmusic.ui.component.LocalUserStarted
 import com.maxrave.simpmusic.ui.icon.ArrowForwardIos
 import com.maxrave.simpmusic.ui.icon.SimpIcons
 import com.maxrave.simpmusic.ui.navigation.destination.home.AnalyticsDestination
@@ -261,20 +258,6 @@ fun App(
         mutableStateOf(false)
     }
 
-    // Every dialog this file raises on its own. Home's launch banner waits until none is up; see
-    // LocalAppDialogOpen. (The banner waits for a running update check by itself.)
-    val appDialogOpen =
-        shouldShowUpdateDialog || showNotificationPermissionDialog ||
-            showDesktopNotificationPermissionDialog || sleepTimerState.isDone
-
-    // Set by the first press or wheel scroll anywhere in the app this launch, or by opening Now
-    // Playing. A launch banner that has not had its turn yet then waits for a later launch.
-    var userStarted by remember {
-        mutableStateOf(false)
-    }
-    LaunchedEffect(isShowNowPlaylistScreen) {
-        if (isShowNowPlaylistScreen) userStarted = true
-    }
 
     val hazeState =
         rememberHazeState()
@@ -428,13 +411,13 @@ fun App(
                         }
                     }
 
-                    // simpmusic://taste — the AI taste card, which sits on Your library. A link of its
-                    // own rather than library?tab=your_library, so it can say that the card exists only
-                    // while local tracking is on.
+                    // simpmusic://taste — the AI taste card. Upstream sits it on Your library, which
+                    // this fork's Library page does not have: the card lives on Analytics instead
+                    // (both sources reach it, and it is gated on local tracking exactly like the tab),
+                    // so the link points there.
                     "taste" -> {
                         if (isAppLinkAvailable(appPath, null, localTrackingOn, youTubeLoggedIn)) {
-                            viewModel.requestLibraryTab(LibraryChipType.YOUR_LIBRARY)
-                            navController.navigate(LibraryDestination)
+                            navController.navigate(AnalyticsDestination)
                         } else {
                             viewModel.makeToast(getString(Res.string.this_link_is_not_supported))
                         }
@@ -596,18 +579,8 @@ fun App(
         Scaffold(
             // 全局点击触感:根布局旁观所有主窗口点击(Initial 通道不消费事件),
             // 弹窗/底部菜单是独立 Android 窗口,不经这里。详见 hapticTapFeedback。
-            // 之下是上游的 userStarted 观察器(promo 横幅只在用户真实交互后出现)。
-            modifier =
-                Modifier.hapticTapFeedback().pointerInput(Unit) {
-                    awaitPointerEventScope {
-                        while (!userStarted) {
-                            val type = awaitPointerEvent(PointerEventPass.Initial).type
-                            if (type == PointerEventType.Press || type == PointerEventType.Scroll) {
-                                userStarted = true
-                            }
-                        }
-                    }
-                },
+            // (上游的 userStarted 观察器随 promo 横幅移除而撤。)
+            modifier = Modifier.hapticTapFeedback(),
             containerColor =
                 if (isDesktopShell) desktopWindow else MaterialTheme.colorScheme.background,
             bottomBar = {
@@ -661,11 +634,16 @@ fun App(
                                     neteaseLoggedIn = neteaseLoggedInValue,
                                     onSourceSelected = { source ->
                                         if (selectedSourceValue != source.name) {
-                                            // 切源不停播、不跳页(用户 2026-09-22 定案):留在当前页,
-                                            // 区分音源的页(Home/Mix 按状态分流、Search 自适应)原地
-                                            // 刷新;若切源后 Mix tab 不再可见,下方
-                                            // LaunchedEffect(showMixForYouTab) 会把用户带回主页
-                                            viewModel.switchSource(source)
+                                            // 切源不停播(2026-09-22 定案保留);跳主页+刷新
+                                            // (2026-10-13 用户新定案,替代"留当前页")
+                                            // CR P1:等切换真正落定再跳主页+发刷新——
+                                            // 被登录守卫拦截或写盘超时时不导航(留在原页),
+                                            // 也不再让旧主页消费到新源的刷新信号
+                                            viewModel.switchSource(source) { switched ->
+                                                if (switched) {
+                                                    viewModel.navigateHomeAndRefresh(navController)
+                                                }
+                                            }
                                         }
                                     },
                                     liquidGlass = isLiquidGlassEnabled == TRUE,
@@ -682,8 +660,15 @@ fun App(
                                     neteaseLoggedIn = neteaseLoggedInValue,
                                     onSourceSelected = { source ->
                                         if (selectedSourceValue != source.name) {
-                                            // 同上:切源不停播、不跳页,原地刷新区分音源的页
-                                            viewModel.switchSource(source)
+                                            // 同上:切源不停播,跳主页+刷新(2026-10-13)
+                                            // CR P1:等切换真正落定再跳主页+发刷新——
+                                            // 被登录守卫拦截或写盘超时时不导航(留在原页),
+                                            // 也不再让旧主页消费到新源的刷新信号
+                                            viewModel.switchSource(source) { switched ->
+                                                if (switched) {
+                                                    viewModel.navigateHomeAndRefresh(navController)
+                                                }
+                                            }
                                         }
                                     },
                                     reloadDestinationIfNeeded = { klass ->
@@ -720,7 +705,13 @@ fun App(
                                 neteaseLoggedIn = neteaseLoggedInValue,
                                 onSourceSelected = { source ->
                                     if (selectedSourceValue != source.name) {
-                                        viewModel.switchSource(source)
+                                        // 横屏 rail 同款:切源不停播,跳主页+刷新(2026-10-13)
+                                        // 同上(CR P1):切换成功才导航
+                                        viewModel.switchSource(source) { switched ->
+                                            if (switched) {
+                                                viewModel.navigateHomeAndRefresh(navController)
+                                            }
+                                        }
                                     }
                                 },
                                 reloadDestinationIfNeeded = { klass ->
@@ -784,9 +775,6 @@ fun App(
                                 CompositionLocalProvider(
                                     LocalAppContentPadding provides innerPadding,
                                     LocalAppBottomOverlayPadding provides bottomOverlayPadding,
-                                    LocalAppDialogOpen provides appDialogOpen,
-                                    LocalNowPlayingOpen provides isShowNowPlaylistScreen,
-                                    LocalUserStarted provides userStarted,
                                 ) {
                                     AppNavigationGraph(
                                         innerPadding = innerPadding,

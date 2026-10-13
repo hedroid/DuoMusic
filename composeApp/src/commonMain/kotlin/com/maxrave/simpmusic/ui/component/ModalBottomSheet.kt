@@ -210,6 +210,7 @@ import com.maxrave.simpmusic.ui.icon.SyncDisabled
 import com.maxrave.simpmusic.ui.icon.Update
 import com.maxrave.simpmusic.ui.navigation.destination.list.AlbumDestination
 import com.maxrave.simpmusic.ui.navigation.destination.list.ArtistDestination
+import com.maxrave.common.NETEASE_CLOUD_DISK_PLAYLIST_ID
 import com.maxrave.common.NETEASE_MV_MEDIA_ID_PREFIX
 import com.maxrave.simpmusic.ui.navigation.destination.list.SimilarSongsDestination
 import com.maxrave.simpmusic.ui.screen.player.deriveOrderIndex
@@ -1366,7 +1367,19 @@ fun QueueBottomSheet(
             onDismiss = { moreFor = null },
             navController = navController,
             song = track.toSongEntity(),
-            queuePosition = QueuePosition(index, track.videoId),
+            queuePosition =
+                QueuePosition(
+                    index,
+                    track.videoId,
+                    queue.getOrNull(index - 1)?.videoId,
+                    queue.getOrNull(index + 1)?.videoId,
+                ),
+            // 云盘歌的队列行身份(与播放页口径一致):云盘哨兵队列 + 行挂载标记非空,
+            // 或旧快照(非标记纪元)且行 id 在恢复注册表。纪元队列里无标记的行=后来
+            // 插入的普通歌,按普通歌对待。只给曲库门控信号(电台/相似/分享/私人文件
+            // 写入口),不给 onDeleteFromCloudDisk——队列 sheet 无页面出处证明,不可逆
+            // 删除维持播放页/云盘页专属。
+            isCloudDiskSong = queueRowIsCloudDisk(queueData, track),
             onNavigateToOtherScreen = onNavigateToOtherScreen,
         )
     }
@@ -1687,7 +1700,28 @@ fun QueueBottomSheet(
 data class QueuePosition(
     val index: Int,
     val videoId: String,
+    // 打开菜单那一刻的邻居指纹:电台队列里同一首歌会出现多次,index+videoId 分不清
+    // 是哪一次出现;前后行的 id 通常能。边缘行取 null,与"没有前/后行"互相匹配。
+    val previousId: String? = null,
+    val nextId: String? = null,
 )
+
+/**
+ * 云盘歌的队列行身份(与播放页当前曲口径一致):云盘哨兵队列 + 行挂载标记非空,或
+ * 旧快照(非标记纪元)且行 id 在恢复注册表。纪元队列里无标记的行=后来插入的普通歌,
+ * 按普通歌对待。只承载"是云盘歌"的门控信号(电台/相似/分享/私人文件写入口);
+ * 不可逆删除(onDeleteFromCloudDisk)仍属播放页/云盘页——队列菜单无页面出处证明。
+ * 队列弹窗与播放页内嵌队列两个入口共用,别再各写一份口径。
+ */
+internal fun queueRowIsCloudDisk(
+    queueData: QueueData?,
+    track: Track,
+): Boolean {
+    val data = queueData?.data ?: return false
+    if (data.playlistId != NETEASE_CLOUD_DISK_PLAYLIST_ID) return false
+    return track.neteaseCloudDiskMounted != null ||
+        (data.cloudDiskFlagEra != true && track.videoId in data.cloudDiskRestoredOriginalIds)
+}
 
 /**
  * The rows only a queue track has: move it up, down or to play next, or take it out of the queue.
@@ -1711,14 +1745,20 @@ private fun QueueItemActions(
             ?.size ?: 0
     val current = musicServiceHandler.currentOrderIndex()
     val act: (suspend () -> Unit) -> Unit = { action ->
-        val stillThere =
-            musicServiceHandler.queueData.value
-                ?.data
-                ?.listTracks
-                ?.getOrNull(index)
-                ?.videoId == position.videoId
-        if (stillThere) coroutineScope.launch { action() }
-        onDone()
+        // Re-checked INSIDE the coroutine, at execution time: a radio trim or a queue swap can
+        // land between the tap and the launch, and the stale index would then move or delete
+        // whatever slid into that slot. Checking before the launch only narrowed the window.
+        coroutineScope.launch {
+            val tracks = musicServiceHandler.queueData.value?.data?.listTracks
+            // 邻居指纹一起核对:换队后"同位置同 id"但前后行不同=不是打开菜单时那一行
+            val stillThere =
+                tracks != null &&
+                    tracks.getOrNull(index)?.videoId == position.videoId &&
+                    tracks.getOrNull(index - 1)?.videoId == position.previousId &&
+                    tracks.getOrNull(index + 1)?.videoId == position.nextId
+            if (stillThere) action()
+            onDone()
+        }
     }
     if (index > 0) {
         ActionButton(icon = SimpIcons.KeyboardDoubleArrowUp, text = Res.string.move_up) {

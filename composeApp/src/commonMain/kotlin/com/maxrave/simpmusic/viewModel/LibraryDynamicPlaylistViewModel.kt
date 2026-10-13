@@ -51,6 +51,7 @@ class LibraryDynamicPlaylistViewModel(
     private val playlistRepository: com.maxrave.domain.repository.PlaylistRepository by inject()
     private val albumRepository: com.maxrave.domain.repository.AlbumRepository by inject()
     private val localPlaylistRepository: com.maxrave.domain.repository.LocalPlaylistRepository by inject()
+    private val neteaseRepository: com.maxrave.data.repository.NeteaseRepositoryImpl by inject()
     private val _listFavoriteSong: MutableStateFlow<List<SongEntity>> = MutableStateFlow(emptyList())
     val listFavoriteSong: StateFlow<List<SongEntity>> get() = _listFavoriteSong
 
@@ -240,6 +241,40 @@ class LibraryDynamicPlaylistViewModel(
                     likedSong.sortedByDescending {
                         it.favoriteAt ?: REMOVED_SONG_DATE_TIME
                     }
+                // 首帧纠偏:显示灰色来自 DB 冻结快照,老库行(M9 加列前迁移)恒 false 误灰
+                refreshNeteaseAvailabilityOnce(likedSong)
+            }
+        }
+    }
+
+    /**
+     * 本地歌曲列表的版权态纠偏(2026-10-13 用户"艺人页喜欢的歌曲全灰"):列表页灰色读的是
+     * DB 行 isAvailable 冻结快照,唯一修正通道原本只有"播放后回写"——没播过的老行永远误灰。
+     * 首帧落地后向 songDetail 批量拉 privileges(与歌单管线同一判定),与 DB 值不同的行走
+     * updateIsAvailable 同款通道修正,Room 流自动重发刷新 UI。VM 生命周期内只做一次,静默失败。
+     */
+    private var availabilityRefreshed = false
+    private fun refreshNeteaseAvailabilityOnce(songs: List<SongEntity>) {
+        if (availabilityRefreshed || songs.isEmpty()) return
+        availabilityRefreshed = true
+        viewModelScope.launch {
+            val neteaseSongs = songs.filter { it.videoId.toLongOrNull() != null }
+            if (neteaseSongs.isEmpty()) return@launch
+            val fresh =
+                neteaseRepository.refreshNeteaseSongsAvailability(
+                    neteaseSongs.mapNotNull { it.videoId.toLongOrNull() },
+                )
+            if (fresh == null) {
+                // 整批失败(任一分片):不落"已刷新"标记,下次进入/下帧重试
+                // (CR P2:旧实现发请求前就置位,失败后本 VM 生命周期内永不重试)
+                availabilityRefreshed = false
+                return@launch
+            }
+            neteaseSongs.forEach { song ->
+                val id = song.videoId.toLongOrNull() ?: return@forEach
+                fresh[id]?.takeIf { it != song.isAvailable }?.let { available ->
+                    songRepository.updateIsAvailable(available, song.videoId)
+                }
             }
         }
     }
@@ -325,6 +360,8 @@ class LibraryDynamicPlaylistViewModel(
                     likedSong.sortedByDescending {
                         it.favoriteAt ?: REMOVED_SONG_DATE_TIME
                     }
+                // 同 getFavoriteSong:首帧后网络 privileges 纠偏冻结快照的误灰
+                refreshNeteaseAvailabilityOnce(likedSong)
             }
         }
     }

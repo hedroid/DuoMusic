@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -57,6 +58,7 @@ import com.maxrave.simpmusic.ui.icon.SimpIcons
 import com.maxrave.simpmusic.ui.component.CenterLoadingBox
 import com.maxrave.simpmusic.ui.component.EndOfPage
 import com.maxrave.simpmusic.ui.component.MediaRow
+import com.maxrave.simpmusic.ui.navigation.destination.home.NeteaseRadioListDestination
 import com.maxrave.simpmusic.ui.navigation.destination.list.ArtistDestination
 import com.maxrave.simpmusic.ui.navigation.destination.list.NeteasePodcastCategoryDestination
 import com.maxrave.simpmusic.ui.navigation.destination.list.NeteaseRadioDetailDestination
@@ -67,6 +69,7 @@ import kotlinx.datetime.toLocalDateTime
 import com.maxrave.simpmusic.ui.utils.formatCompactCount
 import com.maxrave.simpmusic.ui.utils.scrollSettleTapRescue
 import com.maxrave.simpmusic.viewModel.NeteasePodcastViewModel
+import com.maxrave.simpmusic.viewModel.NeteaseRadioListSource
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import simpmusic.composeapp.generated.resources.Res
@@ -156,11 +159,25 @@ fun NeteasePodcastScreen(
                 }
             }
 
-            // 我的订阅(未登录/空即隐藏)
+            // 我的订阅(未登录/空即隐藏):YTM 式限量横滑+头部"更多"进二级页(2026-10-12)
             if (uiState.myRadios.isNotEmpty()) {
                 item(key = "podcast_my_subscriptions") {
-                    MediaRow(title = stringResource(Res.string.podcast_my_subscriptions), modifier = Modifier.padding(top = 16.dp)) {
-                        items(uiState.myRadios, key = { "my_radio_${it.id}" }) { radio ->
+                    val title = stringResource(Res.string.podcast_my_subscriptions)
+                    MediaRow(
+                        title = title,
+                        modifier = Modifier.padding(top = 16.dp),
+                        onMoreClick =
+                            if (uiState.myRadios.size > PODCAST_ROW_PREVIEW_COUNT) {
+                                {
+                                    navController.navigate(
+                                        NeteaseRadioListDestination(source = NeteaseRadioListSource.MY_SUBS, title = title),
+                                    )
+                                }
+                            } else {
+                                null
+                            },
+                    ) {
+                        items(uiState.myRadios.take(PODCAST_ROW_PREVIEW_COUNT), key = { "my_radio_${it.id}" }) { radio ->
                             NeteaseDjRadioCard(radio = radio, navController = navController) {
                                 navController.navigate(
                                     NeteaseRadioDetailDestination(radioId = radio.id, radioName = radio.name),
@@ -171,11 +188,25 @@ fun NeteasePodcastScreen(
                 }
             }
 
-            // 猜你喜欢(需登录;未登录服务端回空,区块隐藏)
+            // 猜你喜欢(需登录;未登录服务端回空,区块隐藏):限量+更多进二级页
             if (uiState.personalizedRadios.isNotEmpty()) {
                 item(key = "podcast_personalized") {
-                    MediaRow(title = stringResource(Res.string.podcast_guess_you_like), modifier = Modifier.padding(top = 16.dp)) {
-                        items(uiState.personalizedRadios, key = { "personalized_${it.id}" }) { radio ->
+                    val title = stringResource(Res.string.podcast_guess_you_like)
+                    MediaRow(
+                        title = title,
+                        modifier = Modifier.padding(top = 16.dp),
+                        onMoreClick =
+                            if (uiState.personalizedRadios.size > PODCAST_ROW_PREVIEW_COUNT) {
+                                {
+                                    navController.navigate(
+                                        NeteaseRadioListDestination(source = NeteaseRadioListSource.GUESS, title = title),
+                                    )
+                                }
+                            } else {
+                                null
+                            },
+                    ) {
+                        items(uiState.personalizedRadios.take(PODCAST_ROW_PREVIEW_COUNT), key = { "personalized_${it.id}" }) { radio ->
                             NeteaseDjRadioCard(radio = radio, navController = navController) {
                                 navController.navigate(
                                     NeteaseRadioDetailDestination(radioId = radio.id, radioName = radio.name),
@@ -216,11 +247,25 @@ fun NeteasePodcastScreen(
                 }
             }
 
-            // 精选电台
+            // 精选电台:限量+更多进二级页
             if (uiState.recommendRadios.isNotEmpty()) {
                 item(key = "podcast_recommend") {
-                    MediaRow(title = stringResource(Res.string.podcast_featured_radios), modifier = Modifier.padding(top = 16.dp)) {
-                        items(uiState.recommendRadios, key = { "recommend_${it.id}" }) { radio ->
+                    val title = stringResource(Res.string.podcast_featured_radios)
+                    MediaRow(
+                        title = title,
+                        modifier = Modifier.padding(top = 16.dp),
+                        onMoreClick =
+                            if (uiState.recommendRadios.size > PODCAST_ROW_PREVIEW_COUNT) {
+                                {
+                                    navController.navigate(
+                                        NeteaseRadioListDestination(source = NeteaseRadioListSource.FEATURED, title = title),
+                                    )
+                                }
+                            } else {
+                                null
+                            },
+                    ) {
+                        items(uiState.recommendRadios.take(PODCAST_ROW_PREVIEW_COUNT), key = { "recommend_${it.id}" }) { radio ->
                             NeteaseDjRadioCard(radio = radio, navController = navController) {
                                 navController.navigate(
                                     NeteaseRadioDetailDestination(radioId = radio.id, radioName = radio.name),
@@ -231,11 +276,25 @@ fun NeteasePodcastScreen(
                 }
             }
 
-            // 热门电台榜(独立 shelf,带排名)
+            // 热门电台榜(独立 shelf,带排名):限量+更多进二级页(二级页带完整排名)
             if (uiState.hotRadios.isNotEmpty()) {
                 item(key = "podcast_toplist_hot") {
-                    MediaRow(title = stringResource(Res.string.podcast_toplist_radios), modifier = Modifier.padding(top = 16.dp)) {
-                        itemsIndexed(uiState.hotRadios, key = { _, r -> "toplist_${r.id}" }) { index, radio ->
+                    val title = stringResource(Res.string.podcast_toplist_radios)
+                    MediaRow(
+                        title = title,
+                        modifier = Modifier.padding(top = 16.dp),
+                        onMoreClick =
+                            if (uiState.hotRadios.size > PODCAST_ROW_PREVIEW_COUNT) {
+                                {
+                                    navController.navigate(
+                                        NeteaseRadioListDestination(source = NeteaseRadioListSource.HOT, title = title),
+                                    )
+                                }
+                            } else {
+                                null
+                            },
+                    ) {
+                        itemsIndexed(uiState.hotRadios.take(PODCAST_ROW_PREVIEW_COUNT), key = { _, r -> "toplist_${r.id}" }) { index, radio ->
                             NeteaseDjRadioCard(radio = radio, rank = index + 1, navController = navController) {
                                 navController.navigate(
                                     NeteaseRadioDetailDestination(radioId = radio.id, radioName = radio.name),
@@ -246,11 +305,25 @@ fun NeteasePodcastScreen(
                 }
             }
 
-            // 新晋电台榜(独立 shelf,带排名)
+            // 新晋电台榜(独立 shelf,带排名):限量+更多进二级页(二级页带完整排名)
             if (uiState.newRadios.isNotEmpty()) {
                 item(key = "podcast_toplist_new") {
-                    MediaRow(title = stringResource(Res.string.podcast_new_radios), modifier = Modifier.padding(top = 16.dp)) {
-                        itemsIndexed(uiState.newRadios, key = { _, r -> "new_toplist_${r.id}" }) { index, radio ->
+                    val title = stringResource(Res.string.podcast_new_radios)
+                    MediaRow(
+                        title = title,
+                        modifier = Modifier.padding(top = 16.dp),
+                        onMoreClick =
+                            if (uiState.newRadios.size > PODCAST_ROW_PREVIEW_COUNT) {
+                                {
+                                    navController.navigate(
+                                        NeteaseRadioListDestination(source = NeteaseRadioListSource.NEW, title = title),
+                                    )
+                                }
+                            } else {
+                                null
+                            },
+                    ) {
+                        itemsIndexed(uiState.newRadios.take(PODCAST_ROW_PREVIEW_COUNT), key = { _, r -> "new_toplist_${r.id}" }) { index, radio ->
                             NeteaseDjRadioCard(radio = radio, rank = index + 1, navController = navController) {
                                 navController.navigate(
                                     NeteaseRadioDetailDestination(radioId = radio.id, radioName = radio.name),
@@ -292,9 +365,11 @@ fun NeteasePodcastScreen(
     }
 }
 
-/** 发现页列表区块的展示窗口:剧集类内容取前 N 条(全量横滑无"页底",列表太长喧宾夺主) */
+/** 发现页列表区块的展示窗口:剧集类内容取前 N 条(全量横滑无"页底",列表太长喧宾夺主);
+ *  电台货架行同款限量(YTM 式"显示几个+更多进二级页",2026-10-12) */
 private const val LATEST_PROGRAMS_SHOWN = 10
 private const val TOPLIST_PROGRAMS_SHOWN = 10
+private const val PODCAST_ROW_PREVIEW_COUNT = 8
 
 /** 分类浏览 chips(点击=进分类电台列表页;与已移除的"cateId 过滤节目"假过滤不同,这里拉电台列表) */
 @Composable
@@ -325,18 +400,31 @@ private fun PodcastCategoryChipsRow(
     }
 }
 
-/** 电台横滑卡(160dp 定宽,与主页货架 tile 同尺寸;榜单带排名角标) */
+/** 电台横滑卡(160dp 定宽,与主页货架 tile 同尺寸;榜单带排名角标)。
+ *  fillMaxWidth=true 时铺满网格槽宽(电台列表二级页,Adaptive 网格)。 */
 @Composable
 internal fun NeteaseDjRadioCard(
     radio: com.maxrave.netease.model.NeteaseDjRadio,
     rank: Int? = null,
     navController: NavController? = null,
+    fillMaxWidth: Boolean = false,
     onClick: () -> Unit,
 ) {
+    val cardModifier =
+        if (fillMaxWidth) {
+            Modifier.fillMaxWidth()
+        } else {
+            Modifier.width(160.dp)
+        }
+    val thumbModifier =
+        if (fillMaxWidth) {
+            Modifier.fillMaxWidth().aspectRatio(1f)
+        } else {
+            Modifier.size(160.dp)
+        }
     Column(
         modifier =
-            Modifier
-                .width(160.dp)
+            cardModifier
                 .clip(RoundedCornerShape(8.dp))
                 .clickable(onClick = onClick)
                 // 兜底 snap 收尾弹簧期间点击被 scrollable 吞掉(见工具文档):横滑货架后
@@ -355,8 +443,7 @@ internal fun NeteaseDjRadioCard(
                 contentDescription = radio.name,
                 contentScale = ContentScale.Crop,
                 modifier =
-                    Modifier
-                        .size(160.dp)
+                    thumbModifier
                         .clip(RoundedCornerShape(10.dp)),
             )
             if (rank != null) {
@@ -373,16 +460,19 @@ internal fun NeteaseDjRadioCard(
                 )
             }
         }
-        // 标题独立(1 行就 1 行、2 行截断),播主永远紧随其后的下一行——单行标题→播主在第 2 行,
-        // 两行标题→播主在第 3 行,行与行之间无空隙(2026-09-29 用户定案语义)
+        // 标题独立行+播主紧随其后(2026-10-13 用户定稿:卡下文本统一两行=标题一行+副标题
+        // 一行,超宽跑马灯横滚——标准档 2s 间隔重复,非 Immediately,性能优先不超宽零动画;
+        // 推翻 2026-09-29 单行省略终案)。start=10/上下 8/3/3 对齐歌曲/歌单卡文本缩进
+        // (2026-10-13 用户反馈播客卡文本没有缩进,与 AdapterItems.HomeItemSong 同款几何)
         Text(
             text = radio.name,
             style = typo().titleSmall,
             color = MaterialTheme.colorScheme.onSurface,
-            // 单行省略(2026-09-29 用户终案:固定两行太丑);跳动问题已由区块间距+播主紧随缓解
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = 6.dp),
+            modifier =
+                Modifier
+                    .padding(start = 10.dp, top = 8.dp),
         )
         Text(
             text = radio.djNickname.orEmpty(),
@@ -390,6 +480,8 @@ internal fun NeteaseDjRadioCard(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
+            modifier =
+                Modifier.padding(start = 10.dp, top = 3.dp, bottom = 3.dp),
         )
     }
 }
