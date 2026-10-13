@@ -335,6 +335,15 @@ fun SongFullWidthItems(
                             }
                         } else if (index == null) {
                             val thumb = track?.thumbnails?.lastOrNull()?.url ?: songEntity?.thumbnails
+                            // 🚨占位画器形状必须跟槽形一致(coil3 CrossfadePainter.intrinsicSize 对
+                            // start/end 逐分量取 max,而且 settle 后仍是该值):视频行槽是 16:9,
+                            // 用方形 holder(860x860>槽)会把合成 intrinsic 撑成方形→Crop 按
+                            // 方形算缩放→绘制 224x224 被槽裁中带、位图再按方形中心裁=用户所见
+                            // "封面只显示中心一半"(2026-10-13 收藏视频页实测,网格图注入定案)。
+                            // 歌行方槽+方形 holder 几何自洽不受影响;命中内存缓存时 coil 跳过
+                            // crossfade 不构 painter,所以同页首行(顶封先解码)曾表现正常。
+                            val slotHolderPainter: Painter =
+                                coverFallbackPainter ?: rememberHolderPainter(isVideo = videoThumb)
                             AsyncImage(
                                 model =
                                     ImageRequest
@@ -344,12 +353,11 @@ fun SongFullWidthItems(
                                         .diskCacheKey(thumb)
                                         .crossfade(true)
                                         .build(),
-                                placeholder = coverFallbackPainter ?: rememberHolderPainter(),
-                                error = coverFallbackPainter ?: rememberHolderPainter(),
+                                placeholder = slotHolderPainter,
+                                error = slotHolderPainter,
                                 contentDescription = null,
-                                // Crop:方源零变化;16:9 视频源填满 48dp 方槽(2026-10-13 用户
-                                // "视频卡片宽度以音乐卡片为基准统一"——FillWidth 只填宽,视频行
-                                // 缩略图缩成 48×27 横带浮在槽里,与歌曲行的满槽方图宽度观感不一)
+                                // Crop:歌行方源零变化;视频行 16:9 源在 16:9 槽同样零裁切
+                                // (FillWidth 时代 16:9 源曾缩成 48×27 横带浮在槽里,已废)
                                 contentScale = ContentScale.Crop,
                                 alpha = if (unavailable) 0.4f else 1f,
                                 modifier =
