@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,17 +49,12 @@ fun DescriptionView(
     var expanded by rememberSaveable {
         mutableStateOf(false)
     }
-    var shouldHideExpandButton by rememberSaveable {
-        mutableStateOf(false)
-    }
     var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
 
-    LaunchedEffect(layoutResult) {
-        val lineCount = layoutResult?.lineCount ?: 0
-        if (lineCount < limitLine) {
-            shouldHideExpandButton = true
-        }
-    }
+    // 网易/YTMG 的描述常带尾部换行或行尾空格:排版会多量出"幽灵空行"(2 行内容
+    // 量出 3 行),既骗出无意义的"更多",展开后又只多出一条空行。测量和渲染都
+    // 基于裁掉尾部空白后的文本。
+    val effectiveText = text.trimEnd()
 
     val timeRegex = Regex("""(\d+):(\d+)(?::(\d+))?""")
     // Parentheses count only as a pair: descriptions wrap links in them — "From Wikipedia
@@ -75,11 +69,11 @@ fun DescriptionView(
             fontWeight = FontWeight.Normal,
         )
     val combinedRegex = Regex("${timeRegex.pattern}|${urlRegex.pattern}")
-    val matchedWords = combinedRegex.findAll(text)
+    val matchedWords = combinedRegex.findAll(effectiveText)
     matchedWords.forEachIndexed { index, matchResult ->
         // Add text before the match
         if (matchResult.range.first > currentIndex) {
-            annotatedString.append(text.substring(currentIndex, matchResult.range.first))
+            annotatedString.append(effectiveText.substring(currentIndex, matchResult.range.first))
         }
 
         // Add the matched text with the given style
@@ -95,14 +89,14 @@ fun DescriptionView(
             }
         }
         if (index == matchedWords.count() - 1) {
-            annotatedString.append(text.substring(matchResult.range.last + 1, text.length))
+            annotatedString.append(effectiveText.substring(matchResult.range.last + 1, effectiveText.length))
         }
 
         // Update the current index to the end of the match
         currentIndex = matchResult.range.last + 1
     }
     if (matchedWords.count() == 0) {
-        annotatedString.append(text)
+        annotatedString.append(effectiveText)
     }
 
     val textMeasurer = rememberTextMeasurer()
@@ -117,7 +111,7 @@ fun DescriptionView(
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             val maxWidthPx = constraints.maxWidth
             val (fullHeightPx, collapsedHeightPx) =
-                remember(text, maxWidthPx, textStyle, limitLine) {
+                remember(effectiveText, maxWidthPx, textStyle, limitLine) {
                     val layout =
                         textMeasurer.measure(
                             annotatedString.toAnnotatedString(),
@@ -136,57 +130,67 @@ fun DescriptionView(
                 targetValue = if (expanded) fullHeightPx else collapsedHeightPx,
                 animationSpec = tween(durationMillis = 250, easing = FastOutSlowInEasing),
             )
-            Text(
-                text = annotatedString.toAnnotatedString(),
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .height(with(LocalDensity.current) { heightPx.toDp() })
-                        .clipToBounds()
-                        .pointerInput(Unit) {
-                            detectTapGestures { offset ->
-                                layoutResult?.let { layoutResult ->
-                                    val position = layoutResult.getOffsetForPosition(offset)
-                                    Logger.w("DescriptionView", "Position: $position")
-                                    annotatedString
-                                        .toAnnotatedString()
-                                        .getStringAnnotations(
-                                            start = position,
-                                            end = position,
-                                        ).firstOrNull { annotation ->
-                                            Logger.w("DescriptionView", "Annotation: ${annotation.tag}")
-                                            annotation.tag.startsWith("CLICKABLE_USER_")
-                                        }?.let { annotation ->
-                                            when (annotation.tag) {
-                                                "CLICKABLE_USER_TIME" -> {
-                                                    Logger.w("DescriptionView", "Time clicked: ${annotation.item}")
-                                                    onTimeClicked(annotation.item)
-                                                }
+            // 内层 Column 只为把按钮收进 BoxWithConstraints 作用域——按钮的显隐
+            // 要读上面的高度,布局顺序与宽度同外层 Column 等价。
+            Column {
+                Text(
+                    text = annotatedString.toAnnotatedString(),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .height(with(LocalDensity.current) { heightPx.toDp() })
+                            .clipToBounds()
+                            .pointerInput(Unit) {
+                                detectTapGestures { offset ->
+                                    layoutResult?.let { layoutResult ->
+                                        val position = layoutResult.getOffsetForPosition(offset)
+                                        Logger.w("DescriptionView", "Position: $position")
+                                        annotatedString
+                                            .toAnnotatedString()
+                                            .getStringAnnotations(
+                                                start = position,
+                                                end = position,
+                                            ).firstOrNull { annotation ->
+                                                Logger.w("DescriptionView", "Annotation: ${annotation.tag}")
+                                                annotation.tag.startsWith("CLICKABLE_USER_")
+                                            }?.let { annotation ->
+                                                when (annotation.tag) {
+                                                    "CLICKABLE_USER_TIME" -> {
+                                                        Logger.w("DescriptionView", "Time clicked: ${annotation.item}")
+                                                        onTimeClicked(annotation.item)
+                                                    }
 
-                                                "CLICKABLE_USER_URL" -> {
-                                                    Logger.w("DescriptionView", "URL clicked: ${annotation.item}")
-                                                    onURLClicked(annotation.item)
+                                                    "CLICKABLE_USER_URL" -> {
+                                                        Logger.w("DescriptionView", "URL clicked: ${annotation.item}")
+                                                        onURLClicked(annotation.item)
+                                                    }
                                                 }
                                             }
-                                        }
+                                    }
                                 }
-                            }
-                        },
-                onTextLayout = { layoutResult = it },
-                style = textStyle,
-            )
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-        androidx.compose.animation.AnimatedVisibility(!shouldHideExpandButton) {
-            Text(
-                text = if (expanded) stringResource(Res.string.less) else stringResource(Res.string.more),
-                color = Color.LightGray,
-                modifier =
-                    Modifier.clickable {
-                        expanded = !expanded
-                    },
-                style = typo().labelSmall,
-            )
+                            },
+                    onTextLayout = { layoutResult = it },
+                    style = textStyle,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                // 按钮存在与否是纯派生态:折叠高度==全文高度即"展开看不到任何
+                // 新内容",不显示按钮。此前用一个只写 true 的 sticky 标志 + 读
+                // nullable 布局结果的 LaunchedEffect 来判,列表把头部 item 销毁
+                // 重建时布局结果归 null、effect 读到 0 行把标志钉死,且恰好
+                // limitLine 行的文本(如 2 行内容+1 个空行)也判不出"无内容可展开"
+                // ——就是"两行描述却有更多"与"滚动返回后按钮消失"的共同根因。
+                androidx.compose.animation.AnimatedVisibility(fullHeightPx != collapsedHeightPx) {
+                    Text(
+                        text = if (expanded) stringResource(Res.string.less) else stringResource(Res.string.more),
+                        color = Color.LightGray,
+                        modifier =
+                            Modifier.clickable {
+                                expanded = !expanded
+                            },
+                        style = typo().labelSmall,
+                    )
+                }
+            }
         }
     }
 }
