@@ -928,7 +928,10 @@ private fun NeteaseHomeAccountButton(
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) {
-        Box {
+        Box(
+            modifier =
+                Modifier.clickable(onClick = { menuOpen = true }),
+        ) {
             AsyncImage(
                 model =
                     ImageRequest.Builder(LocalPlatformContext.current)
