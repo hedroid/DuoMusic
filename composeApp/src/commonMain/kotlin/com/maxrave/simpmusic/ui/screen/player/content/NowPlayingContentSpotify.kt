@@ -1976,11 +1976,14 @@ internal fun NowPlayingTrackInfoRow(
                     }
                 }
             }
-            if (state.isNeteaseSong) {
+            // 评论入口双源统一(2026-10-27):网易歌→NeteaseCommentsSheet(M7),
+            // YT 歌→上游 InnerTube CommentsBottomSheet;云盘置灰仅网易分支
+            run {
                 IconButton(
-                    // 非完整挂载云盘歌:评论区无效置灰;完整挂载开放
-                    modifier = Modifier.size(36.dp).alpha(if (state.isCloudDiskQueue && !state.cloudFullyMounted) 0.4f else 1f).clip(CircleShape),
-                    onClick = { actions.onShowNeteaseComments() },
+                    modifier = Modifier.size(36.dp).alpha(if (state.isNeteaseSong && state.isCloudDiskQueue && !state.cloudFullyMounted) 0.4f else 1f).clip(CircleShape),
+                    onClick = {
+                        if (state.isNeteaseSong) actions.onShowNeteaseComments() else actions.onShowComments()
+                    },
                 ) {
                     Icon(
                         imageVector = SimpIcons.Comment,

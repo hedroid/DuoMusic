@@ -832,14 +832,17 @@ internal fun ExpressiveTrackInfoRow(
         }
         // 评论=网易歌专属常驻入口,放红心右侧与互动区同行(详情卡里的旧入口已删);
         // 视觉语言与左侧红心圆钮同款(tonal 圆面+暗图标)
-        if (state.isNeteaseSong) {
+        // 评论入口双源统一(2026-10-27):网易→M7 sheet,YT→上游 sheet;云盘置灰仅网易分支
+        run {
             Spacer(modifier = Modifier.size(8.dp))
             Surface(
-                onClick = { actions.onShowNeteaseComments() },
+                onClick = {
+                    if (state.isNeteaseSong) actions.onShowNeteaseComments() else actions.onShowComments()
+                },
                 shape = CircleShape,
                 color = colorScheme.surfaceContainerHigh,
                 // 非完整挂载云盘歌:评论区无效置灰(点击由壳层 toast);完整挂载开放
-                modifier = Modifier.size(48.dp).alpha(if (state.isCloudDiskQueue && !state.cloudFullyMounted) 0.4f else 1f),
+                modifier = Modifier.size(48.dp).alpha(if (state.isNeteaseSong && state.isCloudDiskQueue && !state.cloudFullyMounted) 0.4f else 1f),
             ) {
                 Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                     Icon(

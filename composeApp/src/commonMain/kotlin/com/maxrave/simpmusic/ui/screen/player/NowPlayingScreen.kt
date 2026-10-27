@@ -870,6 +870,8 @@ fun NowPlayingScreenContent(
                     showNeteaseComments = true
                 }
             },
+            // YT 评论(上游 InnerTube sheet):入口三主题统一,网易走上面的 M7 sheet
+            onShowComments = { showCommentsSheet = true },
             onNavigateToArtist = {
                 // 非完整挂载云盘歌/播客:艺人页无目标,播放页艺人名点击不跳转
                 val song = sharedViewModel.nowPlayingState.value?.songEntity
@@ -1205,6 +1207,33 @@ fun NowPlayingScreenContent(
                 },
             isPodcast = isPodcastEpisode,
         )
+    }
+
+    // YT 评论(上游 InnerTube):按当前曲 id 打开;时间戳点击跳转进度
+    if (showCommentsSheet) {
+        val videoId = nowPlayingVideoId
+        if (videoId == null) {
+            // 没在播:丢掉请求,别把它挂到下一首上
+            LaunchedEffect(Unit) { showCommentsSheet = false }
+        } else {
+            CommentsBottomSheet(
+                videoId = videoId,
+                isLoggedIn = isUserLoggedIn,
+                onTimestamp = { raw ->
+                    // 与 Info 卡描述同一规则:只有落在曲目内的时间才 seek
+                    val timestamp = parseTimestampToMilliseconds(raw)
+                    val total = sharedViewModel.timeline.value.total
+                    if (timestamp != 0.0 && timestamp < total) {
+                        sharedViewModel.onUIEvent(UIEvent.UpdateProgress(((timestamp * 100) / total).toFloat()))
+                    }
+                },
+                onLogIn = {
+                    showCommentsSheet = false
+                    navController.navigate(LoginDestination)
+                },
+                onDismiss = { showCommentsSheet = false },
+            )
+        }
     }
 
     // NEW: Add to Playlist Bottom Sheet
