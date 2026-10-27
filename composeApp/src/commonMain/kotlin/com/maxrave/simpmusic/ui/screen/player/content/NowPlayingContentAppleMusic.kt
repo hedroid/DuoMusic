@@ -449,17 +449,19 @@ private fun AppleMusicMainView(
             } else {
                 null
             }
-        val meshSeam = if (showsClip) clipFrameHeight else artworkHeight
-        if (meshPage) AppleMusicMeshBackdrop(mesh = mesh, seam = meshSeam)
-
-        // The band under the status bar and the grabber, where a bright or busy sleeve drowns their
-        // white glyphs: darkened by the wash below. The blurred copy (TopBandBlur) now lives only
-        // inside the animated-artwork frame, whose clip still it reuses — the static page's own copy
-        // was dropped when pages were reduced to moving static covers only (nothing re-requests art
-        // mid-motion). Android only — Desktop has neither, and its dismiss button is glass.
+        // 顶带溶解(上游 141d472a 移植):Android 上封面从状态栏下起,顶部 topFade 溶进
+        // 自己的颜色;mesh 接缝随 topInset 下移,topHold 是顶带到底行渐变的中点锚。
+        // Desktop 无状态栏,一切归零。
         val statusBarHeight = with(localDensity) { WindowInsets.statusBars.getTop(localDensity).toDp() }
-        val topBand =
-            if (meshPage && getPlatform() == Platform.Android) statusBarHeight + TOP_BAND_STRIP else 0.dp
+        val topInset = if (meshPage && getPlatform() == Platform.Android) statusBarHeight else 0.dp
+        val topFade = topInset
+        val shownHeight = if (showsClip) clipFrameHeight else artworkHeight
+        val meshSeam = topInset + shownHeight
+        val topHold =
+            if (topInset > 0.dp) topInset + topFade + ((shownHeight - topFade - artworkFade) / 2).coerceAtLeast(0.dp) else 0.dp
+        if (meshPage) AppleMusicMeshBackdrop(mesh = mesh, seam = meshSeam, topHold = topHold)
+        // wash 的高度仍按"状态栏+条带"计(遮罩保白图标,上游同款保留)
+        val topBand = if (topInset > 0.dp) statusBarHeight + TOP_BAND_STRIP else 0.dp
 
         HorizontalPager(
             state = state.artworkPagerState,
@@ -477,8 +479,8 @@ private fun AppleMusicMainView(
                 page = page,
                 artworkHeight = artworkHeight,
                 clipMaxHeight = clipMaxHeight,
-                topBandSolid = statusBarHeight,
-                topBand = topBand,
+                topInset = topInset,
+                topFade = topFade,
                 bottomContentHeightDp = bottomContentHeightDp,
                 fullscreenCanvas = fullscreenCanvas,
                 animatedArtwork = animatedArtwork,
@@ -506,7 +508,7 @@ private fun AppleMusicMainView(
             AppleMusicMeshBackdrop(
                 mesh = mesh,
                 seam = meshSeam,
-                modifier = Modifier.appleMusicFadeBetween(transparentAt = clipFrameHeight - artworkFade, opaqueAt = clipFrameHeight),
+                modifier = Modifier.appleMusicFadeBetween(transparentAt = topInset + clipFrameHeight - artworkFade, opaqueAt = topInset + clipFrameHeight),
             )
         }
 
@@ -932,8 +934,8 @@ private fun AppleMusicArtworkPage(
     page: Int,
     artworkHeight: Dp,
     clipMaxHeight: Dp,
-    topBandSolid: Dp,
-    topBand: Dp,
+    topInset: Dp,
+    topFade: Dp,
     bottomContentHeightDp: Int,
     fullscreenCanvas: Boolean,
     animatedArtwork: NowPlayingScreenData.CanvasData?,
@@ -977,6 +979,7 @@ private fun AppleMusicArtworkPage(
                 Modifier
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
+                    .padding(top = topInset)
                     .height(artworkHeight),
         ) {
             // Pager 与播放器都确认同一页后再提交当前页；手势和按钮共用播放器驱动路径。
@@ -998,7 +1001,7 @@ private fun AppleMusicArtworkPage(
                     Modifier
                         .fillMaxSize()
                         .alpha(coverAlpha)
-                        .appleMusicVerticalFadeEdges(topFade = 0.dp, bottomFade = artworkFade),
+                        .appleMusicVerticalFadeEdges(topFade = topFade, bottomFade = artworkFade),
             )
         }
         if (isCurrentPage) {
@@ -1006,8 +1009,9 @@ private fun AppleMusicArtworkPage(
                 AnimatedArtworkFrame(
                     canvas = animatedArtwork,
                     heightLimit = clipMaxHeight,
-                    topBandSolid = topBandSolid,
-                    topBand = topBand,
+                    // 帧内 TopBandBlur 仍是"实底+渐隐"双段(上游同款保留):实底=状态栏,渐隐=+条带
+                    topBandSolid = topInset,
+                    topBand = topInset + TOP_BAND_STRIP,
                     alpha = clipAlpha,
                     onStill = { still, height, seed ->
                         clipReady = true
