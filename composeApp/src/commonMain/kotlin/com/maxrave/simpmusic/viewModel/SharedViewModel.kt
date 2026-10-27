@@ -1,5 +1,12 @@
 package com.maxrave.simpmusic.viewModel
 
+import com.maxrave.simpmusic.extension.neteaseWriteErrorString
+import com.maxrave.domain.source.MusicSource
+import simpmusic.composeapp.generated.resources.created_playlist
+import simpmusic.composeapp.generated.resources.could_not_create_playlist
+import com.maxrave.domain.data.model.searchResult.playlists.PlaylistsResult
+import com.maxrave.simpmusic.viewModel.LibraryMutation
+import com.maxrave.simpmusic.viewModel.LibraryMutationBus
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.lifecycle.viewModelScope
 import com.maxrave.common.AppIdentity
@@ -2892,6 +2899,62 @@ class SharedViewModel(
                 makeToast(
                     getString(if (added) Res.string.added_to_queue else Res.string.already_in_queue),
                 )
+            }
+        }
+    }
+
+    /** 库页本地回写总线(Koin single);Create 按钮建单从任意页面发事件 */
+    private val mutationBus: LibraryMutationBus by lazy { getKoin().get() }
+
+    /**
+     * Create 按钮的"新建歌单"(A 案,2026-10-27 定):按当前选中音源建云端歌单——
+     * YT=空曲目建单、网易=隐私建单。成功后发 LibraryMutation 事件带行(单体回读,
+     * 回读失败退占位行),库页任意状态下立即回写;与库页 tab 的建单 tile 同一套事件。
+     */
+    fun createCloudPlaylistForCurrentSource(name: String) {
+        viewModelScope.launch {
+            if (selectedSource.first() == MusicSource.NETEASE.name) {
+                neteaseRepository
+                    .createNeteasePlaylist(name)
+                    .fold(
+                        onSuccess = { id ->
+                            makeToast(getString(Res.string.created_playlist))
+                            val row =
+                                neteaseRepository.getNeteasePlaylistAsLibraryRow(id)
+                                    ?: PlaylistEntity(
+                                        id = id,
+                                        source = MusicSource.NETEASE.name,
+                                        author = "",
+                                        title = name,
+                                        trackCount = 0,
+                                    )
+                            mutationBus.send(LibraryMutation.NeteasePlaylistCreated(row))
+                        },
+                        onFailure = {
+                            makeToast(
+                                getString(neteaseWriteErrorString(it, Res.string.could_not_create_playlist)),
+                            )
+                        },
+                    )
+            } else {
+                val id = playlistRepository.createYouTubePlaylistWithTracks(name, emptyList())
+                if (id != null) {
+                    makeToast(getString(Res.string.created_playlist))
+                    val row =
+                        playlistRepository.getYouTubePlaylistAsLibraryRow(id)
+                            ?: PlaylistsResult(
+                                author = "",
+                                browseId = id,
+                                category = "",
+                                itemCount = "",
+                                resultType = "",
+                                thumbnails = listOf(),
+                                title = name,
+                            )
+                    mutationBus.send(LibraryMutation.YouTubePlaylistCreated(row))
+                } else {
+                    makeToast(getString(Res.string.could_not_create_playlist))
+                }
             }
         }
     }

@@ -1,5 +1,12 @@
 package com.maxrave.simpmusic.ui.component
 
+import simpmusic.composeapp.generated.resources.netease
+import simpmusic.composeapp.generated.resources.create_new_playlist
+import simpmusic.composeapp.generated.resources.login_required_short
+import com.maxrave.simpmusic.ui.screen.library.CreatePlaylistDialog
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.material3.LocalContentColor
+import com.maxrave.domain.source.MusicSource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -91,6 +98,19 @@ fun CreateActions(
     val room by koinInject<ListenTogetherRepository>().room.collectAsStateWithLifecycle()
     var showCreate by remember { mutableStateOf(false) }
     var showPlaylistName by remember { mutableStateOf(false) }
+    // fork A 案(2026-10-27):"新建歌单"=云端建单,按当前选中音源路由;
+    // 未登录该源→行置灰,副标题换"登录 XX 后可用"(与全局门控约定一致)
+    val isNeteaseSource by sharedViewModel.selectedSource
+        .collectAsStateWithLifecycle(initialValue = MusicSource.YOUTUBE_MUSIC.name)
+    val neteaseLoggedIn by sharedViewModel.neteaseLoggedIn.collectAsStateWithLifecycle()
+    val youtubeLoggedIn by sharedViewModel.isUserLoggedInFlow().collectAsStateWithLifecycle(initialValue = false)
+    val createEnabled = if (isNeteaseSource == MusicSource.NETEASE.name) neteaseLoggedIn else youtubeLoggedIn
+    val sourceLabel =
+        if (isNeteaseSource == MusicSource.NETEASE.name) {
+            stringResource(Res.string.netease)
+        } else {
+            "YouTube Music"
+        }
     val tint = MaterialTheme.colorScheme.onBackground
 
     val createButton: @Composable () -> Unit = {
@@ -152,6 +172,8 @@ fun CreateActions(
     if (showCreate) {
         CreateSheet(
             liveRoom = room.inRoom,
+            createEnabled = createEnabled,
+            sourceLabel = sourceLabel,
             onDismiss = { showCreate = false },
             onPlaylist = {
                 showCreate = false
@@ -164,9 +186,13 @@ fun CreateActions(
         )
     }
     if (showPlaylistName) {
-        CreateLocalPlaylistSheet(
+        // 复用库页建单 tile 的命名弹窗(AlertDialog 形态,IME 教训);未登录不该走到这
+        CreatePlaylistDialog(
             onDismiss = { showPlaylistName = false },
-            onCreate = sharedViewModel::createLocalPlaylist,
+            onCreate = { name ->
+                showPlaylistName = false
+                sharedViewModel.createCloudPlaylistForCurrentSource(name)
+            },
         )
     }
 }
@@ -175,6 +201,8 @@ fun CreateActions(
 @Composable
 private fun CreateSheet(
     liveRoom: Boolean,
+    createEnabled: Boolean,
+    sourceLabel: String,
     onDismiss: () -> Unit,
     onPlaylist: () -> Unit,
     onListenTogether: () -> Unit,
@@ -205,8 +233,14 @@ private fun CreateSheet(
                 )
                 CreateRow(
                     icon = SimpIcons.PlaylistAdd,
-                    title = stringResource(Res.string.local_playlist),
-                    subtitle = stringResource(Res.string.create_playlist_description),
+                    title = stringResource(Res.string.create_new_playlist),
+                    subtitle =
+                        if (createEnabled) {
+                            sourceLabel
+                        } else {
+                            stringResource(Res.string.login_required_short, sourceLabel)
+                        },
+                    enabled = createEnabled,
                     onClick = onPlaylist,
                 )
                 CreateRow(
@@ -226,17 +260,20 @@ private fun CreateRow(
     icon: ImageVector,
     title: String,
     subtitle: String,
+    enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
+    val contentAlpha = if (enabled) 1f else 0.38f
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clickable(onClick = onClick)
+                .clickable(enabled = enabled, onClick = onClick)
                 .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
+        CompositionLocalProvider(LocalContentColor provides LocalContentColor.current.copy(alpha = contentAlpha)) {
         Box(
             modifier =
                 Modifier
@@ -250,6 +287,7 @@ private fun CreateRow(
         Column {
             Text(text = title, style = typo().titleSmall)
             Text(text = subtitle, style = typo().bodySmall)
+        }
         }
     }
 }
