@@ -90,7 +90,7 @@ import simpmusic.composeapp.generated.resources.settings
  */
 @Composable
 fun CreateActions(
-    backdrop: PlatformBackdrop,
+    backdrop: PlatformBackdrop?,
     navController: NavController,
     onSettings: (() -> Unit)? = null,
     sharedViewModel: SharedViewModel = koinInject(),
@@ -145,7 +145,7 @@ fun CreateActions(
         }
     }
 
-    if (LocalLiquidGlassEnabled.current) {
+    if (LocalLiquidGlassEnabled.current && backdrop != null) {
         Row(
             modifier =
                 Modifier

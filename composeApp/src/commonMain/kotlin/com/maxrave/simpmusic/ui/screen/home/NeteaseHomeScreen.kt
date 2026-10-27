@@ -1,5 +1,13 @@
 package com.maxrave.simpmusic.ui.screen.home
 
+import com.maxrave.simpmusic.ui.component.CreateActions
+import simpmusic.composeapp.generated.resources.netease_account
+import simpmusic.composeapp.generated.resources.log_in_to_netease
+import com.maxrave.simpmusic.ui.navigation.destination.login.NeteaseLoginDestination
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import com.maxrave.simpmusic.ui.icon.Person
+import com.maxrave.simpmusic.ui.icon.PersonAdd
 import simpmusic.composeapp.generated.resources.welcome_back
 import coil3.request.ImageRequest
 import coil3.request.crossfade
@@ -97,7 +105,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.maxrave.simpmusic.ui.component.ItemArtistChart
 import com.maxrave.simpmusic.ui.component.rememberHolderPainter
-import com.maxrave.simpmusic.extension.isScrollingUp
 import com.maxrave.simpmusic.extension.scrollReportingEffect
 import com.maxrave.simpmusic.ui.component.Chip
 import com.maxrave.simpmusic.ui.component.EndOfPage
@@ -156,7 +163,6 @@ fun NeteaseHomeScreen(
     // 旧上报把末端钳制回吸读成上滑致底栏振荡——2026-10-13 混合页回归案,两页同修)
     scrollState.scrollReportingEffect(onScrolling)
     // 顶栏标题行显隐仍用方向态(上游同款;只管标题不管底栏上报)
-    val isScrollingUp by scrollState.isScrollingUp()
     val pullToRefreshState = rememberPullToRefreshState()
     val chipRowState = rememberScrollState()
     var topAppBarHeightPx by remember { mutableIntStateOf(0) }
@@ -279,46 +285,47 @@ fun NeteaseHomeScreen(
                             topAppBarHeightPx = coordinates.size.height
                         },
             ) {
-                AnimatedVisibility(
-                    visible = isScrollingUp,
-                    enter = fadeIn() + expandVertically(),
-                    exit = fadeOut() + shrinkVertically(),
-                ) {
-                    HomeTopAppBar(navController = navController)
-                }
-                AnimatedVisibility(
-                    visible = !isScrollingUp,
-                    enter = fadeIn() + expandVertically(),
-                    exit = fadeOut() + shrinkVertically(),
-                ) {
-                    Spacer(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .windowInsetsPadding(WindowInsets.statusBars),
-                    )
-                }
+                // 头部跟随上游 YT 主页新设计(2026-10-27):头像菜单+chips+Create 药丸常驻一行;
+                // 通知入头像菜单、设置在药丸齿轮——网易主页自此有通知与设置入口(旧不对称消除)
                 Row(
                     modifier =
                         Modifier
-                            .horizontalScroll(chipRowState)
-                            .padding(vertical = 8.dp, horizontal = 15.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            .fillMaxWidth()
+                            .windowInsetsPadding(WindowInsets.statusBars)
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Chip(
-                        isAnimated = false,
-                        isSelected = false,
-                        text = stringResource(Res.string.all),
-                    ) { }
-                    viewModel.chips.forEach { tag ->
+                    NeteaseHomeAccountButton(
+                        accountInfo = accountInfo,
+                        navController = navController,
+                    )
+                    Row(
+                        modifier =
+                            Modifier
+                                .weight(1f)
+                                .horizontalScroll(chipRowState),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
                         Chip(
                             isAnimated = false,
                             isSelected = false,
-                            text = tag,
-                        ) {
-                            navController.navigate(NeteaseTagDestination(tag = tag))
+                            text = stringResource(Res.string.all),
+                        ) { }
+                        viewModel.chips.forEach { tag ->
+                            Chip(
+                                isAnimated = false,
+                                isSelected = false,
+                                text = tag,
+                            ) {
+                                navController.navigate(NeteaseTagDestination(tag = tag))
+                            }
                         }
                     }
+                    CreateActions(
+                        backdrop = null,
+                        navController = navController,
+                        onSettings = { navController.navigate(SettingsDestination) },
+                    )
                 }
             }
         }
@@ -913,8 +920,61 @@ internal fun NewAlbumAreaChips(
     }
 }
 
-// 上游重做 YT 主页头部时删了这两个共享组件;网易主页头部跟随改造(待办)前先原样内嵌
-@OptIn(ExperimentalMaterial3Api::class)
+// 网易主页头像按钮:头像(或占位圆)+下拉菜单(通知/登录态),对齐上游 HomeAccountButton 形态
+@Composable
+private fun NeteaseHomeAccountButton(
+    accountInfo: Pair<String?, String?>?,
+    navController: NavController,
+) {
+    var menuOpen by remember { mutableStateOf(false) }
+    Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) {
+        Box {
+            AsyncImage(
+                model =
+                    ImageRequest.Builder(LocalPlatformContext.current)
+                        .data(accountInfo?.second ?: "")
+                        .diskCachePolicy(CachePolicy.ENABLED)
+                        .crossfade(550)
+                        .build(),
+                contentDescription = stringResource(Res.string.netease_account),
+                modifier =
+                    Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                contentScale = ContentScale.Crop,
+            )
+            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                accountInfo?.first?.let { name ->
+                    DropdownMenuItem(
+                        text = { Text(name, style = typo().bodyMedium) },
+                        leadingIcon = { Icon(SimpIcons.Person, contentDescription = null) },
+                        onClick = { menuOpen = false },
+                    )
+                }
+                DropdownMenuItem(
+                    text = { Text(stringResource(Res.string.notification), style = typo().bodyMedium) },
+                    leadingIcon = { Icon(SimpIcons.Notifications, contentDescription = null) },
+                    onClick = {
+                        menuOpen = false
+                        navController.navigate(NotificationDestination)
+                    },
+                )
+                if (accountInfo == null) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(Res.string.log_in_to_netease), style = typo().bodyMedium) },
+                        leadingIcon = { Icon(SimpIcons.PersonAdd, contentDescription = null) },
+                        onClick = {
+                            menuOpen = false
+                            navController.navigate(NeteaseLoginDestination)
+                        },
+                    )
+                }
+            }
+        }
+    }
+}
+
 @Composable
 fun HomeTopAppBar(navController: NavController) {
     val hour =
