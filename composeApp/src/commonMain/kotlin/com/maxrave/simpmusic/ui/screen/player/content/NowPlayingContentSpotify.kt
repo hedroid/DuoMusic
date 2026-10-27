@@ -1459,8 +1459,8 @@ fun NowPlayingContentSpotify(
                                                     .diskCacheKey(thumb)
                                                     .crossfade(550)
                                                     .build(),
-                                            placeholder = rememberHolderPainter(isVideo = true),
-                                            error = rememberHolderPainter(isVideo = true),
+                                            placeholder = rememberHolderPainter(),
+                                            error = rememberHolderPainter(),
                                             contentDescription = null,
                                             contentScale = ContentScale.Crop,
                                             // No explicit clip: the ElevatedCard already clips to

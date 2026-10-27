@@ -28,6 +28,7 @@ import com.maxrave.domain.repository.SongRepository
 import com.maxrave.domain.utils.Resource
 import com.maxrave.domain.utils.collectLatestResource
 import com.maxrave.domain.utils.collectResource
+import com.maxrave.domain.utils.isLive
 import com.maxrave.domain.utils.toTrack
 import com.maxrave.logger.LogLevel
 import com.maxrave.netease.NeteaseNotLoggedInException
@@ -469,6 +470,7 @@ class NowPlayingBottomSheetViewModel(
                                         thumbnails = song.thumbnails,
                                         liked = song.liked,
                                         downloadState = song.downloadState,
+                                        isLive = song.isLive,
                                         album =
                                             song.albumName?.takeIf { it.isNotEmpty() }?.let { name ->
                                                 Album(name = name, id = song.albumId ?: "")
@@ -963,6 +965,7 @@ data class NowPlayingBottomSheetUIState(
         val neteaseCloudDiskPrivate: Boolean? = null,
         /** 视频文件路径(Room 实时流):非空且文件在="下载视频"行显示已下载态 */
         val downloadedVideoFilePath: String? = null,
+        val isLive: Boolean = false,
     )
 }
 

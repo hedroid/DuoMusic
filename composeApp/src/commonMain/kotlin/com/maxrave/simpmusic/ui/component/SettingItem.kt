@@ -58,6 +58,10 @@ fun SettingItem(
     // logout that invalidates it (SettingsViewModel: setSpotifyLogIn, logOutDiscord, logOutLastfm,
     // setUsedAccount, logOutAllYouTube, setAIApiKey), which is a real event and cannot misfire.
     val dividerColor = MaterialTheme.colorScheme.outlineVariant
+    // The disabled colour the sheets use (SurfaceDarkColors.disabled). TextStyle.greyScale() alone
+    // left a disabled title as bright as an enabled one, because the title passes its own colour,
+    // and an enabled subtitle is already grey.
+    val disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
     Box(
         Modifier
             // Rows separate themselves: a hairline along the top, from where the text starts to the
@@ -103,11 +107,8 @@ fun SettingItem(
             ) {
                 Text(
                     text = title,
-                    style =
-                        typo().labelMedium.let {
-                            if (!isEnable) it.greyScale() else it
-                        },
-                    color = MaterialTheme.colorScheme.onSurface,
+                    style = typo().labelMedium,
+                    color = if (isEnable) MaterialTheme.colorScheme.onSurface else disabledContentColor,
                 )
                 if (subtitle != null) {
                     Spacer(Modifier.height(4.dp))
@@ -123,6 +124,21 @@ fun SettingItem(
                                     if (!isEnable) it.greyScale() else it
                                 }
                             },
+                        // No maxLines: with a cap and no overflow set, Compose defaults to Clip and cut
+                        // the second line through the middle of the glyphs, with no ellipsis to show
+                        // anything was missing. A settings list scrolls vertically anyway, and these
+                        // descriptions are translated — German and Vietnamese run longer than the
+                        // English they were sized against, so any fixed cap just moves the problem to
+                        // another language.
+                    )
+                }
+                // fork 契约:subtitle 为 null = 该行只有标题;上游的非空默认不采用
+                if (subtitle != null) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = subtitle,
+                        style = if (smallSubtitle) typo().bodySmall else typo().bodyMedium,
+                        color = if (isEnable) Color.Unspecified else disabledContentColor,
                         // No maxLines: with a cap and no overflow set, Compose defaults to Clip and cut
                         // the second line through the middle of the glyphs, with no ellipsis to show
                         // anything was missing. A settings list scrolls vertically anyway, and these

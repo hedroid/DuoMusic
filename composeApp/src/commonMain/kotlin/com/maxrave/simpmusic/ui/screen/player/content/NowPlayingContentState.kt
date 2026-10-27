@@ -371,6 +371,8 @@ class NowPlayingContentActions(
     val onSetRemoteLiked: (Boolean) -> Unit,
     /** 未登录源上的红心点击:给"需要登录"提示而不是打注定失败的请求 */
     val onLoginRequired: () -> Unit = {},
+    /** Opens the comments sheet for the track playing. (fork:评论统一适配前默认空实现) */
+    val onShowComments: () -> Unit = {},
     val onShowFullscreenLyrics: () -> Unit,
     val onShowVoteDialog: () -> Unit,
     /** Writes the lyrics timing offset — the same value Settings › Lyrics edits. */

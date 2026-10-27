@@ -6021,3 +6021,9 @@ fun NeteaseCommentsSheet(
         }
     }
 }
+/** The YouTube Dislike action's three states, for the song sheet and the player rows. */
+enum class YouTubeDislikeState {
+    DISLIKE,
+    DISLIKING,
+    DISLIKED,
+}

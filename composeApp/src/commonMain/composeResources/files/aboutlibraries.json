@@ -1276,10 +1276,10 @@
         },
         {
             "uniqueId": "androidx.datastore:datastore",
-            "artifactVersion": "1.2.1",
+            "artifactVersion": "1.3.0",
             "name": "DataStore",
             "description": "Android DataStore - contains the underlying store used by each serialization method along with components that require an Android dependency",
-            "website": "https://developer.android.com/jetpack/androidx/releases/datastore#1.2.1",
+            "website": "https://developer.android.com/jetpack/androidx/releases/datastore#1.3.0",
             "developers": [
                 {
                     "name": "The Android Open Source Project"
@@ -1301,10 +1301,10 @@
         },
         {
             "uniqueId": "androidx.datastore:datastore-core",
-            "artifactVersion": "1.2.1",
+            "artifactVersion": "1.3.0",
             "name": "DataStore Core",
             "description": "Android DataStore Core - contains the underlying store used by each serialization method",
-            "website": "https://developer.android.com/jetpack/androidx/releases/datastore#1.2.1",
+            "website": "https://developer.android.com/jetpack/androidx/releases/datastore#1.3.0",
             "developers": [
                 {
                     "name": "The Android Open Source Project"
@@ -1326,10 +1326,10 @@
         },
         {
             "uniqueId": "androidx.datastore:datastore-core-okio",
-            "artifactVersion": "1.2.1",
+            "artifactVersion": "1.3.0",
             "name": "DataStore Core Okio",
             "description": "Android DataStore Core Okio- contains APIs to use datastore-core in multiplatform via okio",
-            "website": "https://developer.android.com/jetpack/androidx/releases/datastore#1.2.1",
+            "website": "https://developer.android.com/jetpack/androidx/releases/datastore#1.3.0",
             "developers": [
                 {
                     "name": "The Android Open Source Project"
@@ -1351,10 +1351,10 @@
         },
         {
             "uniqueId": "androidx.datastore:datastore-preferences",
-            "artifactVersion": "1.2.1",
+            "artifactVersion": "1.3.0",
             "name": "Preferences DataStore",
             "description": "Android Preferences DataStore",
-            "website": "https://developer.android.com/jetpack/androidx/releases/datastore#1.2.1",
+            "website": "https://developer.android.com/jetpack/androidx/releases/datastore#1.3.0",
             "developers": [
                 {
                     "name": "The Android Open Source Project"
@@ -1376,10 +1376,10 @@
         },
         {
             "uniqueId": "androidx.datastore:datastore-preferences-core",
-            "artifactVersion": "1.2.1",
+            "artifactVersion": "1.3.0",
             "name": "Preferences DataStore Core",
             "description": "Android Preferences DataStore without the Android Dependencies",
-            "website": "https://developer.android.com/jetpack/androidx/releases/datastore#1.2.1",
+            "website": "https://developer.android.com/jetpack/androidx/releases/datastore#1.3.0",
             "developers": [
                 {
                     "name": "The Android Open Source Project"
@@ -1401,10 +1401,10 @@
         },
         {
             "uniqueId": "androidx.datastore:datastore-preferences-external-protobuf",
-            "artifactVersion": "1.2.1",
+            "artifactVersion": "1.3.0",
             "name": "Preferences External Protobuf",
             "description": "Repackaged proto-lite dependency for use by datastore preferences",
-            "website": "https://developer.android.com/jetpack/androidx/releases/datastore#1.2.1",
+            "website": "https://developer.android.com/jetpack/androidx/releases/datastore#1.3.0",
             "developers": [
                 {
                     "name": "The Android Open Source Project"
@@ -1426,10 +1426,10 @@
         },
         {
             "uniqueId": "androidx.datastore:datastore-preferences-proto",
-            "artifactVersion": "1.2.1",
+            "artifactVersion": "1.3.0",
             "name": "Preferences DataStore Proto",
             "description": "Jarjar the generated proto for use by datastore-preferences.",
-            "website": "https://developer.android.com/jetpack/androidx/releases/datastore#1.2.1",
+            "website": "https://developer.android.com/jetpack/androidx/releases/datastore#1.3.0",
             "developers": [
                 {
                     "name": "The Android Open Source Project"
@@ -2526,10 +2526,10 @@
         },
         {
             "uniqueId": "androidx.mediarouter:mediarouter",
-            "artifactVersion": "1.8.1",
+            "artifactVersion": "1.9.0-beta01",
             "name": "MediaRouter",
             "description": "Android MediaRouter Support Library",
-            "website": "https://developer.android.com/jetpack/androidx/releases/mediarouter#1.8.1",
+            "website": "https://developer.android.com/jetpack/androidx/releases/mediarouter#1.9.0-beta01",
             "developers": [
                 {
                     "name": "The Android Open Source Project"
@@ -2676,10 +2676,10 @@
         },
         {
             "uniqueId": "androidx.paging:paging-common",
-            "artifactVersion": "3.5.2",
+            "artifactVersion": "3.5.3",
             "name": "Paging-Common",
             "description": "Android Paging-Common",
-            "website": "https://developer.android.com/jetpack/androidx/releases/paging#3.5.2",
+            "website": "https://developer.android.com/jetpack/androidx/releases/paging#3.5.3",
             "developers": [
                 {
                     "name": "The Android Open Source Project"
@@ -2701,10 +2701,10 @@
         },
         {
             "uniqueId": "androidx.paging:paging-compose",
-            "artifactVersion": "3.5.2",
+            "artifactVersion": "3.5.3",
             "name": "Paging-Compose",
             "description": "Compose integration with Paging",
-            "website": "https://developer.android.com/jetpack/androidx/releases/paging#3.5.2",
+            "website": "https://developer.android.com/jetpack/androidx/releases/paging#3.5.3",
             "developers": [
                 {
                     "name": "The Android Open Source Project"
@@ -3242,6 +3242,31 @@
             "scm": {
                 "connection": "scm:git:https://android.googlesource.com/platform/frameworks/support",
                 "url": "http://source.android.com"
+            },
+            "licenses": [
+                "Apache-2.0"
+            ],
+            "funding": [
+                
+            ]
+        },
+        {
+            "uniqueId": "androidx.webkit:webkit",
+            "artifactVersion": "1.18.0",
+            "name": "Webkit",
+            "description": "The Jetpack Webkit Library is a static library you can add to your Android application in order to use android.webkit APIs that are not available for older platform versions.",
+            "website": "https://developer.android.com/jetpack/androidx/releases/webkit#1.18.0",
+            "developers": [
+                {
+                    "name": "The Android Open Source Project"
+                }
+            ],
+            "organization": {
+                "name": "The Android Open Source Project"
+            },
+            "scm": {
+                "connection": "scm:git:https://android.googlesource.com/platform/frameworks/support",
+                "url": "https://cs.android.com/androidx/platform/frameworks/support"
             },
             "licenses": [
                 "Apache-2.0"
@@ -3811,7 +3836,7 @@
         },
         {
             "uniqueId": "com.github.maxrave-dev.PipePipeExtractor:PipePipeExtractor",
-            "artifactVersion": "f8982ca9e7",
+            "artifactVersion": "27aac1e14e",
             "name": "com.github.maxrave-dev.PipePipeExtractor:PipePipeExtractor",
             "description": "",
             "developers": [
@@ -3826,7 +3851,7 @@
         },
         {
             "uniqueId": "com.github.maxrave-dev.PipePipeExtractor:extractor",
-            "artifactVersion": "f8982ca9e7",
+            "artifactVersion": "27aac1e14e",
             "name": "com.github.maxrave-dev.PipePipeExtractor:extractor",
             "description": "",
             "developers": [
@@ -3841,7 +3866,7 @@
         },
         {
             "uniqueId": "com.github.maxrave-dev.PipePipeExtractor:timeago-parser",
-            "artifactVersion": "f8982ca9e7",
+            "artifactVersion": "27aac1e14e",
             "name": "com.github.maxrave-dev.PipePipeExtractor:timeago-parser",
             "description": "",
             "developers": [
@@ -3856,7 +3881,7 @@
         },
         {
             "uniqueId": "com.github.maxrave-dev:BravePipeExtractor",
-            "artifactVersion": "0fcaf19ecc",
+            "artifactVersion": "105aad96c7",
             "name": "NewPipe Extractor",
             "description": "A library for extracting data from streaming websites, used in NewPipe",
             "website": "https://github.com/TeamNewPipe/NewPipeExtractor",
@@ -3879,7 +3904,7 @@
         },
         {
             "uniqueId": "com.github.maxrave-dev:PipePipeExtractor",
-            "artifactVersion": "f8982ca9e7",
+            "artifactVersion": "27aac1e14e",
             "name": "com.github.maxrave-dev:PipePipeExtractor",
             "description": "",
             "developers": [
@@ -4000,7 +4025,7 @@
         },
         {
             "uniqueId": "com.google.android.gms:play-services-base",
-            "artifactVersion": "18.7.2",
+            "artifactVersion": "18.11.0",
             "name": "play-services-base",
             "description": "",
             "developers": [
@@ -4015,7 +4040,7 @@
         },
         {
             "uniqueId": "com.google.android.gms:play-services-basement",
-            "artifactVersion": "18.9.0",
+            "artifactVersion": "18.12.0",
             "name": "play-services-basement",
             "description": "",
             "developers": [
@@ -4030,7 +4055,7 @@
         },
         {
             "uniqueId": "com.google.android.gms:play-services-cast",
-            "artifactVersion": "22.3.1",
+            "artifactVersion": "23.0.0",
             "name": "play-services-cast",
             "description": "",
             "developers": [
@@ -4045,7 +4070,7 @@
         },
         {
             "uniqueId": "com.google.android.gms:play-services-cast-framework",
-            "artifactVersion": "22.3.1",
+            "artifactVersion": "23.0.0",
             "name": "play-services-cast-framework",
             "description": "",
             "developers": [
@@ -4075,7 +4100,7 @@
         },
         {
             "uniqueId": "com.google.android.gms:play-services-tasks",
-            "artifactVersion": "18.3.2",
+            "artifactVersion": "18.4.1",
             "name": "play-services-tasks",
             "description": "",
             "developers": [
@@ -4354,7 +4379,7 @@
         },
         {
             "uniqueId": "com.google.protobuf:protobuf-javalite",
-            "artifactVersion": "4.35.1",
+            "artifactVersion": "4.36.2",
             "name": "Protocol Buffers [Lite]",
             "description": "Lite version of Protocol Buffers library. This version is targeted for mobile client use\n    rather than server side use. It is optimized for code size, but does not guarantee API/ABI\n    stability.",
             "website": "https://developers.google.com/protocol-buffers/protobuf-javalite/",
@@ -4390,29 +4415,6 @@
                 "connection": "scm:git:https://github.com/zxing/zxing.git/core",
                 "developerConnection": "scm:git:https://github.com/zxing/zxing.git/core",
                 "url": "https://github.com/zxing/zxing/core"
-            },
-            "licenses": [
-                "Apache-2.0"
-            ],
-            "funding": [
-                
-            ]
-        },
-        {
-            "uniqueId": "com.ionspin.kotlin:bignum",
-            "artifactVersion": "0.3.10",
-            "name": "Kotlin Multiplatform BigNum",
-            "description": "Kotlin Multiplatform BigNum library",
-            "website": "https://github.com/ionspin/kotlin-multiplatform-bignum",
-            "developers": [
-                {
-                    "name": "Ugljesa Jovanovic"
-                }
-            ],
-            "scm": {
-                "connection": "scm:git:git://git@github.com:ionspin/kotlin-multiplatform-bignum.git",
-                "developerConnection": "scm:git:ssh://git@github.com:ionspin/kotlin-multiplatform-bignum.git",
-                "url": "https://github.com/ionspin/kotlin-multiplatform-bignum"
             },
             "licenses": [
                 "Apache-2.0"
@@ -4584,7 +4586,7 @@
         },
         {
             "uniqueId": "com.mikepenz:aboutlibraries-compose-core",
-            "artifactVersion": "15.2.0",
+            "artifactVersion": "15.3.0",
             "name": "AboutLibraries Compose UI Library",
             "description": "AboutLibraries automatically detects all dependencies of a project and collects their information including the license. Optionally visualising it via the provided ui components.",
             "website": "https://github.com/mikepenz/AboutLibraries",
@@ -4607,7 +4609,7 @@
         },
         {
             "uniqueId": "com.mikepenz:aboutlibraries-compose-m3",
-            "artifactVersion": "15.2.0",
+            "artifactVersion": "15.3.0",
             "name": "AboutLibraries Compose Material 3 Library",
             "description": "AboutLibraries automatically detects all dependencies of a project and collects their information including the license. Optionally visualising it via the provided ui components.",
             "website": "https://github.com/mikepenz/AboutLibraries",
@@ -4630,7 +4632,7 @@
         },
         {
             "uniqueId": "com.mikepenz:aboutlibraries-core",
-            "artifactVersion": "15.2.0",
+            "artifactVersion": "15.3.0",
             "name": "AboutLibraries Core Library",
             "description": "AboutLibraries automatically detects all dependencies of a project and collects their information including the license. Optionally visualising it via the provided ui components.",
             "website": "https://github.com/mikepenz/AboutLibraries",
@@ -4653,7 +4655,7 @@
         },
         {
             "uniqueId": "com.mikepenz:multiplatform-markdown-renderer",
-            "artifactVersion": "0.45.0",
+            "artifactVersion": "0.46.0",
             "name": "Multiplatform Markdown Renderer",
             "description": "Kotlin Multiplatform Markdown Renderer. (Android, Desktop, ...) powered by Compose Multiplatform",
             "website": "https://github.com/mikepenz/multiplatform-markdown-renderer",
@@ -4676,7 +4678,7 @@
         },
         {
             "uniqueId": "com.mikepenz:multiplatform-markdown-renderer-m3",
-            "artifactVersion": "0.45.0",
+            "artifactVersion": "0.46.0",
             "name": "Multiplatform Markdown Renderer - Material 3",
             "description": "Kotlin Multiplatform Markdown Renderer. (Android, Desktop, ...) powered by Compose Multiplatform",
             "website": "https://github.com/mikepenz/multiplatform-markdown-renderer",
@@ -4932,7 +4934,7 @@
         },
         {
             "uniqueId": "com.squareup.okhttp3:logging-interceptor",
-            "artifactVersion": "5.5.0",
+            "artifactVersion": "5.5.1",
             "name": "logging-interceptor",
             "description": "Square\u2019s meticulous HTTP client for Java and Kotlin.",
             "website": "https://lysine.dev/okhttp/",
@@ -4955,7 +4957,7 @@
         },
         {
             "uniqueId": "com.squareup.okhttp3:okhttp",
-            "artifactVersion": "5.5.0",
+            "artifactVersion": "5.5.1",
             "name": "okhttp",
             "description": "Square\u2019s meticulous HTTP client for Java and Kotlin.",
             "website": "https://lysine.dev/okhttp/",
@@ -5100,7 +5102,7 @@
         },
         {
             "uniqueId": "commons-codec:commons-codec",
-            "artifactVersion": "1.22.1",
+            "artifactVersion": "1.23.0",
             "name": "Apache Commons Codec",
             "description": "The Apache Commons Codec component contains encoders and decoders for\n     formats such as Base16, Base32, Base64, digest, and Hexadecimal. In addition to these\n     widely used encoders and decoders, the codec package also maintains a\n     collection of phonetic encoding utilities.",
             "website": "https://commons.apache.org/proper/commons-codec/",
@@ -6574,7 +6576,7 @@
         },
         {
             "uniqueId": "io.sentry:sentry",
-            "artifactVersion": "8.59.0",
+            "artifactVersion": "8.61.1",
             "name": "Sentry SDK",
             "description": "SDK for sentry.io",
             "website": "https://github.com/getsentry/sentry-java",
@@ -7244,7 +7246,7 @@
         },
         {
             "uniqueId": "org.jetbrains.androidx.window:window-core",
-            "artifactVersion": "1.4.0",
+            "artifactVersion": "1.5.0",
             "name": "WindowManager Core",
             "description": "WindowManager Core Library.",
             "website": "https://github.com/JetBrains/compose-jb",
@@ -7268,7 +7270,7 @@
         },
         {
             "uniqueId": "org.jetbrains.compose.animation:animation",
-            "artifactVersion": "1.12.1",
+            "artifactVersion": "1.12.2",
             "name": "Compose Animation",
             "description": "Compose animation library",
             "website": "https://github.com/JetBrains/compose-multiplatform",
@@ -7292,7 +7294,7 @@
         },
         {
             "uniqueId": "org.jetbrains.compose.animation:animation-core",
-            "artifactVersion": "1.12.1",
+            "artifactVersion": "1.12.2",
             "name": "Compose Animation Core",
             "description": "Animation engine and animation primitives that are the building blocks of the Compose animation library",
             "website": "https://github.com/JetBrains/compose-multiplatform",
@@ -7316,7 +7318,7 @@
         },
         {
             "uniqueId": "org.jetbrains.compose.annotation-internal:annotation",
-            "artifactVersion": "1.9.0",
+            "artifactVersion": "1.10.0",
             "name": "Annotation",
             "description": "Provides source annotations for tooling and readability.",
             "website": "https://github.com/JetBrains/compose-jb",
@@ -7364,7 +7366,7 @@
         },
         {
             "uniqueId": "org.jetbrains.compose.components:components-resources",
-            "artifactVersion": "1.12.1",
+            "artifactVersion": "1.12.2",
             "name": "Resources for Compose JB",
             "description": "Resources for Compose JB",
             "website": "https://github.com/JetBrains/compose-multiplatform",
@@ -7388,7 +7390,7 @@
         },
         {
             "uniqueId": "org.jetbrains.compose.desktop:desktop",
-            "artifactVersion": "1.12.1",
+            "artifactVersion": "1.12.2",
             "name": "Compose Desktop",
             "description": "Compose Desktop",
             "website": "https://github.com/JetBrains/compose-multiplatform",
@@ -7412,7 +7414,7 @@
         },
         {
             "uniqueId": "org.jetbrains.compose.desktop:desktop-jvm-macos-arm64",
-            "artifactVersion": "1.12.1",
+            "artifactVersion": "1.12.2",
             "name": "Compose Desktop",
             "description": "Compose Desktop",
             "website": "https://github.com/JetBrains/compose-multiplatform",
@@ -7436,7 +7438,7 @@
         },
         {
             "uniqueId": "org.jetbrains.compose.foundation:foundation",
-            "artifactVersion": "1.12.1",
+            "artifactVersion": "1.12.2",
             "name": "Compose Foundation",
             "description": "Higher level abstractions of the Compose UI primitives. This library is design system agnostic, providing the high-level building blocks for both application and design-system developers",
             "website": "https://github.com/JetBrains/compose-multiplatform",
@@ -7460,7 +7462,7 @@
         },
         {
             "uniqueId": "org.jetbrains.compose.foundation:foundation-layout",
-            "artifactVersion": "1.12.1",
+            "artifactVersion": "1.12.2",
             "name": "Compose Layouts",
             "description": "Compose layout implementations",
             "website": "https://github.com/JetBrains/compose-multiplatform",
@@ -7616,10 +7618,10 @@
         },
         {
             "uniqueId": "org.jetbrains.compose.material3.adaptive:adaptive",
-            "artifactVersion": "1.2.0",
+            "artifactVersion": "1.3.0",
             "name": "Material Adaptive",
             "description": "Compose Material Design Adaptive Library",
-            "website": "https://github.com/JetBrains/compose-jb",
+            "website": "https://github.com/JetBrains/compose-multiplatform",
             "developers": [
                 {
                     "name": "Compose Multiplatform Team",
@@ -7627,9 +7629,9 @@
                 }
             ],
             "scm": {
-                "connection": "scm:git:https://github.com/JetBrains/compose-jb.git",
-                "developerConnection": "scm:git:https://github.com/JetBrains/compose-jb.git",
-                "url": "https://github.com/JetBrains/compose-jb"
+                "connection": "scm:git:https://github.com/JetBrains/compose-multiplatform.git",
+                "developerConnection": "scm:git:https://github.com/JetBrains/compose-multiplatform.git",
+                "url": "https://github.com/JetBrains/compose-multiplatform"
             },
             "licenses": [
                 "Apache-2.0"
@@ -7664,7 +7666,7 @@
         },
         {
             "uniqueId": "org.jetbrains.compose.material:material",
-            "artifactVersion": "1.12.1",
+            "artifactVersion": "1.12.2",
             "name": "Compose Material Components",
             "description": "Compose Material Design Components library",
             "website": "https://github.com/JetBrains/compose-multiplatform",
@@ -7688,7 +7690,7 @@
         },
         {
             "uniqueId": "org.jetbrains.compose.material:material-ripple",
-            "artifactVersion": "1.12.1",
+            "artifactVersion": "1.12.2",
             "name": "Compose Material Ripple",
             "description": "Material ripple used to build interactive components",
             "website": "https://github.com/JetBrains/compose-multiplatform",
@@ -7712,7 +7714,7 @@
         },
         {
             "uniqueId": "org.jetbrains.compose.runtime:runtime",
-            "artifactVersion": "1.12.1",
+            "artifactVersion": "1.12.2",
             "name": "Compose Runtime",
             "description": "Tree composition support for code generated by the Compose compiler plugin and corresponding public API",
             "website": "https://github.com/JetBrains/compose-multiplatform",
@@ -7736,7 +7738,7 @@
         },
         {
             "uniqueId": "org.jetbrains.compose.runtime:runtime-saveable",
-            "artifactVersion": "1.12.1",
+            "artifactVersion": "1.12.2",
             "name": "Compose Saveable",
             "description": "Compose components that allow saving and restoring the local ui state",
             "website": "https://github.com/JetBrains/compose-multiplatform",
@@ -7760,7 +7762,7 @@
         },
         {
             "uniqueId": "org.jetbrains.compose.ui:ui",
-            "artifactVersion": "1.12.1",
+            "artifactVersion": "1.12.2",
             "name": "Compose UI",
             "description": "Compose UI primitives. This library contains the primitives that form the Compose UI Toolkit, such as drawing, measurement and layout.",
             "website": "https://github.com/JetBrains/compose-multiplatform",
@@ -7784,7 +7786,7 @@
         },
         {
             "uniqueId": "org.jetbrains.compose.ui:ui-backhandler",
-            "artifactVersion": "1.12.1",
+            "artifactVersion": "1.12.2",
             "name": "Compose BackHandler",
             "description": "Provides BackHandler in Compose Multiplatform projects",
             "website": "https://github.com/JetBrains/compose-multiplatform",
@@ -7808,7 +7810,7 @@
         },
         {
             "uniqueId": "org.jetbrains.compose.ui:ui-geometry",
-            "artifactVersion": "1.12.1",
+            "artifactVersion": "1.12.2",
             "name": "Compose Geometry",
             "description": "Compose classes related to dimensions without units",
             "website": "https://github.com/JetBrains/compose-multiplatform",
@@ -7832,7 +7834,7 @@
         },
         {
             "uniqueId": "org.jetbrains.compose.ui:ui-graphics",
-            "artifactVersion": "1.12.1",
+            "artifactVersion": "1.12.2",
             "name": "Compose Graphics",
             "description": "Compose graphics",
             "website": "https://github.com/JetBrains/compose-multiplatform",
@@ -7856,7 +7858,7 @@
         },
         {
             "uniqueId": "org.jetbrains.compose.ui:ui-text",
-            "artifactVersion": "1.12.1",
+            "artifactVersion": "1.12.2",
             "name": "Compose UI Text",
             "description": "Compose Text primitives and utilities",
             "website": "https://github.com/JetBrains/compose-multiplatform",
@@ -7880,7 +7882,7 @@
         },
         {
             "uniqueId": "org.jetbrains.compose.ui:ui-tooling-preview",
-            "artifactVersion": "1.12.1",
+            "artifactVersion": "1.12.2",
             "name": "Compose UI Preview Tooling",
             "description": "Compose tooling library API. This library provides the API required to declare @Preview composables in user apps.",
             "website": "https://github.com/JetBrains/compose-multiplatform",
@@ -7904,7 +7906,7 @@
         },
         {
             "uniqueId": "org.jetbrains.compose.ui:ui-uikit",
-            "artifactVersion": "1.12.1",
+            "artifactVersion": "1.12.2",
             "name": "Compose UIKit",
             "description": "Internal iOS UIKit utilities including Objective-C library.",
             "website": "https://github.com/JetBrains/compose-multiplatform",
@@ -7928,7 +7930,7 @@
         },
         {
             "uniqueId": "org.jetbrains.compose.ui:ui-unit",
-            "artifactVersion": "1.12.1",
+            "artifactVersion": "1.12.2",
             "name": "Compose Unit",
             "description": "Compose classes for simple units",
             "website": "https://github.com/JetBrains/compose-multiplatform",
@@ -7952,7 +7954,7 @@
         },
         {
             "uniqueId": "org.jetbrains.compose.ui:ui-util",
-            "artifactVersion": "1.12.1",
+            "artifactVersion": "1.12.2",
             "name": "Compose Util",
             "description": "Internal Compose utilities used by other modules",
             "website": "https://github.com/JetBrains/compose-multiplatform",
@@ -7976,7 +7978,7 @@
         },
         {
             "uniqueId": "org.jetbrains.kotlin:kotlin-reflect",
-            "artifactVersion": "2.4.20",
+            "artifactVersion": "2.4.21",
             "name": "Kotlin Reflect",
             "description": "Kotlin Full Reflection Library",
             "website": "https://kotlinlang.org/",
@@ -8000,7 +8002,7 @@
         },
         {
             "uniqueId": "org.jetbrains.kotlin:kotlin-stdlib",
-            "artifactVersion": "2.4.20",
+            "artifactVersion": "2.4.21",
             "name": "Kotlin Stdlib",
             "description": "Kotlin Standard Library",
             "website": "https://kotlinlang.org/",
@@ -8024,7 +8026,7 @@
         },
         {
             "uniqueId": "org.jetbrains.kotlin:kotlin-stdlib-common",
-            "artifactVersion": "2.4.20",
+            "artifactVersion": "2.4.21",
             "name": "Kotlin Stdlib Common",
             "description": "Kotlin Common Standard Library (legacy, use kotlin-stdlib instead)",
             "website": "https://kotlinlang.org/",
@@ -8048,7 +8050,7 @@
         },
         {
             "uniqueId": "org.jetbrains.kotlin:kotlin-stdlib-jdk7",
-            "artifactVersion": "2.0.0",
+            "artifactVersion": "1.9.0",
             "name": "Kotlin Stdlib Jdk7",
             "description": "Kotlin Standard Library JDK 7 extension",
             "website": "https://kotlinlang.org/",
@@ -8072,7 +8074,7 @@
         },
         {
             "uniqueId": "org.jetbrains.kotlin:kotlin-stdlib-jdk8",
-            "artifactVersion": "2.0.0",
+            "artifactVersion": "1.9.0",
             "name": "Kotlin Stdlib Jdk8",
             "description": "Kotlin Standard Library JDK 8 extension",
             "website": "https://kotlinlang.org/",
@@ -8096,7 +8098,7 @@
         },
         {
             "uniqueId": "org.jetbrains.kotlin:kotlin-test",
-            "artifactVersion": "2.4.20",
+            "artifactVersion": "2.4.21",
             "name": "Kotlin Test",
             "description": "Kotlin Test Multiplatform library",
             "website": "https://kotlinlang.org/",
@@ -8164,7 +8166,7 @@
         },
         {
             "uniqueId": "org.jetbrains.kotlinx:kotlinx-collections-immutable",
-            "artifactVersion": "0.5.1",
+            "artifactVersion": "0.5.2",
             "name": "kotlinx-collections-immutable",
             "description": "Kotlin Immutable Collections multiplatform library",
             "website": "https://github.com/Kotlin/kotlinx.collections.immutable",
@@ -8384,7 +8386,7 @@
         },
         {
             "uniqueId": "org.jetbrains.kotlinx:kotlinx-serialization-bom",
-            "artifactVersion": "1.11.0",
+            "artifactVersion": "1.12.0",
             "name": "kotlinx-serialization-bom",
             "description": "Kotlin multiplatform serialization runtime library",
             "website": "https://github.com/Kotlin/kotlinx.serialization",
@@ -8406,7 +8408,7 @@
         },
         {
             "uniqueId": "org.jetbrains.kotlinx:kotlinx-serialization-core",
-            "artifactVersion": "1.11.0",
+            "artifactVersion": "1.12.0",
             "name": "kotlinx-serialization-core",
             "description": "Kotlin multiplatform serialization runtime library",
             "website": "https://github.com/Kotlin/kotlinx.serialization",
@@ -8428,7 +8430,7 @@
         },
         {
             "uniqueId": "org.jetbrains.kotlinx:kotlinx-serialization-json",
-            "artifactVersion": "1.11.0",
+            "artifactVersion": "1.12.0",
             "name": "kotlinx-serialization-json",
             "description": "Kotlin multiplatform serialization runtime library",
             "website": "https://github.com/Kotlin/kotlinx.serialization",
@@ -8450,7 +8452,7 @@
         },
         {
             "uniqueId": "org.jetbrains.kotlinx:kotlinx-serialization-json-io",
-            "artifactVersion": "1.11.0",
+            "artifactVersion": "1.12.0",
             "name": "kotlinx-serialization-json-io",
             "description": "Kotlin multiplatform serialization runtime library",
             "website": "https://github.com/Kotlin/kotlinx.serialization",
@@ -8494,7 +8496,7 @@
         },
         {
             "uniqueId": "org.jetbrains.kotlinx:kotlinx-serialization-protobuf",
-            "artifactVersion": "1.11.0",
+            "artifactVersion": "1.12.0",
             "name": "kotlinx-serialization-protobuf",
             "description": "Kotlin multiplatform serialization runtime library",
             "website": "https://github.com/Kotlin/kotlinx.serialization",
@@ -8539,7 +8541,7 @@
         },
         {
             "uniqueId": "org.jetbrains.skiko:skiko",
-            "artifactVersion": "0.150.1",
+            "artifactVersion": "0.150.2",
             "name": "Skiko KMP",
             "description": "Kotlin Skia bindings",
             "website": "https://www.github.com/JetBrains/skiko",
@@ -8563,7 +8565,7 @@
         },
         {
             "uniqueId": "org.jetbrains.skiko:skiko-awt",
-            "artifactVersion": "0.150.1",
+            "artifactVersion": "0.150.2",
             "name": "Skiko Awt",
             "description": "Kotlin Skia bindings",
             "website": "https://www.github.com/JetBrains/skiko",
@@ -8587,7 +8589,7 @@
         },
         {
             "uniqueId": "org.jetbrains.skiko:skiko-awt-runtime-macos-arm64",
-            "artifactVersion": "0.150.1",
+            "artifactVersion": "0.150.2",
             "name": "Skiko JVM Runtime for MacOS Arm64",
             "description": "Kotlin Skia bindings",
             "website": "https://www.github.com/JetBrains/skiko",
@@ -8635,7 +8637,7 @@
         },
         {
             "uniqueId": "org.jetbrains:markdown",
-            "artifactVersion": "0.7.9",
+            "artifactVersion": "0.7.17",
             "name": "markdown",
             "description": "Markdown parser in Kotlin",
             "website": "https://github.com/JetBrains/markdown",
@@ -8658,7 +8660,7 @@
         },
         {
             "uniqueId": "org.jsoup:jsoup",
-            "artifactVersion": "1.23.1",
+            "artifactVersion": "1.23.2",
             "name": "jsoup Java HTML Parser",
             "description": "jsoup is a Java library that simplifies working with real-world HTML and XML. It offers an easy-to-use API for URL fetching, data parsing, extraction, and manipulation using DOM API methods, CSS, and xpath selectors. jsoup implements the WHATWG HTML5 specification, and parses HTML to the same DOM as modern browsers.",
             "website": "https://jsoup.org/",

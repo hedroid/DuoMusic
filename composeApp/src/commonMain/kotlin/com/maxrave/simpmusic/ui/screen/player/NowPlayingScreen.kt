@@ -73,6 +73,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.kmpalette.rememberPaletteState
 import com.maxrave.common.Config.MAIN_PLAYER
+import com.maxrave.common.MERGING_DATA_TYPE
+import com.maxrave.domain.extension.isVideo
 import com.maxrave.domain.manager.DataStoreManager
 import com.maxrave.domain.mediaservice.handler.MediaPlayerHandler
 import com.maxrave.logger.Logger
@@ -85,24 +87,29 @@ import com.maxrave.simpmusic.expect.hapticTapFeedback
 import com.maxrave.simpmusic.extension.getColorFromPalette
 import com.maxrave.simpmusic.extension.getScreenSizeInfo
 import com.maxrave.simpmusic.extension.hsvToColor
+import com.maxrave.simpmusic.extension.parseTimestampToMilliseconds
 import com.maxrave.simpmusic.extension.rememberIsInPipMode
 import com.maxrave.simpmusic.getPlatform
 import com.maxrave.simpmusic.ui.component.AddToPlaylistModalBottomSheet
 import com.maxrave.simpmusic.ui.component.FullscreenLyricsContent
 import com.maxrave.simpmusic.ui.component.FullscreenLyricsSheet
+import com.maxrave.simpmusic.ui.component.CommentsBottomSheet
 import com.maxrave.simpmusic.ui.component.InfoPlayerBottomSheet
 import com.maxrave.simpmusic.ui.component.NeteaseCommentsSheet
 import com.maxrave.domain.data.model.browse.album.Track
+import com.maxrave.domain.utils.YouTubeLikeStatus
 import com.maxrave.domain.utils.toSongEntity
 import com.maxrave.simpmusic.ui.component.NowPlayingBottomSheet
 import com.maxrave.simpmusic.ui.component.QueueBottomSheet
 import com.maxrave.simpmusic.ui.component.queueRowIsCloudDisk
 import com.maxrave.simpmusic.ui.component.QueuePosition
 import com.maxrave.simpmusic.ui.component.VoteLyricsDialog
+import com.maxrave.simpmusic.ui.component.YouTubeDislikeState
 import com.maxrave.simpmusic.ui.icon.KeyboardArrowDown
 import com.maxrave.simpmusic.ui.icon.SimpIcons
 import com.maxrave.simpmusic.ui.navigation.destination.home.ListenTogetherDestination
 import com.maxrave.simpmusic.ui.navigation.destination.list.ArtistDestination
+import com.maxrave.simpmusic.ui.navigation.destination.login.LoginDestination
 import com.maxrave.simpmusic.ui.navigation.destination.player.FullscreenDestination
 import com.maxrave.common.NETEASE_CLOUD_DISK_PLAYLIST_ID
 import com.maxrave.common.NETEASE_MV_MEDIA_ID_PREFIX
@@ -535,6 +542,10 @@ fun NowPlayingScreenContent(
         mutableStateOf(false)
     }
     var showNeteaseComments by rememberSaveable {
+        mutableStateOf(false)
+    }
+
+    var showCommentsSheet by rememberSaveable {
         mutableStateOf(false)
     }
 

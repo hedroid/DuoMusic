@@ -514,7 +514,7 @@ fun AppNavigationRail(
     }
     // 音源菜单状态:横屏 rail 的搜索项长按弹出(与竖屏底栏同款交互,见 sourceSwitchGesture)
     var showSourceMenu by remember { mutableStateOf(false) }
-    NavigationRail {
+    NavigationRail(containerColor = Color.Transparent) {
         Spacer(Modifier.height(16.dp))
         Spacer(Modifier.weight(1f))
         bottomNavScreens.forEach { screen ->

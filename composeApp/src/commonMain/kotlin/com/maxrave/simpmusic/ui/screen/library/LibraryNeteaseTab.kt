@@ -428,8 +428,8 @@ private fun SubscribedMvRow(
                     .build(),
             contentDescription = null,
             contentScale = ContentScale.Crop,
-            placeholder = rememberHolderPainter(isVideo = true),
-            error = rememberHolderPainter(isVideo = true),
+            placeholder = rememberHolderPainter(),
+            error = rememberHolderPainter(),
             modifier =
                 Modifier
                     .size(112.dp)

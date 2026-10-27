@@ -728,8 +728,8 @@ internal fun ImmersiveMvHeader(
                             .diskCacheKey(coverUrl)
                             .crossfade(false)
                             .build(),
-                    placeholder = rememberHolderPainter(isVideo = true),
-                    error = rememberHolderPainter(isVideo = true),
+                    placeholder = rememberHolderPainter(),
+                    error = rememberHolderPainter(),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     onSuccess = { onBitmap(it.result.image.toImageBitmap()) },
@@ -744,8 +744,8 @@ internal fun ImmersiveMvHeader(
                 contentDescription = null,
                 // Crop 全宽铺满(PlaylistScreen 头图同款);旧 Fit 对非严格 16:9 源左右露边
                 contentScale = ContentScale.Crop,
-                placeholder = rememberHolderPainter(isVideo = true),
-                error = rememberHolderPainter(isVideo = true),
+                placeholder = rememberHolderPainter(),
+                error = rememberHolderPainter(),
                 modifier =
                     Modifier
                         .fillMaxSize()

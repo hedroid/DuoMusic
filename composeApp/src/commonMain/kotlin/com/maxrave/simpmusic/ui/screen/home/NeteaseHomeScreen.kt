@@ -1,5 +1,31 @@
 package com.maxrave.simpmusic.ui.screen.home
 
+import simpmusic.composeapp.generated.resources.welcome_back
+import coil3.request.ImageRequest
+import coil3.request.crossfade
+import coil3.request.CachePolicy
+import coil3.compose.LocalPlatformContext
+import simpmusic.composeapp.generated.resources.notification
+import simpmusic.composeapp.generated.resources.listen_together
+import simpmusic.composeapp.generated.resources.settings
+import com.maxrave.simpmusic.ui.navigation.destination.home.NotificationDestination
+import com.maxrave.simpmusic.ui.navigation.destination.home.ListenTogetherDestination
+import com.maxrave.simpmusic.ui.navigation.destination.home.SettingsDestination
+import com.maxrave.simpmusic.ui.component.ListenTogetherIconButton
+import com.maxrave.simpmusic.ui.icon.Settings
+import simpmusic.composeapp.generated.resources.app_name
+import simpmusic.composeapp.generated.resources.good_morning
+import simpmusic.composeapp.generated.resources.good_afternoon
+import simpmusic.composeapp.generated.resources.good_evening
+import simpmusic.composeapp.generated.resources.good_night
+import com.maxrave.simpmusic.ui.component.RippleIconButton
+import com.maxrave.simpmusic.ui.icon.Notifications
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.exclude
+import com.maxrave.domain.extension.now
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
@@ -883,6 +909,129 @@ internal fun NewAlbumAreaChips(
                 isSelected = code == selected,
                 text = label,
             ) { onSelect(code) }
+        }
+    }
+}
+
+// 上游重做 YT 主页头部时删了这两个共享组件;网易主页头部跟随改造(待办)前先原样内嵌
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun HomeTopAppBar(navController: NavController) {
+    val hour =
+        remember {
+            val date = now().time
+            date.hour
+        }
+    TopAppBar(
+        windowInsets =
+            TopAppBarDefaults.windowInsets.exclude(
+                TopAppBarDefaults.windowInsets.only(WindowInsetsSides.Start),
+            ),
+        title = {
+            Column {
+                Text(
+                    text = stringResource(Res.string.app_name),
+                    style = typo().titleMedium,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.padding(bottom = 4.dp),
+                )
+                Text(
+                    text =
+                        when (hour) {
+                            in 6..12 -> {
+                                stringResource(Res.string.good_morning)
+                            }
+
+                            in 13..17 -> {
+                                stringResource(Res.string.good_afternoon)
+                            }
+
+                            in 18..23 -> {
+                                stringResource(Res.string.good_evening)
+                            }
+
+                            else -> {
+                                stringResource(Res.string.good_night)
+                            }
+                        },
+                    style = typo().bodySmall,
+                )
+            }
+        },
+        actions = {
+            // 顶栏图标钮必须带描述:无描述的 IconButton 在 TalkBack 下是 NAF、被完全跳过
+            // (UI-CR-07 走查实证:设置/通知/历史/一起听入口曾整体不可达)
+            RippleIconButton(
+                imageVector = SimpIcons.Notifications,
+                tint = MaterialTheme.colorScheme.onBackground,
+                contentDescription = stringResource(Res.string.notification),
+            ) {
+                navController.navigate(NotificationDestination)
+            }
+            // 一起听随上游新头部进 Create sheet;History(Recently Added)页随上游删除。
+            // 网易主页头部跟随改造(待办)时此整个组件按新设计重做。
+            ListenTogetherIconButton(
+                contentDescription = stringResource(Res.string.listen_together),
+            ) { navController.navigate(ListenTogetherDestination) }
+            RippleIconButton(
+                imageVector = SimpIcons.Settings,
+                tint = MaterialTheme.colorScheme.onBackground,
+                contentDescription = stringResource(Res.string.settings),
+            ) {
+                navController.navigate(SettingsDestination)
+            }
+        },
+        colors =
+            TopAppBarDefaults.topAppBarColors(
+                containerColor = Color.Transparent,
+            ),
+    )
+}
+
+@Composable
+fun AccountLayout(
+    accountName: String,
+    url: String,
+) {
+    Column {
+        Text(
+            text = stringResource(Res.string.welcome_back),
+            style = typo().bodyMedium,
+            color = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier.padding(bottom = 3.dp),
+        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 5.dp, vertical = 5.dp),
+        ) {
+            AsyncImage(
+                model =
+                    ImageRequest
+                        .Builder(LocalPlatformContext.current)
+                        .data(url)
+                        .diskCachePolicy(CachePolicy.ENABLED)
+                        .diskCacheKey(url)
+                        .crossfade(true)
+                        .build(),
+                placeholder = rememberHolderPainter(),
+                error = rememberHolderPainter(),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier =
+                    Modifier
+                        .size(40.dp)
+                        .clip(
+                            CircleShape,
+                        ),
+            )
+            Text(
+                text = accountName,
+                style = typo().headlineMedium,
+                color = MaterialTheme.colorScheme.onBackground,
+                modifier =
+                    Modifier
+                        .padding(start = 8.dp),
+            )
         }
     }
 }

@@ -1,5 +1,8 @@
 package com.maxrave.simpmusic.ui.screen.library
 
+import com.maxrave.simpmusic.ui.theme.LocalLiquidGlassEnabled
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.expandHorizontally
@@ -14,13 +17,11 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -32,28 +33,19 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -75,12 +67,15 @@ import com.maxrave.domain.data.entities.SongEntity
 import com.maxrave.domain.utils.LocalResource
 import com.maxrave.logger.Logger
 import com.maxrave.simpmusic.Platform
+import com.maxrave.simpmusic.expect.ui.layerBackdrop
+import com.maxrave.simpmusic.expect.ui.rememberBackdrop
 import com.maxrave.simpmusic.extension.copy
 import com.maxrave.simpmusic.extension.isScrollingUp
 import com.maxrave.simpmusic.extension.ultraThinBarStyle
 import com.maxrave.simpmusic.getPlatform
 import com.maxrave.simpmusic.ui.component.AddToPlaylistModalBottomSheet
 import com.maxrave.simpmusic.ui.component.Chip
+import com.maxrave.simpmusic.ui.component.CreateLocalPlaylistSheet
 import com.maxrave.simpmusic.ui.component.EndOfPage
 import com.maxrave.simpmusic.ui.component.GridLibraryPlaylist
 import com.maxrave.simpmusic.ui.component.LibraryItem
@@ -439,8 +434,11 @@ fun LibraryScreen(
         }
     }
 
+    // The floating chip row refracts the page scrolling under it, so the page is the glass source and
+    // the row its sibling (nesting the row inside the source is the RuntimeShader feedback loop).
+    val chipBackdrop = rememberBackdrop(MaterialTheme.colorScheme.background)
     Crossfade(
-        modifier = Modifier.hazeSource(hazeState),
+        modifier = Modifier.then(if (LocalLiquidGlassEnabled.current) Modifier.layerBackdrop(chipBackdrop) else Modifier).hazeSource(hazeState),
         targetState = currentFilter,
     ) { filter ->
         // 只认"当前 chip 页"的滚动上报:Crossfade 过渡期旧页仍在组合、fling 可能还没停,
@@ -648,81 +646,10 @@ fun LibraryScreen(
     }
     val coroutineScope = rememberCoroutineScope()
     if (showAddSheet) {
-        var newTitle by remember { mutableStateOf("") }
-        val showAddSheetState =
-            rememberModalBottomSheetState(
-                skipPartiallyExpanded = true,
-            )
-        val hideEditTitleBottomSheet: () -> Unit =
-            {
-                coroutineScope.launch {
-                    showAddSheetState.hide()
-                    showAddSheet = false
-                }
-            }
-        ModalBottomSheet(
-            onDismissRequest = { showAddSheet = false },
-            sheetState = showAddSheetState,
-            containerColor = Color.Transparent,
-            contentColor = Color.Transparent,
-            dragHandle = null,
-            scrimColor = Color.Black.copy(alpha = .5f),
-        ) {
-            Card(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .wrapContentHeight(),
-                shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp),
-                colors = CardDefaults.cardColors().copy(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Spacer(modifier = Modifier.height(5.dp))
-                    Card(
-                        modifier =
-                            Modifier
-                                .width(60.dp)
-                                .height(4.dp),
-                        colors =
-                            CardDefaults.cardColors().copy(
-                                containerColor = MaterialTheme.colorScheme.outline,
-                            ),
-                        shape = RoundedCornerShape(50),
-                    ) {}
-                    Spacer(modifier = Modifier.height(5.dp))
-                    OutlinedTextField(
-                        value = newTitle,
-                        onValueChange = { s -> newTitle = s },
-                        label = {
-                            Text(text = stringResource(Res.string.playlist_name))
-                        },
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 8.dp),
-                    )
-                    Spacer(modifier = Modifier.height(5.dp))
-                    TextButton(
-                        onClick = {
-                            if (newTitle.isBlank()) {
-                                viewModel.makeToast(runBlocking { getString(Res.string.playlist_name_cannot_be_empty) })
-                            } else {
-                                viewModel.createPlaylist(newTitle)
-                                hideEditTitleBottomSheet()
-                            }
-                        },
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .align(Alignment.CenterHorizontally),
-                    ) {
-                        Text(text = stringResource(Res.string.create))
-                    }
-                }
-            }
-        }
+        CreateLocalPlaylistSheet(
+            onDismiss = { showAddSheet = false },
+            onCreate = viewModel::createPlaylist,
+        )
     }
     Column(
         Modifier
@@ -851,6 +778,7 @@ fun LibraryScreen(
                             LibraryChipType.CHART -> stringResource(Res.string.simpmusic_charts)
                             LibraryChipType.WRAPPED -> stringResource(Res.string.wrapped)
                         },
+                    backdrop = chipBackdrop,
                 ) {
                     viewModel.setCurrentScreen(type)
                 }
