@@ -1,11 +1,15 @@
 package com.maxrave.simpmusic.ui.screen.home
 
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxHeight
 import com.maxrave.simpmusic.getPlatform
 import com.maxrave.simpmusic.Platform
 import com.maxrave.simpmusic.extension.getScreenSizeInfo
 import androidx.compose.animation.core.animateFloatAsState
+import com.maxrave.simpmusic.ui.component.rememberCardHover
+import com.maxrave.simpmusic.ui.component.hoverZoom
+import com.maxrave.simpmusic.ui.component.HoverPlayButton
 import com.maxrave.simpmusic.ui.component.ExpandableChip
 import simpmusic.composeapp.generated.resources.category
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -253,6 +257,8 @@ fun NeteaseHomeScreen(
                 state = scrollState,
                 modifier = Modifier.hazeSource(hazeState),
                 verticalArrangement = Arrangement.spacedBy(20.dp),
+                // 上游 141d472a 同款:第一栏上方 8dp 呼吸(头部与内容不贴死)
+                contentPadding = PaddingValues(top = 8.dp),
             ) {
                 item(key = "top-space") {
                     Spacer(
@@ -537,11 +543,14 @@ internal fun NeteaseSongCard(
     onTrash: (() -> Unit)? = null,
     cardWidth: androidx.compose.ui.unit.Dp = 88.dp,
 ) {
+    // hover 态(上游 HomeItemSong 同款,桌面鼠标):卡片 tint 浮起+封面框内缩放+悬停播放钮
+    val (hoverModifier, hovered) = rememberCardHover(enabled = true)
     Column(
         modifier =
             Modifier
                 .width(cardWidth)
                 .clip(RoundedCornerShape(8.dp))
+                .then(hoverModifier)
                 .clickable(onClick = onClick),
     ) {
         Box(
@@ -557,8 +566,10 @@ internal fun NeteaseSongCard(
                     Modifier
                         .fillMaxWidth()
                         .aspectRatio(1f)
-                        .clip(RoundedCornerShape(8.dp)),
+                        .clip(RoundedCornerShape(8.dp))
+                        .hoverZoom(hovered),
             )
+            HoverPlayButton(visible = hovered, onClick = onClick)
             if (onTrash != null) {
                 Box(
                     modifier =
