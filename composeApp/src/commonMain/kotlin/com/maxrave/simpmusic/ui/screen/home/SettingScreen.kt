@@ -1341,29 +1341,6 @@ fun SettingScreen(
                     },
                 )
                 SettingItem(
-                    title = stringResource(Res.string.video_download_quality),
-                    subtitle = videoDownloadQuality ?: "",
-                    onClick = {
-                        viewModel.setAlertData(
-                            SettingAlertState(
-                                title = runBlocking { getString(Res.string.video_download_quality) },
-                                selectOne =
-                                    SettingAlertState.SelectData(
-                                        listSelect =
-                                            VIDEO_QUALITY.items.map { item ->
-                                                (item.toString() == videoDownloadQuality) to item.toString()
-                                            },
-                                    ),
-                                confirm =
-                                    runBlocking { getString(Res.string.change) } to { state ->
-                                        viewModel.setVideoDownloadQuality(state.selectOne?.getSelected() ?: "")
-                                    },
-                                dismiss = runBlocking { getString(Res.string.cancel) },
-                            ),
-                        )
-                    },
-                )
-                SettingItem(
                     title = stringResource(Res.string.auto_download_liked_songs),
                     subtitle = stringResource(Res.string.auto_download_liked_songs_description),
                     smallSubtitle = true,
