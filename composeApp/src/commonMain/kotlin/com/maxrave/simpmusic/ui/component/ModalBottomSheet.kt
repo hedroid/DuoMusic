@@ -242,6 +242,7 @@ import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import simpmusic.composeapp.generated.resources.Res
+import simpmusic.composeapp.generated.resources.search
 import simpmusic.composeapp.generated.resources.netease_action_failed
 import simpmusic.composeapp.generated.resources.comment_label
 import simpmusic.composeapp.generated.resources.create
@@ -4087,6 +4088,36 @@ fun AddToPlaylistModalBottomSheet(
                         } else {
                             emptyList()
                         }
+
+                    // 歌单搜索框(上游 2.4.0 移植):只过滤当前云端分区;清空=全显。
+                    var playlistQuery by rememberSaveable { mutableStateOf("") }
+                    val playlistKeyword = playlistQuery.trim()
+                    val shownYouTubePlaylists =
+                        remember(visibleYouTubePlaylists, playlistKeyword) {
+                            if (playlistKeyword.isEmpty()) {
+                                visibleYouTubePlaylists
+                            } else {
+                                visibleYouTubePlaylists.filter { it.title.contains(playlistKeyword, ignoreCase = true) }
+                            }
+                        }
+                    val shownNeteasePlaylists =
+                        remember(visibleNeteasePlaylists, playlistKeyword) {
+                            if (playlistKeyword.isEmpty()) {
+                                visibleNeteasePlaylists
+                            } else {
+                                visibleNeteasePlaylists.filter { it.title.contains(playlistKeyword, ignoreCase = true) }
+                            }
+                        }
+                    if (selectedLibrary == 1 || selectedLibrary == 2) {
+                        OutlinedTextField(
+                            value = playlistQuery,
+                            onValueChange = { playlistQuery = it },
+                            singleLine = true,
+                            label = { Text(stringResource(Res.string.search)) },
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 15.dp),
+                        )
+                        Spacer(modifier = Modifier.height(5.dp))
+                    }
                     if (visibleYouTubePlaylists.isNotEmpty() || visibleNeteasePlaylists.isNotEmpty()) {
                         Row(
                             modifier =
@@ -4194,7 +4225,7 @@ fun AddToPlaylistModalBottomSheet(
                         Crossfade(selectedLibrary) { library ->
                             if (library == 1 || library == 2) {
                                 val cloudPlaylists =
-                                    if (library == 1) visibleYouTubePlaylists else visibleNeteasePlaylists
+                                    if (library == 1) shownYouTubePlaylists else shownNeteasePlaylists
                                 LazyColumn {
                                     // 列表顶部固定"新建歌单"行:直接建云端歌单并把这首歌塞进去
                                     item(key = "create_new_playlist") {
