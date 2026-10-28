@@ -1,5 +1,6 @@
 package com.maxrave.simpmusic.ui.screen.library
 
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.background
@@ -96,6 +97,8 @@ import kotlinx.coroutines.runBlocking
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
+import simpmusic.composeapp.generated.resources.cached
+import simpmusic.composeapp.generated.resources.remove_from_cache
 import simpmusic.composeapp.generated.resources.n_songs_selected
 import simpmusic.composeapp.generated.resources.select_all
 import simpmusic.composeapp.generated.resources.download_no_completed
@@ -265,6 +268,12 @@ fun DownloadedManagementBody(
     val managementRows by dynamicPlaylistViewModel.downloadManagementRows.collectAsStateWithLifecycle()
     val nowPlaying by sharedViewModel.nowPlayingState.collectAsStateWithLifecycle()
     var downloadedSection by remember { mutableStateOf(DownloadedSection.Completed) }
+    // 已缓存未下载列表(选中该磁贴时刷新;移除后原地重载)
+    val cachedSongs by dynamicPlaylistViewModel.cachedSongs.collectAsStateWithLifecycle()
+    var removeCachedTarget by remember { mutableStateOf<Pair<String, String>?>(null) }
+    LaunchedEffect(downloadedSection) {
+        if (downloadedSection == DownloadedSection.Cached) dynamicPlaylistViewModel.refreshCachedSongs()
+    }
     var selectedDownloadedSong by remember { mutableStateOf<com.maxrave.domain.data.entities.SongEntity?>(null) }
     // 行删除/取消的确认目标(videoId+标题);在途”取消下载”也走确认防误触
     var deleteRowTarget by remember { mutableStateOf<Pair<String, String>?>(null) }
@@ -324,8 +333,19 @@ fun DownloadedManagementBody(
                     onClick = { downloadedSection = DownloadedSection.Completed },
                 )
             }
+            Box(modifier = Modifier.weight(1f)) {
+                // 已缓存未下载(fork 2026-10-28):完整缓存的歌,非下载物;计数同款
+                val cachedWord = stringResource(Res.string.cached)
+                LibraryTilingItem(
+                    state = LibraryTilingState.DownloadCached,
+                    selected = downloadedSection == DownloadedSection.Cached,
+                    titleString = if (cachedSongs.isNotEmpty()) "$cachedWord (${cachedSongs.size})" else cachedWord,
+                    onClick = { downloadedSection = DownloadedSection.Cached },
+                )
+            }
         }
         val isInProgressTab = downloadedSection == DownloadedSection.InProgress
+        val isCachedTab = downloadedSection == DownloadedSection.Cached
         // 搜索只作用于"已完成"标签(旧下载页同款判定:标题/任一艺人包含即命中)
         val tabRows =
             when {
@@ -335,7 +355,7 @@ fun DownloadedManagementBody(
             }
         // "已完成"标签操作行(2026-10-07 用户定:补齐旧下载页的播放/随机/搜索按钮,逻辑同款;
         // 播放 48dp 大一档,行内垂直居中对齐——用户 2026-10-07 定)
-        if (!isInProgressTab) {
+        if (!isInProgressTab && !isCachedTab) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 15.dp),
                 horizontalArrangement = Arrangement.End,
@@ -526,6 +546,24 @@ fun DownloadedManagementBody(
                                     }
                                 }
                             }
+                            if (isCachedTab) {
+                                if (cachedSongs.isEmpty()) {
+                                    item(key = "cached-empty") {
+                                        Text(
+                                            text = stringResource(Res.string.no_playlists_downloaded),
+                                            style = typo().bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
+                                            textAlign = TextAlign.Center,
+                                        )
+                                    }
+                                }
+                                items(cachedSongs, key = { it.videoId }) { song ->
+                                    CachedSongRow(song = song) {
+                                        removeCachedTarget = song.videoId to (song.title ?: "")
+                                    }
+                                }
+                            } else {
                             items(tabRows, key = { it.song.videoId }) { row ->
                                 DownloadManagementRowItem(
                                     row = row,
@@ -558,6 +596,7 @@ fun DownloadedManagementBody(
                                     onDelete = { deleteRowTarget = row.song.videoId to row.song.title },
                                     onSongMenu = { selectedDownloadedSong = row.song },
                                 )
+                            }
                             }
                             item { EndOfPage(includeBottomBarPadding = false) }
                         }
@@ -629,6 +668,28 @@ fun DownloadedManagementBody(
         )
     }
 
+    // 移除缓存确认(fork 2026-10-28):只清播放器缓存,不动任何下载文件
+    removeCachedTarget?.let { (videoId, title) ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { removeCachedTarget = null },
+            title = { Text(stringResource(Res.string.remove_from_cache)) },
+            text = { Text(title) },
+            confirmButton = {
+                androidx.compose.material3.TextButton(
+                    onClick = {
+                        removeCachedTarget = null
+                        dynamicPlaylistViewModel.removeCachedSong(videoId)
+                    },
+                ) { Text(stringResource(Res.string.remove_from_cache)) }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { removeCachedTarget = null }) {
+                    Text(stringResource(Res.string.cancel))
+                }
+            },
+        )
+    }
+
 }
 
 /** "下载中"节头右侧的操作(用户定稿:纯文字无底色,primary 色提示可点) */
@@ -647,6 +708,53 @@ private fun DownloadHeaderPill(
                 .clickable(onClick = onClick)
                 .padding(horizontal = 8.dp, vertical = 4.dp),
     )
+}
+
+/** 已缓存未下载行(fork 2026-10-28):简洁行(封面/标题/艺人+移除缓存),点击=移除确认 */
+@Composable
+private fun CachedSongRow(
+    song: com.maxrave.domain.data.entities.SongEntity,
+    onRemove: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onRemove)
+                .padding(horizontal = 15.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        coil3.compose.AsyncImage(
+            model = song.thumbnails?.lastOrNull(),
+            contentDescription = null,
+            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+            modifier =
+                Modifier
+                    .size(48.dp)
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp)),
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = song.title ?: "",
+                style = typo().bodyMedium,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            )
+            Text(
+                text = song.artistName?.joinToString(", ") ?: "",
+                style = typo().bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            )
+        }
+        Text(
+            text = stringResource(Res.string.remove_from_cache),
+            style = typo().labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
 }
 
 /** 两组节共用的行渲染(避免下载中/已完成两段 items 重复二十行接线) */
@@ -689,6 +797,8 @@ private fun DownloadManagementRowItem(
 internal enum class DownloadedSection {
     InProgress,
     Completed,
+    /** 完整缓存未下载(fork 2026-10-28,上游 Cached 数据层挂到下载管理页) */
+    Cached,
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

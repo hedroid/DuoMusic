@@ -1,5 +1,7 @@
 package com.maxrave.simpmusic.viewModel
 
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.asStateFlow
 import androidx.lifecycle.viewModelScope
 import com.maxrave.common.Config
 import com.maxrave.common.NETEASE_MV_MEDIA_ID_PREFIX
@@ -45,7 +47,26 @@ class LibraryDynamicPlaylistViewModel(
     private val songRepository: SongRepository,
     private val artistRepository: ArtistRepository,
     private val analyticsRepository: AnalyticsRepository,
+    private val cacheRepository: com.maxrave.domain.repository.CacheRepository,
 ) : BaseViewModel() {
+
+    // 已缓存未下载(fork 露出,2026-10-28):上游 Cached 自动歌单的数据层,挂在下载管理页
+    private val _cachedSongs = MutableStateFlow<List<SongEntity>>(emptyList())
+    val cachedSongs: StateFlow<List<SongEntity>> = _cachedSongs.asStateFlow()
+
+    fun refreshCachedSongs() {
+        viewModelScope.launch {
+            _cachedSongs.value = loadCachedSongs(cacheRepository, songRepository)
+        }
+    }
+
+    fun removeCachedSong(videoId: String) {
+        viewModelScope.launch {
+            cacheRepository.removeCachedSong(videoId)
+            _cachedSongs.value = loadCachedSongs(cacheRepository, songRepository)
+        }
+    }
+
     private val downloadUtils: com.maxrave.domain.mediaservice.handler.DownloadHandler by inject()
     private val sharedViewModel: SharedViewModel by inject()
     private val playlistRepository: com.maxrave.domain.repository.PlaylistRepository by inject()
@@ -567,4 +588,19 @@ class LibraryDynamicPlaylistViewModel(
         /** Songs a monthly recap holds. The ranking underneath already stops at 100. */
         private const val MONTHLY_RECAP_LIMIT = 50
     }
+}
+
+/** 完整缓存(未下载)的歌曲行:上游 2.4.0 同款取数——播放器缓存里整首在库的 id 映射回
+ *  歌曲行,已下载的排除(那归"已完成"管),常听的(inLibrary)排前。Desktop 无盘上缓存恒空。 */
+internal suspend fun loadCachedSongs(
+    cacheRepository: com.maxrave.domain.repository.CacheRepository,
+    songRepository: com.maxrave.domain.repository.SongRepository,
+): List<SongEntity> {
+    val ids = cacheRepository.getFullyCachedSongIds()
+    if (ids.isEmpty()) return emptyList()
+    return songRepository
+        .getSongsByListVideoId(ids)
+        .first()
+        .filter { it.downloadState != DownloadState.STATE_DOWNLOADED }
+        .sortedByDescending { it.inLibrary }
 }

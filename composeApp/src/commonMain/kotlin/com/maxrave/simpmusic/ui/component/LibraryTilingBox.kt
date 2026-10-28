@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.maxrave.simpmusic.extension.NonLazyGrid
+import com.maxrave.simpmusic.ui.icon.Cloud
 import com.maxrave.simpmusic.ui.icon.Album
 import com.maxrave.simpmusic.ui.icon.DownloadForOffline
 import com.maxrave.simpmusic.ui.icon.Downloading
@@ -36,6 +37,7 @@ import com.maxrave.simpmusic.ui.screen.library.LibraryDynamicPlaylistType
 import com.maxrave.simpmusic.ui.theme.typo
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
+import simpmusic.composeapp.generated.resources.cached
 import simpmusic.composeapp.generated.resources.Res
 import simpmusic.composeapp.generated.resources.download_section_completed
 import simpmusic.composeapp.generated.resources.download_section_in_progress
@@ -251,6 +253,15 @@ data class LibraryTilingState(
                 containerColor = Color(0xffFFE0B2),
                 icon = SimpIcons.Downloading,
                 iconColor = Color.Black,
+            )
+
+        /** 下载管理页"已缓存"磁贴(fork 2026-10-28):完整缓存未下载的歌,区别于已完成下载 */
+        val DownloadCached =
+            LibraryTilingState(
+                title = Res.string.cached,
+                containerColor = Color(0xffB2DFDB),
+                icon = SimpIcons.Cloud,
+                iconColor = Color(0xff004D40),
             )
 
         /** 下载管理页"已完成"磁贴(subtitle 带"N首·总大小"统计) */
