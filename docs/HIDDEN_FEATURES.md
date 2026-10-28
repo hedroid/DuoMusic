@@ -46,6 +46,11 @@
 
 ## 三、播放器 / 菜单级移除
 
+| 功能 | 隐藏方式 | 位置 | 时间/提交 | 恢复方法 |
+| --- | --- | --- | --- | --- |
+| 下载管理页"已缓存"标签(完整缓存未下载列表+单首移除缓存) | `SHOW_CACHED_TAB = false`(第三磁贴+tab 分支双门控) | `LibraryCollectionScreen.kt`(常量在 `DownloadedSection` 枚举上方) | 2026-10-28, 8804bd3b 落地当日用户定"用处不大"即隐藏 | 常量改 `true`。VM 的 `cachedSongs`/`refreshCachedSongs`/`removeCachedSong`、`loadCachedSongs` 取数、`DownloadCached` 磁贴状态、`CachedSongRow`/确认弹窗、`remove_from_cache`/`cached_empty_hint` 字符串全保留;全量清除仍在 设置→存储"清除播放器缓存" |
+
+
 | 功能 | 处置 | 位置 | 说明 |
 | --- | --- | --- | --- |
 | 详情卡"相似歌曲"入口 | 删除（字符串 `similar_songs` 保留备用） | 原 NowPlaying 详情卡数据行 | 因 YTM 描述卡无此元素、破坏双源一致性（2026-09-15）。电台功能仍从三点菜单"收听电台"进入；将来做独立相似歌曲页（复用歌单页布局），不回详情卡 |

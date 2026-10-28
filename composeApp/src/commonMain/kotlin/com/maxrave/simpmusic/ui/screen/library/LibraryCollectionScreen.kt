@@ -334,7 +334,7 @@ fun DownloadedManagementBody(
                     onClick = { downloadedSection = DownloadedSection.Completed },
                 )
             }
-            Box(modifier = Modifier.weight(1f)) {
+            if (SHOW_CACHED_TAB) Box(modifier = Modifier.weight(1f)) {
                 // 已缓存未下载(fork 2026-10-28):完整缓存的歌,非下载物;计数同款
                 val cachedWord = stringResource(Res.string.cached)
                 LibraryTilingItem(
@@ -346,7 +346,7 @@ fun DownloadedManagementBody(
             }
         }
         val isInProgressTab = downloadedSection == DownloadedSection.InProgress
-        val isCachedTab = downloadedSection == DownloadedSection.Cached
+        val isCachedTab = SHOW_CACHED_TAB && downloadedSection == DownloadedSection.Cached
         // 搜索只作用于"已完成"标签(旧下载页同款判定:标题/任一艺人包含即命中)
         val tabRows =
             when {
@@ -796,6 +796,9 @@ private fun DownloadManagementRowItem(
 }
 
 /** 下载管理页两视角(2026-10-01 用户定):下载中/已完成,行混排不按内容分类 */
+// 已缓存 tab(2026-10-28 上游 Cached 数据层):用户定"用处不大"暂隐藏;管线全保留
+private const val SHOW_CACHED_TAB = false
+
 internal enum class DownloadedSection {
     InProgress,
     Completed,
