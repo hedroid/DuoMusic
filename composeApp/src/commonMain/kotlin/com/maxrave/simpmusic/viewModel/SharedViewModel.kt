@@ -301,9 +301,9 @@ class SharedViewModel(
         onSwitched: (Boolean) -> Unit = {},
     ) {
         Logger.w("SRCPROBE", "switchSource -> $source (current=${selectedSource.value})")
-        // 真机 release 诊断(2026-10-13 用户"不能切网易音源"):三星 ROM 静音 kermit,
-        // android.util.Log 直写 logcat 保底——安装新包复现时 adb logcat -s SRCPROBE 即读
-        android.util.Log.w(
+        // 诊断日志(原 android.util.Log 直写,三星 ROM 静音 kermit 时代加的;换自研
+        // 跨平台 Logger 后桌面端才可编译,日志经 fork 写入器仍可导出)
+        Logger.w(
             "SRCPROBE",
             "switchSource -> $source (current=${selectedSource.value}, neteaseLoggedIn=${neteaseLoggedIn.value})",
         )
@@ -324,7 +324,7 @@ class SharedViewModel(
                 } ?: true
             if (source == com.maxrave.domain.source.MusicSource.NETEASE && !neteaseLoggedIn.value && !cookiePresent) {
                 Logger.w("SRCPROBE", "switchSource blocked: netease not logged in")
-                android.util.Log.w("SRCPROBE", "switchSource blocked: netease not logged in")
+                Logger.w("SRCPROBE", "switchSource blocked: netease not logged in")
                 makeToast(getString(Res.string.login_netease_first))
                 onSwitched(false)
                 return@launch
@@ -335,13 +335,13 @@ class SharedViewModel(
                 setSelectedSource(source)
                 true
             }
-            android.util.Log.w(
+            Logger.w(
                 "SRCPROBE",
                 "switchSource write result: written=$written, selectedSource now=${selectedSource.value}",
             )
             if (written != true && selectedSource.value != source.name) {
                 Logger.w("SRCPROBE", "switchSource write timed out: $source")
-                android.util.Log.w("SRCPROBE", "switchSource write timed out: $source")
+                Logger.w("SRCPROBE", "switchSource write timed out: $source")
                 makeToast(getString(Res.string.switch_source_failed))
                 onSwitched(false)
             } else {

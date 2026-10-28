@@ -59,6 +59,9 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import multiplatform.network.cmptoast.ToastHost
 import multiplatform.network.cmptoast.showToast
 import okhttp3.OkHttpClient
@@ -211,7 +214,7 @@ fun runDesktopApp(args: Array<String> = emptyArray()) {
     // app log 暂停态恢复(同 Android,2026-10-13):启动读一次存储,Koin 已就绪
     runCatching {
         val dataStoreManager = org.koin.core.context.GlobalContext.get().get<com.maxrave.domain.manager.DataStoreManager>()
-        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+        CoroutineScope(Dispatchers.IO).launch {
             com.maxrave.logger.Logger.fileLoggingEnabled =
                 dataStoreManager.appLogFileLoggingPaused.first() != com.maxrave.domain.manager.DataStoreManager.Values.TRUE
         }

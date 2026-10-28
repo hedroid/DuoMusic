@@ -279,10 +279,16 @@ private fun CreateRow(
                 Modifier
                     .size(44.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                    // 禁用态整体变灰(2026-10-28 CR P3):圆底与图标显式吃 alpha,
+                    // 与文字的 LocalContentColor 透明度一致,视觉状态才完整
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = contentAlpha)),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface)
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = contentAlpha),
+            )
         }
         Column {
             Text(text = title, style = typo().titleSmall)
