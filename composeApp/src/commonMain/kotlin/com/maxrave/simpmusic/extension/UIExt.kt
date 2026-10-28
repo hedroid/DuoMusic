@@ -636,31 +636,59 @@ fun LazyGridState.isScrollingUp(): State<Boolean> {
  *
  * 设计约束:不回到 3881e85f 的"门控上报"(吞报告把底栏卡死在上一个方向,544a7e99 推翻的
  * 教训)——**同向上报全放行**(底栏即时跟随连续滚动),仅"方向翻转"需要自锚点累计净位移
- * ≥阈值(跨 item 视为立即过阈,一行高度必超);抖动净位移归零永不翻转。消费方
- * (isScrolledToTop/headerAtTop)按值去重,重复同向上报零副作用。
+ * ≥阈值;抖动净位移归零永不翻转。消费方(isScrolledToTop/headerAtTop)按值去重,重复同向
+ * 上报零副作用。
+ *
+ * 🚨净位移的量法(CR 修正,2026-10-28 用户抓的边界反例):不能用"index 变化=立即过阈"
+ * ——手指在两个列表项交界处 ±3px 来回蹭,firstVisibleItemIndex 逐次 ±1 跨界,首版会把
+ * 每次跨界都当大位移、一个抖动周期接受两次翻转,迟滞门在 item 边界完全失效。正确量法=
+ * **锚点项自己在视口里的主轴 offset 差**(visibleItemsInfo 里按 index 查):锚点项仍在
+ * 视口内(边界抖动必然如此)时,它的 viewport offset 差就是跨 item 也精确的净位移;锚点项
+ * 滚出视口=自锚点起至少一个视口高的真实大位移,才直接过阈。
  */
-private class ScrollDirectionGate(private val thresholdPx: Int) {
+internal class ScrollDirectionGate(private val thresholdPx: Int) {
     private var acceptedUp: Boolean? = null
-    private var anchorIndex = 0
-    private var anchorOffset = 0
 
-    fun report(index: Int, offset: Int, rawUp: Boolean): Boolean {
+    /** 锚点项号;-1=锚点无效(建锚时查不到视口信息),翻转尝试只能放行(无更好信息) */
+    private var anchorIndex = -1
+
+    /** 锚点建立时锚点项的视口内主轴 offset */
+    private var anchorViewportOffset = 0
+
+    /**
+     * @param index 当前首个可见项号
+     * @param viewportOffsetOf 按项号查当前视口内主轴 offset;不在视口(或列表无可见项)返回 null
+     * @param rawUp 本帧裸方向(true=内容向上滚/朝顶部)
+     * @return 应上报的方向(同向全放行;反向未过阈=维持原方向)
+     */
+    fun report(index: Int, viewportOffsetOf: (Int) -> Int?, rawUp: Boolean): Boolean {
         val current = acceptedUp
         if (current == null || rawUp == current) {
             acceptedUp = rawUp
-            anchorIndex = index
-            anchorOffset = offset
+            reanchor(index, viewportOffsetOf)
             return rawUp
         }
-        val netPx = if (index != anchorIndex) thresholdPx + 1 else abs(offset - anchorOffset)
+        val anchorNow = if (anchorIndex >= 0) viewportOffsetOf(anchorIndex) else null
+        val netPx =
+            if (anchorNow == null) {
+                // 锚点项已滚出视口/锚点无效:真实大位移(≥一视口)或无信息,直接过阈
+                thresholdPx + 1
+            } else {
+                abs(anchorViewportOffset - anchorNow)
+            }
         if (netPx > thresholdPx) {
             acceptedUp = rawUp
-            anchorIndex = index
-            anchorOffset = offset
+            reanchor(index, viewportOffsetOf)
             return rawUp
         }
-        // 反向未过阈:维持已接受方向(等效于吞掉这次翻转尝试)
+        // 反向未过阈:维持已接受方向(等效于吞掉这次翻转尝试),锚点不动继续累计净位移
         return current
+    }
+
+    private fun reanchor(index: Int, viewportOffsetOf: (Int) -> Int?) {
+        val offset = viewportOffsetOf(index)
+        anchorIndex = if (offset != null) index else -1
+        anchorViewportOffset = offset ?: 0
     }
 }
 
@@ -693,6 +721,11 @@ fun LazyListState.scrollReportingEffect(onScrolling: (onTop: Boolean) -> Unit) {
     val thresholdPx = with(LocalDensity.current) { ScrollDirectionFlipThreshold.toPx().toInt() }
     LaunchedEffect(this) {
         val gate = ScrollDirectionGate(thresholdPx)
+        // 净位移量取锚点项的视口内 offset(调用时现读,不进 snapshotFlow 键);item 边界
+        // 抖动时锚点项恒在视口内,offset 差=跨 item 也精确的净位移(CR 修正见门注释)
+        val viewportOffsetOf: (Int) -> Int? = { itemIndex ->
+            layoutInfo.visibleItemsInfo.firstOrNull { it.index == itemIndex }?.offset
+        }
         var previousIndex = firstVisibleItemIndex
         var previousOffset = firstVisibleItemScrollOffset
         snapshotFlow { firstVisibleItemIndex to firstVisibleItemScrollOffset }
@@ -710,10 +743,10 @@ fun LazyListState.scrollReportingEffect(onScrolling: (onTop: Boolean) -> Unit) {
                 previousOffset = offset
                 if (index <= 1) {
                     // 位置驱动不吃迟滞;同步门内方向,离顶后首个反向不因陈旧锚点误判
-                    gate.report(index, offset, true)
+                    gate.report(index, viewportOffsetOf, true)
                     onScrolling(true)
                 } else {
-                    onScrolling(gate.report(index, offset, rawUp))
+                    onScrolling(gate.report(index, viewportOffsetOf, rawUp))
                 }
             }
     }
@@ -724,6 +757,10 @@ fun LazyGridState.scrollReportingEffect(onScrolling: (onTop: Boolean) -> Unit) {
     val thresholdPx = with(LocalDensity.current) { ScrollDirectionFlipThreshold.toPx().toInt() }
     LaunchedEffect(this) {
         val gate = ScrollDirectionGate(thresholdPx)
+        // Grid 的 ItemInfo.offset 是二维 IntOffset,净位移取主轴 y
+        val viewportOffsetOf: (Int) -> Int? = { itemIndex ->
+            layoutInfo.visibleItemsInfo.firstOrNull { it.index == itemIndex }?.offset?.y
+        }
         var previousIndex = firstVisibleItemIndex
         var previousOffset = firstVisibleItemScrollOffset
         snapshotFlow { firstVisibleItemIndex to firstVisibleItemScrollOffset }
@@ -740,10 +777,10 @@ fun LazyGridState.scrollReportingEffect(onScrolling: (onTop: Boolean) -> Unit) {
                 previousIndex = index
                 previousOffset = offset
                 if (index <= 1) {
-                    gate.report(index, offset, true)
+                    gate.report(index, viewportOffsetOf, true)
                     onScrolling(true)
                 } else {
-                    onScrolling(gate.report(index, offset, rawUp))
+                    onScrolling(gate.report(index, viewportOffsetOf, rawUp))
                 }
             }
     }
