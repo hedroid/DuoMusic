@@ -5605,42 +5605,59 @@ fun NeteaseCommentsSheet(
         modifier = Modifier.hapticTapFeedback(),
         contentWindowInsets = { WindowInsets(0, 0, 0, 0) },
     ) {
-        // 用户定案:评论区无条件全屏(0.95,顶部留状态栏呼吸位)
-        Card(
+        // 头部跟随上游 YT 评论页形态(2026-10-28):全屏 Card 从状态栏下起(YT 版同款),
+        // 拖拽条 32×4 对齐;不再用 0.95 留呼吸位的旧形态
+        val localDensity = LocalDensity.current
+        Box(
             modifier =
                 Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight(0.95f),
+                    .fillMaxSize()
+                    .padding(top = with(localDensity) { WindowInsets.statusBars.getTop(localDensity).toDp() }),
+        ) {
+        Card(
+            modifier = Modifier.fillMaxSize(),
             shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp),
             colors = CardDefaults.cardColors().copy(containerColor = dark.container),
         ) {
             Column(Modifier.fillMaxSize()) {
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(8.dp))
                 Card(
-                    // 与其它弹框同款:拖拽条水平居中(Column 默认 Start 对齐,曾一直偏左)
                     modifier =
                         Modifier
                             .align(Alignment.CenterHorizontally)
-                            .width(60.dp)
+                            .width(32.dp)
                             .height(4.dp),
                     colors = CardDefaults.cardColors().copy(containerColor = dark.handle),
                     shape = RoundedCornerShape(50),
                 ) {}
-                Text(
-                    text =
-                        // 三类评论只在对应线程拿到正数时显示数字；未知和 0 都只显示“评论”。
-                        if (knownServerCount == null || displayTotalCount <= 0) {
-                            stringResource(Res.string.comment_label)
-                        } else {
-                            stringResource(
-                                Res.string.comments_title,
-                                formatCompactCount(displayTotalCount),
-                            )
-                        },
-                    style = typo().titleMedium,
-                    color = dark.content,
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
-                )
+                // 头部行跟随 YT 版:标题+计数同排,关闭钮收右(YT 版同款),下方分割线
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(start = 20.dp, end = 8.dp, top = 6.dp),
+                ) {
+                    Text(
+                        text = stringResource(Res.string.comment_label),
+                        style = typo().titleMedium,
+                        color = dark.content,
+                    )
+                    if (knownServerCount != null && displayTotalCount > 0) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = formatCompactCount(displayTotalCount),
+                            style = typo().bodyMedium,
+                            color = dark.subtitle,
+                        )
+                    }
+                    Spacer(modifier = Modifier.weight(1f))
+                    IconButton(onClick = {
+                        coroutineScope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
+                    }) {
+                        Icon(imageVector = SimpIcons.Close, contentDescription = null, tint = dark.content)
+                    }
+                }
                 // 热门/最新排序切换:热门=服务端精华热评一次拉全,最新=offset 翻页
                 Row(
                     modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
@@ -6049,6 +6066,7 @@ fun NeteaseCommentsSheet(
                     }
                 }
             }
+        }
         }
     }
 }
