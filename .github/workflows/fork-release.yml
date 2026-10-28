@@ -8,6 +8,9 @@ name: Fork Release (arm64 APK)
 # / KEY_PASSWORD(已配在 hedroid/SimpMusic)。
 
 on:
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
     inputs:
       tag:
