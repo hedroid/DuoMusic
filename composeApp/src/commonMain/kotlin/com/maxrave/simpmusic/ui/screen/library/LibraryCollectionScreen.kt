@@ -96,6 +96,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import simpmusic.composeapp.generated.resources.cached_empty_hint
 import simpmusic.composeapp.generated.resources.cached
@@ -138,7 +139,10 @@ fun LibraryCollectionScreen(
     type: String,
     viewModel: LibraryViewModel = koinViewModel(),
     dynamicPlaylistViewModel: LibraryDynamicPlaylistViewModel = koinViewModel(),
-    sharedViewModel: SharedViewModel = koinViewModel(),
+    // 🚨single VM 只能 koinInject:koinViewModel() 会把 Koin 单例登记进本 entry 的
+    // ViewModelStore,entry 出栈/保存态被清时 AndroidX 对单例调 onCleared → viewModelScope
+    // 永久取消,之后全部 switchSource 静默不执行(2026-10-28 真机"切不到网易"根因)
+    sharedViewModel: SharedViewModel = koinInject(),
 ) {
     val pageType = runCatching { LibraryChipType.valueOf(type) }.getOrDefault(LibraryChipType.LOCAL_PLAYLIST)
     val localPlaylists by viewModel.yourLocalPlaylist.collectAsStateWithLifecycle()

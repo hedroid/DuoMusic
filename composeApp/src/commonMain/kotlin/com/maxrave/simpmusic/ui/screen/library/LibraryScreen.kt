@@ -216,8 +216,10 @@ fun LibraryScreen(
     val ownNeteasePlaylistIds by viewModel.ownNeteasePlaylistIds.collectAsStateWithLifecycle()
     val neteaseLikedPlaylistId by viewModel.neteaseLikedPlaylistId.collectAsStateWithLifecycle()
 
-    // 网易云播客 chip 页 VM(Koin single:数据随 single 存活,tab 往返零重拉)
-    val neteasePodcastViewModel: NeteasePodcastViewModel = koinViewModel()
+    // 网易云播客 chip 页 VM(Koin single:数据随 single 存活,tab 往返零重拉)。
+    // 🚨必须 koinInject 不能 koinViewModel——后者会把 single 登记进库页 entry 的
+    // ViewModelStore,store 被清时播客单例陪葬 onCleared(SharedViewModel 同款事故,2026-10-28)
+    val neteasePodcastViewModel: NeteasePodcastViewModel = koinInject()
 
     val selectionState = rememberSongSelectionState()
     val selectionViewModel: SongSelectionViewModel = koinViewModel()
