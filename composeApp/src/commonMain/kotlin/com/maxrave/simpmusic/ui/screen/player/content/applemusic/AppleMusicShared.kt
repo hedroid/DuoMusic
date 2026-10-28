@@ -391,13 +391,14 @@ internal fun AppleMusicHeaderActions(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         val likeBurst = rememberHeartBurstState()
-        // 红心(星)=云端账号喜欢态;未登录源置灰,点击提示登录
+        // 红心(星)=云端账号喜欢态;未登录源置灰,点击提示登录。
+        // 24dp=与同排评论/更多钮(AppleMusicGlyphButton 默认)同大(2026-10-28 用户定案)
         run {
             Box(
                 modifier =
                     Modifier
                         .appleMusicPressInflate()
-                        .size(32.dp)
+                        .size(24.dp)
                         .heartBurst(likeBurst)
                         .alpha(if (state.likeEnabled) 1f else 0.38f)
                         .clip(CircleShape)
@@ -414,7 +415,7 @@ internal fun AppleMusicHeaderActions(
                         imageVector = if (liked) SimpIcons.Favorite else SimpIcons.FavoriteBorder,
                         contentDescription = "",
                         tint = Color.White,
-                        modifier = Modifier.size(32.dp),
+                        modifier = Modifier.size(24.dp),
                     )
                 }
             }
