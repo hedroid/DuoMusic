@@ -1110,7 +1110,7 @@ private fun HomeAccountButton(
 }
 
 @Composable
-private fun AccountAvatar(
+internal fun AccountAvatar(
     signedIn: Boolean,
     thumbnailUrl: String?,
     size: Dp,

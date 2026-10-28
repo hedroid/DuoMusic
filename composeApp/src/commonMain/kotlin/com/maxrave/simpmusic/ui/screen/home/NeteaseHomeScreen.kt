@@ -1,5 +1,14 @@
 package com.maxrave.simpmusic.ui.screen.home
 
+import com.maxrave.simpmusic.expect.ui.rememberBackdrop
+import com.maxrave.simpmusic.extension.ultraThinBarStyle
+import dev.chrisbanes.haze.HazeInput
+import dev.chrisbanes.haze.blur.hazeBlur
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
+import com.maxrave.simpmusic.ui.screen.home.AccountAvatar
+import simpmusic.composeapp.generated.resources.guest
+import androidx.compose.foundation.layout.widthIn
 import com.maxrave.simpmusic.ui.component.CreateActions
 import simpmusic.composeapp.generated.resources.netease_account
 import simpmusic.composeapp.generated.resources.log_in_to_netease
@@ -165,6 +174,10 @@ fun NeteaseHomeScreen(
     // 顶栏标题行显隐仍用方向态(上游同款;只管标题不管底栏上报)
     val pullToRefreshState = rememberPullToRefreshState()
     val chipRowState = rememberScrollState()
+    // 头部对齐 YT 主页玻璃形态(2026-10-28):页面内容=玻璃源,悬浮行(chips/药丸)是
+    // 兄弟层折射;滚走后顶栏 hazeBlur 模糊条淡入(与 YT 一字不差同款)
+    val hazeState = rememberHazeState()
+    val chipBackdrop = rememberBackdrop(MaterialTheme.colorScheme.background)
     var topAppBarHeightPx by remember { mutableIntStateOf(0) }
     // 视频卡/歌曲卡长按=歌曲菜单(YT 主页同款;MV 行经 NETEASE_MV_ 哨兵自动换 MV 语义行)
     var menuTrack by remember {
@@ -226,6 +239,7 @@ fun NeteaseHomeScreen(
         ) {
             LazyColumn(
                 state = scrollState,
+                modifier = Modifier.hazeSource(hazeState),
                 verticalArrangement = Arrangement.spacedBy(20.dp),
             ) {
                 item(key = "top-space") {
@@ -279,7 +293,7 @@ fun NeteaseHomeScreen(
                             if (target) {
                                 Modifier.background(Color.Transparent)
                             } else {
-                                Modifier.background(MaterialTheme.colorScheme.surfaceContainer)
+                                Modifier.hazeBlur(HazeInput.Sources(hazeState), ultraThinBarStyle())
                             },
                         ).onGloballyPositioned { coordinates ->
                             topAppBarHeightPx = coordinates.size.height
@@ -310,19 +324,21 @@ fun NeteaseHomeScreen(
                             isAnimated = false,
                             isSelected = false,
                             text = stringResource(Res.string.all),
+                            backdrop = chipBackdrop,
                         ) { }
                         viewModel.chips.forEach { tag ->
                             Chip(
                                 isAnimated = false,
                                 isSelected = false,
                                 text = tag,
+                                backdrop = chipBackdrop,
                             ) {
                                 navController.navigate(NeteaseTagDestination(tag = tag))
                             }
                         }
                     }
                     CreateActions(
-                        backdrop = null,
+                        backdrop = chipBackdrop,
                         navController = navController,
                         onSettings = { navController.navigate(SettingsDestination) },
                     )
@@ -920,58 +936,76 @@ internal fun NewAlbumAreaChips(
     }
 }
 
-// 网易主页头像按钮:头像(或占位圆)+下拉菜单(通知/登录态),对齐上游 HomeAccountButton 形态
+// 网易主页头像按钮:与 YT 主页 HomeAccountButton 同构(大菜单=账户行+问候语+通知+登录态),
+// 复用共享的 AccountAvatar;问候语时段同款。
 @Composable
 private fun NeteaseHomeAccountButton(
     accountInfo: Pair<String?, String?>?,
     navController: NavController,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
-    Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) {
-        Box(
+    val signedIn = accountInfo?.second?.isNotBlank() == true
+    val displayName = accountInfo?.first?.takeIf { it.isNotBlank() } ?: stringResource(Res.string.guest)
+    val hour = remember { now().time.hour }
+    val greeting =
+        stringResource(
+            when (hour) {
+                in 6..12 -> Res.string.good_morning
+                in 13..17 -> Res.string.good_afternoon
+                in 18..23 -> Res.string.good_evening
+                else -> Res.string.good_night
+            },
+        )
+    Box {
+        AccountAvatar(
+            signedIn = signedIn,
+            thumbnailUrl = accountInfo?.second,
+            size = 44.dp,
+            contentDescription = displayName,
+            modifier = Modifier.clickable { menuOpen = true },
+        )
+        DropdownMenu(
+            expanded = menuOpen,
+            onDismissRequest = { menuOpen = false },
             modifier =
-                Modifier.clickable(onClick = { menuOpen = true }),
+                Modifier
+                    .widthIn(max = 280.dp)
+                    .fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
         ) {
-            AsyncImage(
-                model =
-                    ImageRequest.Builder(LocalPlatformContext.current)
-                        .data(accountInfo?.second ?: "")
-                        .diskCachePolicy(CachePolicy.ENABLED)
-                        .crossfade(550)
-                        .build(),
-                contentDescription = stringResource(Res.string.netease_account),
-                modifier =
-                    Modifier
-                        .size(32.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surfaceContainerHighest),
-                contentScale = ContentScale.Crop,
-            )
-            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                accountInfo?.first?.let { name ->
-                    DropdownMenuItem(
-                        text = { Text(name, style = typo().bodyMedium) },
-                        leadingIcon = { Icon(SimpIcons.Person, contentDescription = null) },
-                        onClick = { menuOpen = false },
-                    )
+            Row(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                AccountAvatar(
+                    signedIn = signedIn,
+                    thumbnailUrl = accountInfo?.second,
+                    size = 40.dp,
+                    contentDescription = null,
+                )
+                Column {
+                    Text(text = displayName, style = typo().titleSmall, maxLines = 1)
+                    Text(text = greeting, style = typo().bodySmall)
                 }
-                DropdownMenuItem(
-                    text = { Text(stringResource(Res.string.notification), style = typo().bodyMedium) },
-                    leadingIcon = { Icon(SimpIcons.Notifications, contentDescription = null) },
+            }
+            DropdownMenuItem(
+                text = { Text(stringResource(Res.string.notification), style = typo().bodyMedium) },
+                leadingIcon = { Icon(SimpIcons.Notifications, contentDescription = null) },
+                onClick = {
+                    menuOpen = false
+                    navController.navigate(NotificationDestination)
+                },
+            )
+            if (!signedIn) {
+                Button(
                     onClick = {
                         menuOpen = false
-                        navController.navigate(NotificationDestination)
+                        navController.navigate(NeteaseLoginDestination)
                     },
-                )
-                if (accountInfo == null) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(Res.string.log_in_to_netease), style = typo().bodyMedium) },
-                        leadingIcon = { Icon(SimpIcons.PersonAdd, contentDescription = null) },
-                        onClick = {
-                            menuOpen = false
-                            navController.navigate(NeteaseLoginDestination)
-                        },
-                    )
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                ) {
+                    Text(stringResource(Res.string.log_in_to_netease))
                 }
             }
         }
