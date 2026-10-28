@@ -263,17 +263,6 @@ fun NeteaseHomeScreen(
                         ),
                     )
                 }
-                // 账户卡(登录时)
-                accountInfo?.let { info ->
-                    item(key = "account") {
-                        Box(Modifier.padding(horizontal = 15.dp)) {
-                            AccountLayout(
-                                accountName = info.first ?: "",
-                                url = info.second ?: "",
-                            )
-                        }
-                    }
-                }
                 // 行级懒加载:固定行序,每行独立槽位(Loading 占位→滚到才拉→Ready/Failed)
                 NeteaseHomeViewModel.Row.entries.forEach { row ->
                     item(key = row.name) {
@@ -1138,50 +1127,3 @@ fun HomeTopAppBar(navController: NavController) {
     )
 }
 
-@Composable
-fun AccountLayout(
-    accountName: String,
-    url: String,
-) {
-    Column {
-        Text(
-            text = stringResource(Res.string.welcome_back),
-            style = typo().bodyMedium,
-            color = MaterialTheme.colorScheme.onBackground,
-            modifier = Modifier.padding(bottom = 3.dp),
-        )
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 5.dp, vertical = 5.dp),
-        ) {
-            AsyncImage(
-                model =
-                    ImageRequest
-                        .Builder(LocalPlatformContext.current)
-                        .data(url)
-                        .diskCachePolicy(CachePolicy.ENABLED)
-                        .diskCacheKey(url)
-                        .crossfade(true)
-                        .build(),
-                placeholder = rememberHolderPainter(),
-                error = rememberHolderPainter(),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier =
-                    Modifier
-                        .size(40.dp)
-                        .clip(
-                            CircleShape,
-                        ),
-            )
-            Text(
-                text = accountName,
-                style = typo().headlineMedium,
-                color = MaterialTheme.colorScheme.onBackground,
-                modifier =
-                    Modifier
-                        .padding(start = 8.dp),
-            )
-        }
-    }
-}
