@@ -46,8 +46,10 @@ class NeteaseHomeViewModel(
         RADAR_PLAYLISTS("雷达歌单"),
         HQ("精品歌单"),
         NEW_SONGS("推荐新歌"),
-        // 个人推荐 MV(personalized/mv;服务端每日仅 2-3 条,2026-10-08 用户定案恢复入口)
-        PERSONALIZED_MV("个人推荐 MV"),
+        // 个人推荐 MV(personalized/mv;服务端每日仅 2-3 条)。2026-10-28 用户定隐藏:
+        // 数据量无意义。管线保留(行定义+拉取+渲染全在),恢复=把这行加回 entries 即可
+        // (HIDDEN_FEATURES 已登记)。
+        // PERSONALIZED_MV("个人推荐 MV"),
         // 最新 MV(mv/first 30 条;原个性化源每日仅 2-3 条横滑无内容,探针实证换源)
         MV("最新 MV"),
         MV_TOPLIST("MV 总榜"),
@@ -224,10 +226,10 @@ class NeteaseHomeViewModel(
             Row.RADAR_PLAYLISTS -> neteaseRepository.getRadarPlaylistsRow(force)?.let { RowUi.Ready(RowContent.Feed(it)) } ?: RowUi.Failed
             Row.HQ -> neteaseRepository.getHqPlaylistsRow(force)?.let { RowUi.Ready(RowContent.Feed(it)) } ?: RowUi.Failed
             Row.NEW_SONGS -> neteaseRepository.getNewSongsRow(force)?.let { RowUi.Ready(RowContent.Feed(it)) } ?: RowUi.Failed
-            Row.PERSONALIZED_MV ->
-                neteaseRepository.getPersonalizedMvs().getOrNull()
-                    ?.takeIf { it.isNotEmpty() }
-                    ?.let { RowUi.Ready(RowContent.MvRow(it)) } ?: RowUi.Failed
+            // PERSONALIZED_MV(2026-10-28 隐藏,见 Row 枚举注释):
+            // neteaseRepository.getPersonalizedMvs().getOrNull()
+            //     ?.takeIf { it.isNotEmpty() }
+            //     ?.let { RowUi.Ready(RowContent.MvRow(it)) } ?: RowUi.Failed
             Row.MV ->
                 neteaseRepository.getMvFirst().getOrNull()
                     ?.takeIf { it.isNotEmpty() }
