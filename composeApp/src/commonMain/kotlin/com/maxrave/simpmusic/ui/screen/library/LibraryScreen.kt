@@ -1,5 +1,11 @@
 package com.maxrave.simpmusic.ui.screen.library
 
+import kotlin.math.roundToInt
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
@@ -226,6 +232,8 @@ fun LibraryScreen(
     // onGloballyPositioned 测量:覆盖式布局下测量链曾量到整页高,把内容推出屏(实测)。
     val headerHeight =
         with(density) { WindowInsets.statusBars.getTop(this).toDp() } + 56.dp + 8.dp
+    // 顶栏背景态(主页同款):true=在顶(透明)/false=滚走(hazeBlur 模糊条淡入)
+    var headerAtTop by remember { mutableStateOf(true) }
     // 各 chip 列表的底部留白:锁定"展开态"底栏高度(maxOf),不跟随底栏形变动画。
     // 液态玻璃底栏随 isScrolledToTop 在两行(迷你条+导航)与一行(沉到导航行)间形变,
     // innerPadding.bottom 逐帧变——若列表 contentPadding.bottom 跟随,贴底位置每次
@@ -244,7 +252,8 @@ fun LibraryScreen(
         viewModel.getRecentlyAdded()
     }
 
-    val chipRowState = rememberLazyListState()
+    // 主页同构:普通 Row+horizontalScroll(LazyRow 的 item 垂直顶对齐会让 chips 偏上 ~8dp)
+    val chipRowState = rememberScrollState()
     val currentFilter by viewModel.currentScreen.collectAsStateWithLifecycle()
     // 2026-10-28 顶栏改主页式常驻(头像+chips 一行,滚走只剩模糊条):高度恒定,
     // 收起/展开机制(标题行显隐/500ms 静默窗/回放/双轨高度)整体退役——高度不变
@@ -327,16 +336,17 @@ fun LibraryScreen(
     // 之后把选中项滚入视野——完全可见时不动,避免与用户手点可见 chip 的滚动打架。
     // 可见性也作 key:chip 集合增删会让同一选中项的 index 平移(如网易两 chip 插到前面)。
     LaunchedEffect(currentFilter, neteaseChipsVisible, ytChipsVisible) {
+        // ScrollState 近似判定:累计宽度估 index 偏移,不在视口内才滚入(语义同 UI-CR-15)
         val index = visibleLibraryChips.indexOf(currentFilter)
         if (index >= 0) {
-            val layoutInfo = chipRowState.layoutInfo
-            val itemInfo = layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }
-            val fullyVisible =
-                itemInfo != null &&
-                    itemInfo.offset >= layoutInfo.viewportStartOffset &&
-                    itemInfo.offset + itemInfo.size <= layoutInfo.viewportEndOffset
-            if (!fullyVisible) {
-                chipRowState.animateScrollToItem(index)
+            val widthPxPerChip = with(density) { 120.dp.toPx() }
+            val itemStart = index * widthPxPerChip
+            val viewportStart = chipRowState.value.toFloat()
+            val viewportEnd = viewportStart + with(density) { 320.dp.toPx() }
+            if (itemStart < viewportStart || itemStart > viewportEnd) {
+                chipRowState.animateScrollTo(
+                    (itemStart - widthPxPerChip).coerceAtLeast(0f).roundToInt(),
+                )
             }
         }
     }
@@ -445,9 +455,13 @@ fun LibraryScreen(
         modifier = Modifier.then(if (LocalLiquidGlassEnabled.current) Modifier.layerBackdrop(chipBackdrop) else Modifier).hazeSource(hazeState),
         targetState = currentFilter,
     ) { filter ->
-        // 各 chip 页滚动上报只转发给 App 驱动底栏(液态玻璃底栏形变);顶栏恒常驻,
-        // 不再有标题翻转消费,静默窗/回放/来源页过滤随之退役。
-        val tabScrolling: (onTop: Boolean) -> Unit = { onTop -> onScrolling(onTop) }
+        // 各 chip 页滚动上报:①驱动顶栏"透明↔模糊条"状态(主页同款 atTop 语义——
+        // 顶部=透明融入内容,滚走=模糊条淡入即"收缩");②转发给 App 驱动底栏形变。
+        // 头部高度恒定,背景切换无几何反馈,旧静默窗/回放机制不需要。
+        val tabScrolling: (onTop: Boolean) -> Unit = { onTop ->
+            headerAtTop = onTop
+            onScrolling(onTop)
+        }
         when (filter) {
             // 下载管理 chip 页:复用独立页的内容体,chip 页无 TopAppBar(库页自带标题区)
             LibraryChipType.DOWNLOADED_PLAYLIST -> {
@@ -615,10 +629,21 @@ fun LibraryScreen(
             onCreate = viewModel::createPlaylist,
         )
     }
+    AnimatedContent(
+        targetState = headerAtTop,
+        transitionSpec = { fadeIn(tween(300)).togetherWith(fadeOut(tween(300))) },
+    ) { atTopState ->
     Column(
         Modifier
             .background(Color.Transparent)
-            .hazeBlur(HazeInput.Sources(hazeState), ultraThinBarStyle()),
+            .then(
+                // 顶部=透明(融入内容);滚走=模糊条(主页头部一字不差的形态切换)
+                if (atTopState) {
+                    Modifier
+                } else {
+                    Modifier.hazeBlur(HazeInput.Sources(hazeState), ultraThinBarStyle())
+                },
+            ),
     ) {
         // 主页式常驻头部(2026-10-28 统一):头像(源账号,44dp,菜单=通知/登录) +
         // chips 行(滚动+渐隐)+ Listen Together。滚走后整个顶栏只剩这条模糊条。
@@ -645,17 +670,16 @@ fun LibraryScreen(
             ) {
                 val chipHeadFade by animateFloatAsState(if (chipRowState.canScrollBackward) 1f else 0f)
                 val chipTailFade by animateFloatAsState(if (chipRowState.canScrollForward) 1f else 0f)
-                LazyRow(
-                    state = chipRowState,
+                Row(
                     modifier =
                         Modifier
                             .fillMaxHeight()
-                            .chipStripEdgeFades(32.dp, start = { chipHeadFade }, end = { chipTailFade }),
+                            .chipStripEdgeFades(32.dp, start = { chipHeadFade }, end = { chipTailFade })
+                            .horizontalScroll(chipRowState),
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    // LazyRow(UI-CR-15):配合上面的 LaunchedEffect 保证程序性变化后选中项滚入
-                    // 视野;rememberLazyListState 同样 saveable,切页返回保留滚动位置。
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    items(visibleLibraryChips, key = { it }) { type ->
+                    visibleLibraryChips.forEach { type ->
                         Chip(
                             isAnimated = false,
                             isSelected = type == currentFilter,
@@ -768,6 +792,7 @@ fun LibraryScreen(
                 },
             )
         }
+    }
     }
 }
 
