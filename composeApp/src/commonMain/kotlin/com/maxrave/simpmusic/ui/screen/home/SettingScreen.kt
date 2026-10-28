@@ -1341,57 +1341,6 @@ fun SettingScreen(
                     },
                 )
                 SettingItem(
-                    title = stringResource(Res.string.auto_download_liked_songs),
-                    subtitle = stringResource(Res.string.auto_download_liked_songs_description),
-                    smallSubtitle = true,
-                    switch = (autoDownloadLikedSongs to { viewModel.setAutoDownloadLikedSongs(it) }),
-                )
-                // Smart downloads are Android only.
-                if (getPlatform() == Platform.Android) {
-                    SettingItem(
-                        title = stringResource(Res.string.smart_downloads),
-                        subtitle =
-                            stringResource(
-                                if (localTrackingEnabled) {
-                                    Res.string.smart_downloads_description
-                                } else {
-                                    Res.string.smart_downloads_needs_local_tracking
-                                },
-                            ),
-                        smallSubtitle = true,
-                        switch = (smartDownloadsEnabled to { viewModel.setSmartDownloadsEnabled(it) }),
-                        // Songs are picked from local tracking, so it gates switching on. Switching off
-                        // stays possible without it, or the downloaded songs could not be cleared.
-                        isEnable = localTrackingEnabled || smartDownloadsEnabled,
-                    )
-                    if (smartDownloadsEnabled) {
-                        SettingItem(
-                            title = stringResource(Res.string.smart_downloads_size),
-                            subtitle = stringResource(Res.string.smart_downloads_size_value, smartDownloadsCount),
-                            smallSubtitle = true,
-                            onClick = {
-                                viewModel.setAlertData(
-                                    SettingAlertState(
-                                        title = runBlocking { getString(Res.string.smart_downloads_size) },
-                                        selectOne =
-                                            SettingAlertState.SelectData(
-                                                listSelect =
-                                                    listOf(25, 50, 100).map { count ->
-                                                        (count == smartDownloadsCount) to count.toString()
-                                                    },
-                                            ),
-                                        confirm =
-                                            runBlocking { getString(Res.string.change) } to { state ->
-                                                state.selectOne?.getSelected()?.toIntOrNull()?.let { viewModel.setSmartDownloadsCount(it) }
-                                            },
-                                        dismiss = runBlocking { getString(Res.string.cancel) },
-                                    ),
-                                )
-                            },
-                        )
-                    }
-                }
-                SettingItem(
                     title = stringResource(Res.string.play_video_for_video_track_instead_of_audio_only),
                     subtitle = stringResource(Res.string.such_as_music_video_lyrics_video_podcasts_and_more),
                     smallSubtitle = true,
@@ -2644,6 +2593,51 @@ fun SettingScreen(
                     smallSubtitle = true,
                     switch = (autoDownloadLikedSongs to { viewModel.setAutoDownloadLikedSongs(it) }),
                 )
+                // Smart downloads are Android only.
+                if (getPlatform() == Platform.Android) {
+                    SettingItem(
+                        title = stringResource(Res.string.smart_downloads),
+                        subtitle =
+                            stringResource(
+                                if (localTrackingEnabled) {
+                                    Res.string.smart_downloads_description
+                                } else {
+                                    Res.string.smart_downloads_needs_local_tracking
+                                },
+                            ),
+                        smallSubtitle = true,
+                        switch = (smartDownloadsEnabled to { viewModel.setSmartDownloadsEnabled(it) }),
+                        // Songs are picked from local tracking, so it gates switching on. Switching off
+                        // stays possible without it, or the downloaded songs could not be cleared.
+                        isEnable = localTrackingEnabled || smartDownloadsEnabled,
+                    )
+                    if (smartDownloadsEnabled) {
+                        SettingItem(
+                            title = stringResource(Res.string.smart_downloads_size),
+                            subtitle = stringResource(Res.string.smart_downloads_size_value, smartDownloadsCount),
+                            smallSubtitle = true,
+                            onClick = {
+                                viewModel.setAlertData(
+                                    SettingAlertState(
+                                        title = runBlocking { getString(Res.string.smart_downloads_size) },
+                                        selectOne =
+                                            SettingAlertState.SelectData(
+                                                listSelect =
+                                                    listOf(25, 50, 100).map { count ->
+                                                        (count == smartDownloadsCount) to count.toString()
+                                                    },
+                                            ),
+                                        confirm =
+                                            runBlocking { getString(Res.string.change) } to { state ->
+                                                state.selectOne?.getSelected()?.toIntOrNull()?.let { viewModel.setSmartDownloadsCount(it) }
+                                            },
+                                        dismiss = runBlocking { getString(Res.string.cancel) },
+                                    ),
+                                )
+                            },
+                        )
+                    }
+                }
                 SettingItem(
                     // 原"已下载缓存"(存储分区):文件式后 SimpleCache 只是转存前的临时
                     // 落点,大小恒近 0,缓存语义已死——改造为一键全删(动作本就是
