@@ -26,6 +26,8 @@ import simpmusic.composeapp.generated.resources.log_in_to_netease
 import simpmusic.composeapp.generated.resources.log_in
 import simpmusic.composeapp.generated.resources.notification
 import com.maxrave.simpmusic.ui.theme.LocalLiquidGlassEnabled
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.animation.AnimatedVisibility
@@ -76,6 +78,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.coerceAtLeast
@@ -254,6 +257,11 @@ fun LibraryScreen(
 
     // 主页同构:普通 Row+horizontalScroll(LazyRow 的 item 垂直顶对齐会让 chips 偏上 ~8dp)
     val chipRowState = rememberScrollState()
+    // 选中项滚入视野用实测几何(CR P2:固定 120dp/320dp 估算在窄屏/长文案下会把屏外
+    // 选中项误判为可见——深链/登录态回落路径可触发):chip 在行内的真实起点与宽度,
+    // 以及 chips 行视口的真实宽度,onGloballyPositioned 回填。
+    val chipMeasured = remember { mutableStateMapOf<LibraryChipType, Long>() } // type -> start shl32 or width
+    var chipViewportPx by remember { mutableIntStateOf(0) }
     val currentFilter by viewModel.currentScreen.collectAsStateWithLifecycle()
     // 2026-10-28 顶栏改主页式常驻(头像+chips 一行,滚走只剩模糊条):高度恒定,
     // 收起/展开机制(标题行显隐/500ms 静默窗/回放/双轨高度)整体退役——高度不变
@@ -335,19 +343,19 @@ fun LibraryScreen(
     // 选中 chip 必须可见(UI-CR-15):程序性变化(回落弹回/切源/登出重定向/深滚动位恢复)
     // 之后把选中项滚入视野——完全可见时不动,避免与用户手点可见 chip 的滚动打架。
     // 可见性也作 key:chip 集合增删会让同一选中项的 index 平移(如网易两 chip 插到前面)。
-    LaunchedEffect(currentFilter, neteaseChipsVisible, ytChipsVisible) {
-        // ScrollState 近似判定:累计宽度估 index 偏移,不在视口内才滚入(语义同 UI-CR-15)
-        val index = visibleLibraryChips.indexOf(currentFilter)
-        if (index >= 0) {
-            val widthPxPerChip = with(density) { 120.dp.toPx() }
-            val itemStart = index * widthPxPerChip
-            val viewportStart = chipRowState.value.toFloat()
-            val viewportEnd = viewportStart + with(density) { 320.dp.toPx() }
-            if (itemStart < viewportStart || itemStart > viewportEnd) {
-                chipRowState.animateScrollTo(
-                    (itemStart - widthPxPerChip).coerceAtLeast(0f).roundToInt(),
-                )
-            }
+    LaunchedEffect(currentFilter, neteaseChipsVisible, ytChipsVisible, chipMeasured.toMap()) {
+        // 实测几何判定(CR P2):选中 chip 的真实起止不在真实视口内才滚入;留 16dp 前导
+        // 防止贴边。完全可见时不动,避免与用户手点可见 chip 的滚动打架。
+        val measured = chipMeasured[currentFilter] ?: return@LaunchedEffect
+        val itemStart = (measured shr 32).toInt()
+        val itemEnd = itemStart + (measured and 0xffffffffL).toInt()
+        val viewportStart = chipRowState.value
+        val viewportEnd = viewportStart + chipViewportPx
+        if (itemStart < viewportStart || itemEnd > viewportEnd) {
+            val leading = with(density) { 16.dp.toPx().roundToInt() }
+            chipRowState.animateScrollTo(
+                (itemStart - leading).coerceIn(0, chipRowState.maxValue),
+            )
         }
     }
 
@@ -660,13 +668,16 @@ fun LibraryScreen(
             Box(Modifier.padding(start = 16.dp, end = 8.dp)) {
                 LibraryAccountButton(
                     thumbnailUrl = accountThumbnail,
+                    neteaseLoggedIn = neteaseLoggedIn,
+                    youtubeLoggedIn = loggedIn,
                     navController = navController,
                 )
             }
             BoxWithConstraints(
                 Modifier
                     .weight(1f)
-                    .fillMaxHeight(),
+                    .fillMaxHeight()
+                    .onGloballyPositioned { chipViewportPx = it.size.width },
             ) {
                 val chipHeadFade by animateFloatAsState(if (chipRowState.canScrollBackward) 1f else 0f)
                 val chipTailFade by animateFloatAsState(if (chipRowState.canScrollForward) 1f else 0f)
@@ -680,6 +691,13 @@ fun LibraryScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     visibleLibraryChips.forEach { type ->
+                        Box(
+                            Modifier.onGloballyPositioned { coords ->
+                                chipMeasured[type] =
+                                    (coords.positionInParent().x.roundToInt().toLong() shl 32) or
+                                        coords.size.width.toLong()
+                            },
+                        ) {
                         Chip(
                             isAnimated = false,
                             isSelected = type == currentFilter,
@@ -700,6 +718,7 @@ fun LibraryScreen(
                             backdrop = chipBackdrop,
                         ) {
                             viewModel.setCurrentScreen(type)
+                        }
                         }
                     }
                 }
@@ -800,13 +819,17 @@ fun LibraryScreen(
 @Composable
 private fun LibraryAccountButton(
     thumbnailUrl: String?,
+    // 登录态用真实流判定(CR P2:头像 URL 判定在无头像账号/头像未加载时会把已登录
+    // 误判成未登录,菜单错误显示登录按钮)
+    neteaseLoggedIn: Boolean,
+    youtubeLoggedIn: Boolean,
     navController: NavController,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     val sharedViewModel: com.maxrave.simpmusic.viewModel.SharedViewModel = koinInject()
     val isNeteaseSource by sharedViewModel.selectedSource
         .collectAsStateWithLifecycle(initialValue = com.maxrave.domain.source.MusicSource.YOUTUBE_MUSIC.name)
-    val signedIn = !thumbnailUrl.isNullOrBlank()
+    val signedIn = if (isNeteaseSource == com.maxrave.domain.source.MusicSource.NETEASE.name) neteaseLoggedIn else youtubeLoggedIn
     Box {
         com.maxrave.simpmusic.ui.screen.home.AccountAvatar(
             signedIn = signedIn,

@@ -999,7 +999,10 @@ private fun NeteaseHomeAccountButton(
     navController: NavController,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
-    val signedIn = accountInfo?.second?.isNotBlank() == true
+    // 登录态用真流(CR P2):头像 URL 判定在无头像账号/头像未回填时误显示登录按钮
+    val sharedVm: com.maxrave.simpmusic.viewModel.SharedViewModel = koinInject()
+    val neteaseLoggedIn by sharedVm.neteaseLoggedIn.collectAsStateWithLifecycle()
+    val signedIn = neteaseLoggedIn
     val displayName = accountInfo?.first?.takeIf { it.isNotBlank() } ?: stringResource(Res.string.guest)
     val hour = remember { now().time.hour }
     val greeting =
