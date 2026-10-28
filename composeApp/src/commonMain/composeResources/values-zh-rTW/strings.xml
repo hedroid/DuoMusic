@@ -1281,4 +1281,5 @@
     <string name="search_in_your_library">在媒體庫中搜尋</string>
     <string name="collapse_your_library">收合媒體庫</string>
     <string name="expand_your_library">展開媒體庫</string>
+    <string name="category">分類</string>
 </resources>

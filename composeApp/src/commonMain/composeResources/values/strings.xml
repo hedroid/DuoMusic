@@ -1364,4 +1364,5 @@
     <string name="search_in_your_library">Search in Your library</string>
     <string name="collapse_your_library">Collapse Your library</string>
     <string name="expand_your_library">Expand Your library</string>
+    <string name="category">Category</string>
 </resources>

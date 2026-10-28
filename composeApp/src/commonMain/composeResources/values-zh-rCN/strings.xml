@@ -1326,4 +1326,5 @@
     <string name="search_in_your_library">在媒体库中搜索</string>
     <string name="collapse_your_library">收起媒体库</string>
     <string name="expand_your_library">展开媒体库</string>
+    <string name="category">分类</string>
 </resources>

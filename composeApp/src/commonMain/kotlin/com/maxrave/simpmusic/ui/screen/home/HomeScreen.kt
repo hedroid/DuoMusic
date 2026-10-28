@@ -977,7 +977,7 @@ fun HomeScreen(
  * reads as running on rather than cut off. [start] and [end] ease each fade in and out and are read
  * at draw time. Smoothstep, like every fade in the app: a linear ramp shows a line where it begins.
  */
-private fun Modifier.chipStripEdgeFades(
+internal fun Modifier.chipStripEdgeFades(
     width: Dp,
     start: () -> Float,
     end: () -> Float,

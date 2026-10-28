@@ -1,5 +1,9 @@
 package com.maxrave.simpmusic.ui.screen.home
 
+import androidx.compose.animation.core.animateFloatAsState
+import com.maxrave.simpmusic.ui.component.ExpandableChip
+import simpmusic.composeapp.generated.resources.category
+import androidx.compose.runtime.saveable.rememberSaveable
 import com.maxrave.simpmusic.expect.ui.rememberBackdrop
 import com.maxrave.simpmusic.extension.ultraThinBarStyle
 import dev.chrisbanes.haze.HazeInput
@@ -173,9 +177,12 @@ fun NeteaseHomeScreen(
     scrollState.scrollReportingEffect(onScrolling)
     // 顶栏标题行显隐仍用方向态(上游同款;只管标题不管底栏上报)
     val pullToRefreshState = rememberPullToRefreshState()
-    val chipRowState = rememberScrollState()
     // 头部对齐 YT 主页玻璃形态(2026-10-28):页面内容=玻璃源,悬浮行(chips/药丸)是
     // 兄弟层折射;滚走后顶栏 hazeBlur 模糊条淡入(与 YT 一字不差同款)
+    // 分类收起/展开(YT 的 Mood chip 同款形态):选中后折叠显示所选分类
+    var categoriesExpanded by rememberSaveable { mutableStateOf(false) }
+    var selectedTagIndex by rememberSaveable { mutableStateOf<Int?>(null) }
+    val chipRowState = rememberScrollState()
     val hazeState = rememberHazeState()
     val chipBackdrop = rememberBackdrop(MaterialTheme.colorScheme.background)
     var topAppBarHeightPx by remember { mutableIntStateOf(0) }
@@ -302,40 +309,58 @@ fun NeteaseHomeScreen(
                 // 头部跟随上游 YT 主页新设计(2026-10-27):头像菜单+chips+Create 药丸常驻一行;
                 // 通知入头像菜单、设置在药丸齿轮——网易主页自此有通知与设置入口(旧不对称消除)
                 Row(
+                    // 头部行几何与 YT 主页逐字段对齐(2026-10-28):行高 56dp,头像盒
+                    // padding(start=16,end=8),"全部"钉在头像旁第一格,其余分类收进
+                    // ExpandableChip(展开选,选中后折叠显示所选),药丸在右
                     modifier =
                         Modifier
                             .fillMaxWidth()
                             .windowInsetsPadding(WindowInsets.statusBars)
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                            .height(56.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    NeteaseHomeAccountButton(
-                        accountInfo = accountInfo,
-                        navController = navController,
-                    )
+                    Box(Modifier.padding(start = 16.dp, end = 8.dp)) {
+                        NeteaseHomeAccountButton(
+                            accountInfo = accountInfo,
+                            navController = navController,
+                        )
+                    }
+                    // 展开的分类选项可能超宽:横向滚动+两端渐隐(YT 的 Mood 行同款)
+                    val chipHeadFade by animateFloatAsState(if (chipRowState.canScrollBackward) 1f else 0f)
+                    val chipTailFade by animateFloatAsState(if (chipRowState.canScrollForward) 1f else 0f)
                     Row(
                         modifier =
                             Modifier
                                 .weight(1f)
+                                .chipStripEdgeFades(32.dp, start = { chipHeadFade }, end = { chipTailFade })
                                 .horizontalScroll(chipRowState),
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Chip(
                             isAnimated = false,
-                            isSelected = false,
+                            isSelected = selectedTagIndex == null && !categoriesExpanded,
                             text = stringResource(Res.string.all),
                             backdrop = chipBackdrop,
-                        ) { }
-                        viewModel.chips.forEach { tag ->
-                            Chip(
-                                isAnimated = false,
-                                isSelected = false,
-                                text = tag,
-                                backdrop = chipBackdrop,
-                            ) {
-                                navController.navigate(NeteaseTagDestination(tag = tag))
-                            }
+                        ) {
+                            // 与 YT 的 All 同款语义:收起分类展开+清选中(回"全部"态)
+                            categoriesExpanded = false
+                            selectedTagIndex = null
                         }
+                        ExpandableChip(
+                            text = stringResource(Res.string.category),
+                            options = viewModel.chips,
+                            selectedIndex = selectedTagIndex,
+                            expanded = categoriesExpanded,
+                            onExpandedChange = { categoriesExpanded = it },
+                            onSelect = { index ->
+                                // YT 的 Mood chip 同款:选中即收起展开
+                                categoriesExpanded = false
+                                selectedTagIndex = index
+                                navController.navigate(NeteaseTagDestination(tag = viewModel.chips[index]))
+                            },
+                            backdrop = chipBackdrop,
+                        )
                     }
                     CreateActions(
                         backdrop = chipBackdrop,
