@@ -1189,4 +1189,7 @@
     <string name="app_log_settings_title">应用日志</string>
     <string name="app_log_settings_description">查看、筛选并导出应用日志</string>
     <string name="developer_option">开发者选项</string>
+    <string name="cached">已缓存</string>
+    <string name="remove_from_cache">移除缓存</string>
+    <string name="cached_empty_hint">还没有完整缓存的歌</string>
 </resources>

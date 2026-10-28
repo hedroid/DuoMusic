@@ -1210,4 +1210,7 @@
     <string name="app_log_settings_description">檢視、篩選並匯出應用程式記錄</string>
     <string name="developer_option">開發者選項</string>
     <string name="netease">網易雲音樂</string>
+    <string name="cached">已快取</string>
+    <string name="remove_from_cache">從快取移除</string>
+    <string name="cached_empty_hint">還沒有完整快取的歌</string>
 </resources>

@@ -97,6 +97,7 @@ import kotlinx.coroutines.runBlocking
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
+import simpmusic.composeapp.generated.resources.cached_empty_hint
 import simpmusic.composeapp.generated.resources.cached
 import simpmusic.composeapp.generated.resources.remove_from_cache
 import simpmusic.composeapp.generated.resources.n_songs_selected
@@ -425,7 +426,8 @@ fun DownloadedManagementBody(
             }
         }
         Box(modifier = Modifier.weight(1f)) {
-            if (tabRows.isEmpty()) {
+            // 已缓存 tab 有自己的空态与列表(tabRows 是'已完成'口径,不作数)
+            if (tabRows.isEmpty() && !isCachedTab) {
                     // 空态=恒在顶:切页不再统一复位标题,从收起态的深滚动页切到空页时
                     // 若不上报,标题会继承收起态且没有任何滚动事件可纠正(CR-31)
                     LaunchedEffect(Unit) { onScrolling(true) }
@@ -550,7 +552,7 @@ fun DownloadedManagementBody(
                                 if (cachedSongs.isEmpty()) {
                                     item(key = "cached-empty") {
                                         Text(
-                                            text = stringResource(Res.string.no_playlists_downloaded),
+                                            text = stringResource(Res.string.cached_empty_hint),
                                             style = typo().bodyMedium,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
