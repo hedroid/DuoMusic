@@ -63,6 +63,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
@@ -625,31 +626,78 @@ fun LazyGridState.isScrollingUp(): State<Boolean> {
 }
 
 /**
- * 库页各 chip 页的滚动上报效果(驱动顶栏标题行显隐 + App 底栏 isScrolledToTop)。
+ * 滚动方向翻转的净位移迟滞门(2026-10-28):库页/主页各列表底部的 footer+锁定 padding 是
+ * 双向可滚的"空滚动区",高密度真机上一次手指微抖就能产生 down→up→down 的连续方向翻转
+ * 信号,每次翻转驱动液态玻璃底栏 300ms 形变=迷你条/底栏"上下跳动"(用户真机反馈)。
+ * 两个具体病灶都能用它吸收:
+ * ①贴底微触:canScrollForward 在 snapshotFlow 外读,首帧陈旧 false 把"从最底开始的向上
+ *   微滚"硬判成下滚,下一帧纠正回上滚——一次触摸=收起+展开两个形变;
+ * ②撞底回吸(bae1c760 的 ⑧ 号护栏针对的场景):净位移 ~10px,远够不到阈值。
+ *
+ * 设计约束:不回到 3881e85f 的"门控上报"(吞报告把底栏卡死在上一个方向,544a7e99 推翻的
+ * 教训)——**同向上报全放行**(底栏即时跟随连续滚动),仅"方向翻转"需要自锚点累计净位移
+ * ≥阈值(跨 item 视为立即过阈,一行高度必超);抖动净位移归零永不翻转。消费方
+ * (isScrolledToTop/headerAtTop)按值去重,重复同向上报零副作用。
+ */
+private class ScrollDirectionGate(private val thresholdPx: Int) {
+    private var acceptedUp: Boolean? = null
+    private var anchorIndex = 0
+    private var anchorOffset = 0
+
+    fun report(index: Int, offset: Int, rawUp: Boolean): Boolean {
+        val current = acceptedUp
+        if (current == null || rawUp == current) {
+            acceptedUp = rawUp
+            anchorIndex = index
+            anchorOffset = offset
+            return rawUp
+        }
+        val netPx = if (index != anchorIndex) thresholdPx + 1 else abs(offset - anchorOffset)
+        if (netPx > thresholdPx) {
+            acceptedUp = rawUp
+            anchorIndex = index
+            anchorOffset = offset
+            return rawUp
+        }
+        // 反向未过阈:维持已接受方向(等效于吞掉这次翻转尝试)
+        return current
+    }
+}
+
+/** 方向翻转需要的净滚动位移:约一行封面的高度,真滚动一帧即过、手指抖动永远够不到。 */
+private val ScrollDirectionFlipThreshold = 20.dp
+
+/**
+ * 库页/主页各滚动页共用的上报效果(驱动顶栏"透明↔模糊条"状态 + App 底栏 isScrolledToTop)。
  *
  * 信号粒度=每次滚动位移(index+offset),方向内联计算,不用 index-only 流:贴底微调
  * 常落在同一 item 内(拿不到 index 变化=零上报,底栏/标题卡死在上一个方向),且
  * snapshotFlow 对 index 跳变做 conflated 后方向推导会读到陈旧 previous(2026-10-03
  * 实测"下滚后迷你条不再沉到导航行"两案)。防振荡不靠吞报告,靠切断几何燃料:各
  * chip 列表底部 padding 锁定展开态高度(见 LibraryScreen lockedBottomPadding),底栏
- * 形变不再改列表几何;下载页标题收展的残余反馈由 500ms 静默窗吞掉。index<=1 视作
- * 在顶(各页原口径)。深处保存态恢复时首帧 index==previous、offset 相等→上报 false
- * (收起),与 CR-30"深处首帧上报即 false=正确语义"一致。
+ * 形变不再改列表几何。index<=1 视作在顶(各页原口径,位置驱动不吃迟滞)。深处保存态
+ * 恢复时首帧 index==previous、offset 相等→上报 false(收起),与 CR-30"深处首帧上报
+ * 即 false=正确语义"一致。
  *
- * 边界防误判:fling 撞到列表末端被拦截时,最后一项的 offset 会被钳制值回吸
- * (数字逐帧递减,实测 105→96),逐帧比较把它读成"上滑"→上报 true→底栏刚收起又
- * 跳回展开(用户实测"快速滑到底部,迷你条先合并到导航栏然后自己又跳回去")。修:
- * canScrollForward=false(已到底)时 offset 回吸不判上滑——只在离底至少一行时才认
- * 同向边界的方向翻转;顶部对称处理(canScrollBackward=false 时 index<=1 分支已兜住)。
+ * 边界防误判三层:
+ * ①canScrollForward=false(已到底)时同项 offset 递减不判上滑——fling 撞到列表末端被
+ *   拦截时最后一项的 offset 会被钳制值回吸(逐帧递减,实测 105→96),裸读成"上滑"会让
+ *   底栏刚收起又跳回展开(bae1c760);
+ * ②方向翻转经 [ScrollDirectionGate] 净位移迟滞——贴底首帧 canScrollForward 陈旧值把
+ *   向上微滚误判成下滚、下一帧又纠正(2026-10-28 用户真机"很小的一个触摸触发迷你条/
+ *   底栏上下跳动"),以及一切快速连续翻转信号,净位移不够一律维持原方向;
+ * ③顶部对称处理由 index<=1 分支兜住(canScrollBackward=false 时必在 index<=1)。
  */
 @Composable
 fun LazyListState.scrollReportingEffect(onScrolling: (onTop: Boolean) -> Unit) {
+    val thresholdPx = with(LocalDensity.current) { ScrollDirectionFlipThreshold.toPx().toInt() }
     LaunchedEffect(this) {
+        val gate = ScrollDirectionGate(thresholdPx)
         var previousIndex = firstVisibleItemIndex
         var previousOffset = firstVisibleItemScrollOffset
         snapshotFlow { firstVisibleItemIndex to firstVisibleItemScrollOffset }
             .collect { (index, offset) ->
-                val up =
+                val rawUp =
                     if (index != previousIndex) {
                         index < previousIndex
                     } else if (!canScrollForward) {
@@ -661,9 +709,11 @@ fun LazyListState.scrollReportingEffect(onScrolling: (onTop: Boolean) -> Unit) {
                 previousIndex = index
                 previousOffset = offset
                 if (index <= 1) {
+                    // 位置驱动不吃迟滞;同步门内方向,离顶后首个反向不因陈旧锚点误判
+                    gate.report(index, offset, true)
                     onScrolling(true)
                 } else {
-                    onScrolling(up)
+                    onScrolling(gate.report(index, offset, rawUp))
                 }
             }
     }
@@ -671,12 +721,14 @@ fun LazyListState.scrollReportingEffect(onScrolling: (onTop: Boolean) -> Unit) {
 
 @Composable
 fun LazyGridState.scrollReportingEffect(onScrolling: (onTop: Boolean) -> Unit) {
+    val thresholdPx = with(LocalDensity.current) { ScrollDirectionFlipThreshold.toPx().toInt() }
     LaunchedEffect(this) {
+        val gate = ScrollDirectionGate(thresholdPx)
         var previousIndex = firstVisibleItemIndex
         var previousOffset = firstVisibleItemScrollOffset
         snapshotFlow { firstVisibleItemIndex to firstVisibleItemScrollOffset }
             .collect { (index, offset) ->
-                val up =
+                val rawUp =
                     if (index != previousIndex) {
                         index < previousIndex
                     } else if (!canScrollForward) {
@@ -688,9 +740,10 @@ fun LazyGridState.scrollReportingEffect(onScrolling: (onTop: Boolean) -> Unit) {
                 previousIndex = index
                 previousOffset = offset
                 if (index <= 1) {
+                    gate.report(index, offset, true)
                     onScrolling(true)
                 } else {
-                    onScrolling(up)
+                    onScrolling(gate.report(index, offset, rawUp))
                 }
             }
     }
