@@ -1,5 +1,7 @@
 package com.maxrave.simpmusic.ui.screen.library
 
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import com.maxrave.simpmusic.ui.icon.KeyboardArrowDown
@@ -705,84 +707,114 @@ fun LibraryScreen(
                         },
                     )
                 }
-                Crossfade(targetState = chipsExpanded, label = "libraryChips") { expanded ->
-                if (!expanded) {
-                    // 收缩态:当前标签(选中样式,点击=展开)+ 展开指示小钮;横滑也可展开
-                    Row(
-                        modifier =
-                            Modifier
-                                .fillMaxHeight()
-                                .pointerInput(Unit) {
+                // 主页同款单结构(2026-10-28):chips 组 + 一起听同住一条可滚行(SpaceBetween,
+                // widthIn(min=maxWidth))——收缩时一起听贴右缘,展开变宽把它推出右缘(视觉=让位
+                // 消失),左滑可滑回;展开动画=尺寸展开(ExpandableChip 同款语义),非 Crossfade 换壳
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxHeight()
+                            .pointerInput(chipsExpanded) {
+                                // 仅收缩态吃横滑(展开后让位给行滚动);key 在状态上,展开即拆监听
+                                if (!chipsExpanded) {
                                     detectHorizontalDragGestures(
                                         onHorizontalDrag = { change, _ ->
                                             change.consume()
                                             chipsExpanded = true
                                         },
                                     )
-                                },
+                                }
+                            }
+                            .chipStripEdgeFades(32.dp, start = { chipHeadFade }, end = { chipTailFade })
+                            .horizontalScroll(chipRowState)
+                            .widthIn(min = maxWidth)
+                            .padding(end = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Row(
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Chip(
-                            isAnimated = false,
-                            isSelected = true,
-                            text = chipLabel(currentFilter),
-                            backdrop = chipBackdrop,
-                        ) { chipsExpanded = true }
+                        // 当前标签常驻:点击=收/展切换
+                        Box(
+                            Modifier.onGloballyPositioned { coords ->
+                                chipMeasured[currentFilter] =
+                                    (coords.positionInParent().x.roundToInt().toLong() shl 32) or
+                                        coords.size.width.toLong()
+                            },
+                        ) {
+                            Chip(
+                                isAnimated = false,
+                                isSelected = true,
+                                text = chipLabel(currentFilter),
+                                backdrop = chipBackdrop,
+                            ) { chipsExpanded = !chipsExpanded }
+                        }
+                        // 展开指示:随状态旋转 180°(收=向下/展=向上),点击同切换
+                        val arrowRotation by animateFloatAsState(
+                            if (chipsExpanded) 180f else 0f,
+                            label = "libraryChipsArrow",
+                        )
                         Box(
                             modifier =
                                 Modifier
                                     .size(32.dp)
                                     .clip(CircleShape)
-                                    .clickable { chipsExpanded = true },
+                                    .clickable { chipsExpanded = !chipsExpanded },
                             contentAlignment = Alignment.Center,
                         ) {
                             Icon(
                                 imageVector = SimpIcons.KeyboardArrowDown,
                                 contentDescription = stringResource(Res.string.category),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(20.dp),
+                                modifier =
+                                    Modifier
+                                        .size(20.dp)
+                                        .graphicsLayer { rotationZ = arrowRotation },
                             )
                         }
-                    }
-                } else {
-                Row(
-                    modifier =
-                        Modifier
-                            .fillMaxHeight()
-                            .chipStripEdgeFades(32.dp, start = { chipHeadFade }, end = { chipTailFade })
-                            .horizontalScroll(chipRowState),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    visibleLibraryChips.forEach { type ->
-                        Box(
-                            Modifier.onGloballyPositioned { coords ->
-                                chipMeasured[type] =
-                                    (coords.positionInParent().x.roundToInt().toLong() shl 32) or
-                                        coords.size.width.toLong()
-                            },
+                        // 其余标签:内联尺寸展开/收起(主页 ExpandableChip 的三态单结构同款)
+                        AnimatedVisibility(
+                            visible = chipsExpanded,
+                            enter = expandHorizontally(tween(300)) + fadeIn(tween(300)),
+                            exit = shrinkHorizontally(tween(300)) + fadeOut(tween(300)),
                         ) {
-                        Chip(
-                            isAnimated = false,
-                            isSelected = type == currentFilter,
-                            text = chipLabel(type),
-                            backdrop = chipBackdrop,
-                        ) {
-                            // 展开态点任意标签(含当前=纯切换收起):选中并收缩回休息态
-                            viewModel.setCurrentScreen(type)
-                            chipsExpanded = false
-                        }
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                visibleLibraryChips
+                                    .filter { it != currentFilter }
+                                    .forEach { type ->
+                                        Box(
+                                            Modifier.onGloballyPositioned { coords ->
+                                                chipMeasured[type] =
+                                                    (coords.positionInParent().x.roundToInt().toLong() shl 32) or
+                                                        coords.size.width.toLong()
+                                            },
+                                        ) {
+                                            Chip(
+                                                isAnimated = false,
+                                                isSelected = false,
+                                                text = chipLabel(type),
+                                                backdrop = chipBackdrop,
+                                            ) {
+                                                viewModel.setCurrentScreen(type)
+                                                chipsExpanded = false
+                                            }
+                                        }
+                                    }
+                            }
                         }
                     }
+                    // 一起听骑行尾:收缩贴右缘;展开被推出(主页药丸同款)
+                    Box(Modifier.padding(start = 8.dp)) {
+                        ListenTogetherIconButton(
+                            contentDescription = stringResource(Res.string.listen_together),
+                        ) { navController.navigate(ListenTogetherDestination) }
+                    }
                 }
-                }
-                }
-            }
-            Box(Modifier.padding(start = 8.dp, end = 16.dp)) {
-                ListenTogetherIconButton(
-                    contentDescription = stringResource(Res.string.listen_together),
-                ) { navController.navigate(ListenTogetherDestination) }
             }
         }
         Spacer(Modifier.height(8.dp))
