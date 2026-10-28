@@ -624,17 +624,20 @@ fun LibraryScreen(
         // chips 行(滚动+渐隐)+ Listen Together。滚走后整个顶栏只剩这条模糊条。
         Box(Modifier.windowInsetsPadding(WindowInsets.statusBars))
         Row(
+            // 几何与主页逐字段一致:头像盒自带 start16/end8(=首 chip 距头像 8dp),
+            // 行本身不加横向 padding;尾部控件 start8/end16
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .height(56.dp)
-                    .padding(start = 16.dp, end = 8.dp),
+                    .height(56.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            LibraryAccountButton(
-                thumbnailUrl = accountThumbnail,
-                navController = navController,
-            )
+            Box(Modifier.padding(start = 16.dp, end = 8.dp)) {
+                LibraryAccountButton(
+                    thumbnailUrl = accountThumbnail,
+                    navController = navController,
+                )
+            }
             BoxWithConstraints(
                 Modifier
                     .weight(1f)
@@ -677,9 +680,11 @@ fun LibraryScreen(
                     }
                 }
             }
-            ListenTogetherIconButton(
-                contentDescription = stringResource(Res.string.listen_together),
-            ) { navController.navigate(ListenTogetherDestination) }
+            Box(Modifier.padding(start = 8.dp, end = 16.dp)) {
+                ListenTogetherIconButton(
+                    contentDescription = stringResource(Res.string.listen_together),
+                ) { navController.navigate(ListenTogetherDestination) }
+            }
         }
         Spacer(Modifier.height(8.dp))
         AnimatedVisibility(visible = selectionState.isActive) {
