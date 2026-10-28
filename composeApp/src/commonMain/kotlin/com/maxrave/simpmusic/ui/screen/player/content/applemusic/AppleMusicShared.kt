@@ -106,8 +106,6 @@ import com.maxrave.simpmusic.ui.icon.Repeat
 import com.maxrave.simpmusic.ui.icon.RepeatOne
 import com.maxrave.simpmusic.ui.icon.Shuffle
 import com.maxrave.simpmusic.ui.icon.SimpIcons
-import com.maxrave.simpmusic.ui.icon.Star
-import com.maxrave.simpmusic.ui.icon.StarBorder
 import com.maxrave.simpmusic.ui.icon.VolumeDown
 import com.maxrave.simpmusic.ui.icon.VolumeUp
 import com.maxrave.simpmusic.ui.screen.player.content.NowPlayingContentActions
@@ -377,7 +375,7 @@ internal fun AppleMusicGlyphButton(
 }
 
 /**
- * The ⊕ (YouTube-liked) / ☆ (favourite, with the heart-burst) / ⋯ (more sheet) trio — shared by
+ * The ⊕ (YouTube-liked) / ♡ (favourite heart, with the heart-burst) / ⋯ (more sheet) trio — shared by
  * the MAIN title row and the LYRICS/QUEUE compact header. Fires the heart-burst on the tap that
  * likes, never on state, matching every other style's like button.
  */
@@ -411,7 +409,9 @@ internal fun AppleMusicHeaderActions(
             ) {
                 Crossfade(targetState = state.controllerState.isLiked, label = "appleMusicFavorite") { liked ->
                     Icon(
-                        imageVector = if (liked) SimpIcons.Star else SimpIcons.StarBorder,
+                        // 心形收藏(2026-10-28 用户定案,弃 Apple Music 星形):与 M3E/经典
+                        // 两主题同款 Favorite/FavoriteBorder,红心爆裂动画本来就是心形
+                        imageVector = if (liked) SimpIcons.Favorite else SimpIcons.FavoriteBorder,
                         contentDescription = "",
                         tint = Color.White,
                         modifier = Modifier.size(32.dp),
