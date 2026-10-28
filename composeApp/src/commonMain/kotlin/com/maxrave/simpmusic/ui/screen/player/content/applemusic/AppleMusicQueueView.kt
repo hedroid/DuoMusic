@@ -84,6 +84,7 @@ import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import simpmusic.composeapp.generated.resources.Res
+import simpmusic.composeapp.generated.resources.radio_mix
 import simpmusic.composeapp.generated.resources.continue_playing
 import simpmusic.composeapp.generated.resources.endless_queue
 import simpmusic.composeapp.generated.resources.endless_queue_artist_radio_locked
@@ -368,7 +369,10 @@ internal fun AppleMusicQueueView(
                         Modifier
                             .align(Alignment.BottomEnd)
                             .padding(end = 20.dp, bottom = QUEUE_BOTTOM_FADE + 16.dp),
-                    contentDescription = stringResource(Res.string.now_playing),
+                    contentDescription =
+                        stringResource(
+                            if (state.screenData.isRadioQueue) Res.string.radio_mix else Res.string.now_playing,
+                        ),
                 )
             }
         }
@@ -513,9 +517,15 @@ private fun AppleMusicContinuePlayingHeader(
                     // endless label uses, mirroring the queue sheet's 队列 xx/YY.
                     text =
                         if (state.currentOrderIndex >= 0 && state.artworkQueue.isNotEmpty()) {
-                            "${stringResource(Res.string.now_playing)} ${state.currentOrderIndex + 1}/${state.artworkQueue.size}"
+                            "${
+                                stringResource(
+                                    if (state.screenData.isRadioQueue) Res.string.radio_mix else Res.string.now_playing,
+                                )
+                            } ${state.currentOrderIndex + 1}/${state.artworkQueue.size}"
                         } else {
-                            stringResource(Res.string.now_playing)
+                            stringResource(
+                                if (state.screenData.isRadioQueue) Res.string.radio_mix else Res.string.now_playing,
+                            )
                         },
                     style = typography.queueSectionSubtitle,
                 )

@@ -133,6 +133,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import org.jetbrains.compose.resources.stringResource
 import simpmusic.composeapp.generated.resources.Res
+import simpmusic.composeapp.generated.resources.radio_mix_upper
 import simpmusic.composeapp.generated.resources.audio_output
 import simpmusic.composeapp.generated.resources.crossfading
 import simpmusic.composeapp.generated.resources.now_playing_upper
@@ -378,7 +379,10 @@ private fun NowPlayingM3ExpressiveLayout(
                         verticalArrangement = Arrangement.Center,
                     ) {
                         Text(
-                            text = stringResource(Res.string.now_playing_upper),
+                            text =
+                                stringResource(
+                                    if (state.screenData.isRadioQueue) Res.string.radio_mix_upper else Res.string.now_playing_upper,
+                                ),
                             style = typo().bodyMedium,
                             color = Color.White,
                         )

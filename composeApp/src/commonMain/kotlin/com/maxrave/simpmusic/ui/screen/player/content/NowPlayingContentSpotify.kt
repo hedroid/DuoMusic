@@ -176,6 +176,7 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 import simpmusic.composeapp.generated.resources.Res
+import simpmusic.composeapp.generated.resources.radio_mix_upper
 import simpmusic.composeapp.generated.resources.artists
 import simpmusic.composeapp.generated.resources.audio_output
 import simpmusic.composeapp.generated.resources.crossfading
@@ -831,7 +832,10 @@ fun NowPlayingContentSpotify(
                             verticalArrangement = Arrangement.Center,
                         ) {
                             Text(
-                                text = stringResource(Res.string.now_playing_upper),
+                                text =
+                                    stringResource(
+                                        if (state.screenData.isRadioQueue) Res.string.radio_mix_upper else Res.string.now_playing_upper,
+                                    ),
                                 style = typo().bodyMedium,
                                 color = Color.White,
                             )

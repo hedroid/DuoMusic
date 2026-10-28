@@ -1,5 +1,6 @@
 package com.maxrave.simpmusic.ui.component
 
+import com.maxrave.simpmusic.extension.LeftToRight
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -61,7 +62,7 @@ fun PlayerControlLayout(
     activeColor: Color = seed,
     contentColor: Color = Color.White,
     onUIEvent: (UIEvent) -> Unit,
-) {
+) = LeftToRight {
     // TalkBack labels (UI-CR-07): the icons are the only content of their clickable boxes, so the
     // description belongs on the icon and merges up into the click target.
     val shuffleLabel = stringResource(Res.string.shuffle)
