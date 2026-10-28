@@ -643,13 +643,16 @@ fun LazyGridState.isScrollingUp(): State<Boolean> {
  * ——手指在两个列表项交界处 ±3px 来回蹭,firstVisibleItemIndex 逐次 ±1 跨界,首版会把
  * 每次跨界都当大位移、一个抖动周期接受两次翻转,迟滞门在 item 边界完全失效。正确量法=
  * **锚点项自己在视口里的主轴 offset 差**(visibleItemsInfo 里按 index 查):锚点项仍在
- * 视口内(边界抖动必然如此)时,它的 viewport offset 差就是跨 item 也精确的净位移;锚点项
- * 滚出视口=自锚点起至少一个视口高的真实大位移,才直接过阈。
+ * 视口内(边界抖动必然如此)时,它的 viewport offset 差就是跨 item 也精确的净位移。
+ * 锚点查不到时**不推定任何位移**(二轮 CR:锚点建在首个可见项上,天然贴视口上缘,
+ * 交界处剩 1px 可见时反向 1px 即离开可见区,"滚出视口≥一视口高"的前提对它不成立;
+ * 数据变更 index 失效/状态恢复同样会查不到)——原地重锚维持当前方向,后续真实位移
+ * 决定翻转,代价仅极端快 fling 的翻转晚一帧。
  */
 internal class ScrollDirectionGate(private val thresholdPx: Int) {
     private var acceptedUp: Boolean? = null
 
-    /** 锚点项号;-1=锚点无效(建锚时查不到视口信息),翻转尝试只能放行(无更好信息) */
+    /** 锚点项号;-1=锚点无效(建锚时查不到视口信息),下个翻转尝试会先无信息重锚 */
     private var anchorIndex = -1
 
     /** 锚点建立时锚点项的视口内主轴 offset */
@@ -669,14 +672,13 @@ internal class ScrollDirectionGate(private val thresholdPx: Int) {
             return rawUp
         }
         val anchorNow = if (anchorIndex >= 0) viewportOffsetOf(anchorIndex) else null
-        val netPx =
-            if (anchorNow == null) {
-                // 锚点项已滚出视口/锚点无效:真实大位移(≥一视口)或无信息,直接过阈
-                thresholdPx + 1
-            } else {
-                abs(anchorViewportOffset - anchorNow)
-            }
-        if (netPx > thresholdPx) {
+        if (anchorNow == null) {
+            // 锚点不可查=无位移信息(不推定大位移,见类注释):原地重锚维持方向,
+            // 后续帧从新锚点量净位移,真实反向滚动照常过阈翻转
+            reanchor(index, viewportOffsetOf)
+            return current
+        }
+        if (abs(anchorViewportOffset - anchorNow) > thresholdPx) {
             acceptedUp = rawUp
             reanchor(index, viewportOffsetOf)
             return rawUp

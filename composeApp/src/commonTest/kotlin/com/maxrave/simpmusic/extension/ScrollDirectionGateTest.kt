@@ -77,13 +77,20 @@ class ScrollDirectionGateTest {
     }
 
     @Test
-    fun 锚点项滚出视口_大位移直接过阈() {
+    fun 锚点不可查不推定位移_维持方向后由真实位移决定() {
         val gate = ScrollDirectionGate(thresholdPx = 52)
         val vp = FakeViewport(10 to 500, 11 to 700)
         assertTrue(gate.report(10, vp::lookup, rawUp = true))
-        // 快速 fling:锚点项10 已不在视口(净位移≥一视口)
+        // 锚点项 10 查不到(首个可见项贴边 1px 被推出视口/数据变更 index 失效):
+        // 不推定大位移,维持上滚方向,原地重锚到当前首可见项 14@300
         vp.moveTo(14 to 300, 15 to 500)
-        assertFalse(gate.report(14, vp::lookup, rawUp = false), "锚点滚出视口应视为真实大位移")
+        assertTrue(
+            gate.report(14, vp::lookup, rawUp = false),
+            "锚点不可查=无位移信息,不应直接接受翻转(二轮 CR:首可见项贴边 1px 即离开视口)",
+        )
+        // 随后真实下滚从新锚点量净位移:14@300→14@200(100>52)过阈翻转
+        vp.moveTo(14 to 200, 15 to 400)
+        assertFalse(gate.report(14, vp::lookup, rawUp = false), "重锚后的真实反向位移应照常过阈")
     }
 
     @Test
