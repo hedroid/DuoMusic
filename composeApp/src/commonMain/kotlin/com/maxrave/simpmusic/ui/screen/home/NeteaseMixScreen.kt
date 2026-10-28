@@ -1,5 +1,7 @@
 package com.maxrave.simpmusic.ui.screen.home
 
+import com.maxrave.simpmusic.ui.component.rememberCardHover
+import com.maxrave.simpmusic.ui.component.hoverZoom
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
@@ -646,7 +648,9 @@ private fun SectionHeader(title: String) {
 }
 
 /** 宽窗口(平板/桌面)hero 轮播阈值:与 YTM 主页 HomeDiscoverSection 同款 */
-private const val DAILY_WIDE_LAYOUT_MIN_DP = 600
+// 大卡目标宽(上游 9dbef7a0 同款移植):固定而非行宽份额——宽行放下更多张标准大卡,
+// 而不是把同样两张拉宽;手机窄于两倍目标宽时仍是一张大卡+两侧窄邻卡
+private val DAILY_HERO_TARGET_WIDTH = 360.dp
 
 /** 每日推荐/私人雷达共用 hero 轮播(YTM"每日发现"HomeDiscoverSection 同款):一张大卡
  *  居中+窄邻卡,卡上叠歌名/艺人;点邻卡=带回中间,点中间卡=从该曲整队起播,头部
@@ -664,6 +668,8 @@ internal fun NeteaseDailySection(
 ) {
     val state = rememberCarouselState { contents.size }
     val scope = rememberCoroutineScope()
+    // hover 缩放(上游 9dbef7a0 同款,桌面鼠标):封面在自身框内放大,不出框
+    val (hoverModifier, hovered) = rememberCardHover(enabled = true)
     Column(Modifier.padding(horizontal = 15.dp)) {
         // 头部走 ShelfTitleRow(分区可见即有数据=播放全部的显示语义,与 YTM playAllEndpoint
         // 数据驱动同构;按钮色维持本页原 onSurface)
@@ -675,8 +681,9 @@ internal fun NeteaseDailySection(
             onPlayAll = onPlayAll,
         )
         BoxWithConstraints(Modifier.fillMaxWidth()) {
-            val wide = maxWidth >= DAILY_WIDE_LAYOUT_MIN_DP.dp
-            val heroWidth = maxWidth * (if (wide) 0.6f else 0.74f)
+            // 上游同款:窄于两倍目标宽=手机形态一张大卡;宽行由轮播按目标宽自动排更多张
+            val heroWidth = (maxWidth * 0.74f).coerceAtMost(DAILY_HERO_TARGET_WIDTH)
+            val wide = maxWidth >= 600.dp
             HorizontalCenteredHeroCarousel(
                 state = state,
                 maxItemWidth = heroWidth,
@@ -685,7 +692,7 @@ internal fun NeteaseDailySection(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .height(if (wide) 400.dp else heroWidth * 1.1f),
+                        .height(320.dp),
             ) { index ->
                 val song = contents[index]
                 val info = carouselItemDrawInfo
@@ -697,13 +704,14 @@ internal fun NeteaseDailySection(
                     Modifier
                         .fillMaxSize()
                         .maskClip(RoundedCornerShape(28.dp))
+                        .then(hoverModifier)
                         .clickable { play() },
                 ) {
                     AsyncImage(
                         model = song.thumbnails.lastOrNull()?.url,
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier.fillMaxSize().hoverZoom(hovered),
                     )
                     Box(
                         Modifier
