@@ -138,7 +138,7 @@
     <string name="prefer_320kbps_stream">建議使用 320kbps 碼率的音訊串流</string>
     <string name="prefer_320kbps_stream_description">自動搜尋網路上可用的 320kbps 音訊串流。如果找不到，則回退到預設音質。</string>
     <string name="download_quality">下載音質</string>
-    <string name="video_download_quality">影片畫質</string>
+    <string name="video_download_quality">下載影片畫質</string>
     <string name="clear_downloaded_cache">清除下載快取</string>
     <string name="clear_thumbnail_cache">清除縮圖快取</string>
     <string name="add">加入</string>
@@ -490,7 +490,7 @@
     <string name="such_as_music_video_lyrics_video_podcasts_and_more">例如音樂影片、歌詞影片、Podcast 等等</string>
     <string name="radio_audio_only">在電台中播放歌曲而非影片</string>
     <string name="radio_audio_only_description">在有可用的音樂供播放時，播放它而非播放 MV。同時跳過只存在於影片的 Remix 與混音。這不會影響到播放清單與專輯</string>
-    <string name="video_quality">影片畫質</string>
+    <string name="video_quality">線上影片畫質</string>
     <plurals name="n_song">
         <item quantity="other">%d 首歌曲</item>
     </plurals>
