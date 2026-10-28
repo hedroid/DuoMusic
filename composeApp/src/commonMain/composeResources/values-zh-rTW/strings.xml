@@ -490,7 +490,7 @@
     <string name="such_as_music_video_lyrics_video_podcasts_and_more">例如音樂影片、歌詞影片、Podcast 等等</string>
     <string name="radio_audio_only">在電台中播放歌曲而非影片</string>
     <string name="radio_audio_only_description">在有可用的音樂供播放時，播放它而非播放 MV。同時跳過只存在於影片的 Remix 與混音。這不會影響到播放清單與專輯</string>
-    <string name="video_quality">線上影片畫質</string>
+    <string name="video_quality">影片畫質</string>
     <plurals name="n_song">
         <item quantity="other">%d 首歌曲</item>
     </plurals>
