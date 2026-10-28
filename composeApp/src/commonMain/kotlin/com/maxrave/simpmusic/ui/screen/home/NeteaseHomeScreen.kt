@@ -1,5 +1,10 @@
 package com.maxrave.simpmusic.ui.screen.home
 
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxHeight
+import com.maxrave.simpmusic.getPlatform
+import com.maxrave.simpmusic.Platform
+import com.maxrave.simpmusic.extension.getScreenSizeInfo
 import androidx.compose.animation.core.animateFloatAsState
 import com.maxrave.simpmusic.ui.component.ExpandableChip
 import simpmusic.composeapp.generated.resources.category
@@ -325,48 +330,71 @@ fun NeteaseHomeScreen(
                             navController = navController,
                         )
                     }
-                    // 展开的分类选项可能超宽:横向滚动+两端渐隐(YT 的 Mood 行同款)
-                    val chipHeadFade by animateFloatAsState(if (chipRowState.canScrollBackward) 1f else 0f)
-                    val chipTailFade by animateFloatAsState(if (chipRowState.canScrollForward) 1f else 0f)
-                    Row(
-                        modifier =
-                            Modifier
-                                .weight(1f)
-                                .chipStripEdgeFades(32.dp, start = { chipHeadFade }, end = { chipTailFade })
-                                .horizontalScroll(chipRowState),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Chip(
-                            isAnimated = false,
-                            isSelected = selectedTagIndex == null && !categoriesExpanded,
-                            text = stringResource(Res.string.all),
+                    // 竖屏:Create 药丸骑在 chips 行尾(YT 同款)——分类展开变宽时药丸被
+                    // 推出右缘而不是从它底下滑过,视觉=展开让位;横屏/桌面药丸钉死右缘。
+                    val createPinned = getPlatform() == Platform.Desktop || getScreenSizeInfo().let { it.wDP >= it.hDP }
+                    val createActions: @Composable () -> Unit = {
+                        CreateActions(
                             backdrop = chipBackdrop,
-                        ) {
-                            // 与 YT 的 All 同款语义:收起分类展开+清选中(回"全部"态)
-                            categoriesExpanded = false
-                            selectedTagIndex = null
-                        }
-                        ExpandableChip(
-                            text = stringResource(Res.string.category),
-                            options = viewModel.chips,
-                            selectedIndex = selectedTagIndex,
-                            expanded = categoriesExpanded,
-                            onExpandedChange = { categoriesExpanded = it },
-                            onSelect = { index ->
-                                // YT 的 Mood chip 同款:选中即收起展开
-                                categoriesExpanded = false
-                                selectedTagIndex = index
-                                navController.navigate(NeteaseTagDestination(tag = viewModel.chips[index]))
-                            },
-                            backdrop = chipBackdrop,
+                            navController = navController,
+                            onSettings = { navController.navigate(SettingsDestination) },
                         )
                     }
-                    CreateActions(
-                        backdrop = chipBackdrop,
-                        navController = navController,
-                        onSettings = { navController.navigate(SettingsDestination) },
-                    )
+                    BoxWithConstraints(
+                        Modifier
+                            .weight(1f)
+                            .fillMaxHeight(),
+                    ) {
+                        val chipHeadFade by animateFloatAsState(if (chipRowState.canScrollBackward) 1f else 0f)
+                        val chipTailFade by animateFloatAsState(if (chipRowState.canScrollForward) 1f else 0f)
+                        Row(
+                            modifier =
+                                Modifier
+                                    .fillMaxHeight()
+                                    .chipStripEdgeFades(32.dp, start = { chipHeadFade }, end = { chipTailFade })
+                                    .horizontalScroll(chipRowState)
+                                    .widthIn(min = maxWidth)
+                                    .padding(end = if (createPinned) 0.dp else 16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Chip(
+                                    isAnimated = false,
+                                    isSelected = selectedTagIndex == null && !categoriesExpanded,
+                                    text = stringResource(Res.string.all),
+                                    backdrop = chipBackdrop,
+                                ) {
+                                    // 与 YT 的 All 同款语义:收起分类展开+清选中(回"全部"态)
+                                    categoriesExpanded = false
+                                    selectedTagIndex = null
+                                }
+                                ExpandableChip(
+                                    text = stringResource(Res.string.category),
+                                    options = viewModel.chips,
+                                    selectedIndex = selectedTagIndex,
+                                    expanded = categoriesExpanded,
+                                    onExpandedChange = { categoriesExpanded = it },
+                                    onSelect = { index ->
+                                        // YT 的 Mood chip 同款:选中即收起展开
+                                        categoriesExpanded = false
+                                        selectedTagIndex = index
+                                        navController.navigate(NeteaseTagDestination(tag = viewModel.chips[index]))
+                                    },
+                                    backdrop = chipBackdrop,
+                                )
+                            }
+                            if (!createPinned) {
+                                Box(Modifier.padding(start = 8.dp)) { createActions() }
+                            }
+                        }
+                    }
+                    if (createPinned) {
+                        Box(Modifier.padding(start = 8.dp, end = 16.dp)) { createActions() }
+                    }
                 }
             }
         }
