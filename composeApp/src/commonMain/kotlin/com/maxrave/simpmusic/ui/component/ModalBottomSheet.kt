@@ -242,6 +242,7 @@ import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import simpmusic.composeapp.generated.resources.Res
+import simpmusic.composeapp.generated.resources.download_disabled_live
 import simpmusic.composeapp.generated.resources.search
 import simpmusic.composeapp.generated.resources.netease_action_failed
 import simpmusic.composeapp.generated.resources.comment_label
@@ -2541,6 +2542,10 @@ fun NowPlayingBottomSheet(
                             uiState.songUIState.videoType != "MUSIC_VIDEO_TYPE_ATV"
                     // 网易 MV(媒体 id=NETEASE_MV_ 哨兵):非歌曲实体——下载/电台/加歌单/
                     // 歌词供应商等歌曲语义的行全部不适用,专属行见"下载 MV"
+// LIVE 直播流(上游 2.4.0):已下载/下载中的直播不可删直播标记,仅未下载态锁行
+                    val downloadBlockedAsLive =
+                        uiState.songUIState.isLive &&
+                            uiState.songUIState.downloadState == DownloadState.STATE_NOT_DOWNLOADED
                     if (!isPodcastEpisode && !isRealVideoSong && !isNeteaseMvSong) ActionButton(
                         icon =
                             when (uiState.songUIState.downloadState) {
@@ -2559,13 +2564,19 @@ fun NowPlayingBottomSheet(
                                 Color.Unspecified
                             },
                         text =
-                            when (uiState.songUIState.downloadState) {
-                                DownloadState.STATE_NOT_DOWNLOADED -> Res.string.download
-                                DownloadState.STATE_DOWNLOADING -> Res.string.downloading
-                                DownloadState.STATE_DOWNLOADED -> Res.string.downloaded
-                                DownloadState.STATE_PREPARING -> Res.string.downloading
-                                else -> Res.string.download
+                            // LIVE 直播流不可下载:行内文案+置灰提前告知(执行层 DownloadUtils 还有拒载兜底)
+                            if (downloadBlockedAsLive) {
+                                Res.string.download_disabled_live
+                            } else {
+                                when (uiState.songUIState.downloadState) {
+                                    DownloadState.STATE_NOT_DOWNLOADED -> Res.string.download
+                                    DownloadState.STATE_DOWNLOADING -> Res.string.downloading
+                                    DownloadState.STATE_DOWNLOADED -> Res.string.downloaded
+                                    DownloadState.STATE_PREPARING -> Res.string.downloading
+                                    else -> Res.string.download
+                                }
                             },
+                        enable = !downloadBlockedAsLive,
                     ) {
                         // Removing or cancelling throws away a finished/progressing download, so
                         // both get a confirmation; only starting a download stays immediate.
