@@ -1,5 +1,24 @@
 package com.maxrave.simpmusic.ui.screen.library
 
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.Alignment
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.Icon
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Button
+import androidx.compose.foundation.shape.RoundedCornerShape
+import com.maxrave.simpmusic.ui.screen.home.chipStripEdgeFades
+import androidx.compose.animation.core.animateFloatAsState
+import com.maxrave.simpmusic.ui.navigation.destination.login.LoginDestination
+import com.maxrave.simpmusic.ui.navigation.destination.login.NeteaseLoginDestination
+import com.maxrave.simpmusic.ui.navigation.destination.home.NotificationDestination
+import com.maxrave.simpmusic.ui.icon.Notifications
+import simpmusic.composeapp.generated.resources.log_in_to_netease
+import simpmusic.composeapp.generated.resources.log_in
+import simpmusic.composeapp.generated.resources.notification
 import com.maxrave.simpmusic.ui.theme.LocalLiquidGlassEnabled
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.foundation.layout.Spacer
@@ -206,14 +225,6 @@ fun LibraryScreen(
     var topAppBarHeight by remember {
         mutableStateOf(0.dp)
     }
-    // 下载管理页专用:实时(随动画)高度。该页的"歌曲/歌单"切换行是列表外层的固定头,
-    // 锁定展开高度会让它在收起态钉在 y≈480,chips 行下方留一条永不消失的空白带
-    // (用户实测"滑到底部后顶部显示一半下不去")。它消费的是 Column 外层 padding,
-    // 列表内部坐标不参与——变高变矮只改视口大小,不触发列表重锚定,无振荡风险,
-    // 与网格页的列表 contentPadding 性质不同。
-    var topBarLiveHeight by remember {
-        mutableStateOf(0.dp)
-    }
     // 各 chip 列表的底部留白:锁定"展开态"底栏高度(maxOf),不跟随底栏形变动画。
     // 液态玻璃底栏随 isScrolledToTop 在两行(迷你条+导航)与一行(沉到导航行)间形变,
     // innerPadding.bottom 逐帧变——若列表 contentPadding.bottom 跟随,贴底位置每次
@@ -226,6 +237,7 @@ fun LibraryScreen(
     lockedBottomPadding = maxOf(lockedBottomPadding, innerPadding.calculateBottomPadding())
     var showAddSheet by remember { mutableStateOf(false) }
 
+
     LaunchedEffect(nowPlaying) {
         Logger.w("LibraryScreen", "Check nowPlaying: $nowPlaying")
         viewModel.getRecentlyAdded()
@@ -233,18 +245,9 @@ fun LibraryScreen(
 
     val chipRowState = rememberLazyListState()
     val currentFilter by viewModel.currentScreen.collectAsStateWithLifecycle()
-    // 顶栏第一排(标题行)随内容滚动收起——与首页顶栏同款效果(用户 2026-09-30)。
-    // 信号沿用各 chip 页的 onScrolling(true=在顶/上滑回顶,false=深入内容下滑):
-    // 在 Crossfade 内容里按来源页过滤后驱动标题行显隐,原样转发给 App 驱动底栏。
-    // 非 saveable:进程重启恒从展开态起步,与上面 padding 锁定值天然一致,避免
-    // "保存了收起态+padding 重新锁定小值"的错位入场。
-    var showTitleBar by remember { mutableStateOf(true) }
-    // 标题行翻转的静默窗截止时刻(见 Crossfade 里 tabScrolling 的说明)
-    var suppressTitleFlipUntilNs by remember { mutableStateOf(0L) }
-    // 静默窗内被吞掉的最后一个"翻转意愿"(null=无):窗到期回放,防用户快速反向滑/
-    // 切到保存了相反滚动态的页时终态被永久丢弃(CR-30)。仅锁定高度页(网格各 chip)
-    // 记录——下载管理页(实时高度)的窗内上报可能是收展动画的几何反馈,回放=振荡回归
-    var pendingTitleFlip by remember { mutableStateOf<Boolean?>(null) }
+    // 2026-10-28 顶栏改主页式常驻(头像+chips 一行,滚走只剩模糊条):高度恒定,
+    // 收起/展开机制(标题行显隐/500ms 静默窗/回放/双轨高度)整体退役——高度不变
+    // 则 contentPadding 不变,三轮振荡修复针对的反馈环从根上不存在了。
     val openLibraryPlaylists = {
         navController.navigate(LibraryCollectionDestination(LibraryChipType.LOCAL_PLAYLIST.name))
     }
@@ -441,56 +444,16 @@ fun LibraryScreen(
         modifier = Modifier.then(if (LocalLiquidGlassEnabled.current) Modifier.layerBackdrop(chipBackdrop) else Modifier).hazeSource(hazeState),
         targetState = currentFilter,
     ) { filter ->
-        // 只认"当前 chip 页"的滚动上报:Crossfade 过渡期旧页仍在组合、fling 可能还没停,
-        // 旧页迟到的 false 会把切页时刚复位的标题行又压回去(实测竞态);对新页无影响。
-        // 转发给 App 的底栏信号维持原行为(新旧页都转发,与改造前一致)。
-        val tabScrolling: (onTop: Boolean) -> Unit = { onTop ->
-            if (filter == viewModel.currentScreen.value) {
-                if (onTop == showTitleBar) {
-                    // 与当前态一致=终态已对齐,清掉待回放
-                    pendingTitleFlip = null
-                } else if (System.nanoTime() >= suppressTitleFlipUntilNs) {
-                    // 翻转后开 500ms 静默窗,窗内吞掉后续翻转:标题收/展动画会改变列表几何
-                    // (下载管理页=视口高度,吃实时高度),在列表底部触发钳制回拉→index 逐帧
-                    // 变化→又触发上报→反向翻转→动画重启,自持振荡(用户 2026-09-30 四轮
-                    // 实测"下载页滑到底部开始跳")。动画的全部几何反馈都落在窗内;真手势的
-                    // 方向反转在窗外,不受影响。
-                    suppressTitleFlipUntilNs = System.nanoTime() + 500_000_000L
-                    pendingTitleFlip = null
-                    showTitleBar = onTop
-                } else if (filter != LibraryChipType.DOWNLOADED_PLAYLIST) {
-                    // 窗内被吞的翻转意愿记账,窗到期回放(CR-30)。锁定高度页(网格各 chip)
-                    // 标题收/展是纯覆盖层、内容零位移,回放不会产生新反馈,安全;下载管理页
-                    // 是唯一实时高度页,窗内上报本身就可能是收展动画的几何反馈,回放它会把
-                    // 四轮修掉的贴底振荡以 500ms 节奏请回来——只吞不回放
-                    pendingTitleFlip = onTop
-                }
-            }
-            onScrolling(onTop)
-        }
-        // 静默窗到期回放:把窗内最后被吞的用户终态落地(锁定高度页专属,见上)
-        LaunchedEffect(pendingTitleFlip, suppressTitleFlipUntilNs) {
-            if (pendingTitleFlip == null) return@LaunchedEffect
-            val until = suppressTitleFlipUntilNs
-            val remainingMs = (until - System.nanoTime()) / 1_000_000L
-            if (remainingMs > 0) kotlinx.coroutines.delay(remainingMs + 8)
-            // 等待期间出现新翻转(窗被重开/意愿被消费)则放弃本次回放
-            if (suppressTitleFlipUntilNs != until) return@LaunchedEffect
-            val v = pendingTitleFlip ?: return@LaunchedEffect
-            if (v != showTitleBar) {
-                showTitleBar = v
-                // 回放的翻转同样开静默窗(窗内新意愿照常记账,不丢单向终态)
-                suppressTitleFlipUntilNs = System.nanoTime() + 500_000_000L
-            }
-            pendingTitleFlip = null
-        }
+        // 各 chip 页滚动上报只转发给 App 驱动底栏(液态玻璃底栏形变);顶栏恒常驻,
+        // 不再有标题翻转消费,静默窗/回放/来源页过滤随之退役。
+        val tabScrolling: (onTop: Boolean) -> Unit = { onTop -> onScrolling(onTop) }
         when (filter) {
             // 下载管理 chip 页:复用独立页的内容体,chip 页无 TopAppBar(库页自带标题区)
             LibraryChipType.DOWNLOADED_PLAYLIST -> {
                 val dynamicViewModel: LibraryDynamicPlaylistViewModel = koinViewModel()
                 val sharedVm: SharedViewModel = koinInject()
                 DownloadedManagementBody(
-                    topPadding = topBarLiveHeight,
+                    topPadding = topAppBarHeight,
                     bottomPadding = lockedBottomPadding,
                     navController = navController,
                     viewModel = viewModel,
@@ -655,87 +618,77 @@ fun LibraryScreen(
         Modifier
             .background(Color.Transparent)
             .hazeBlur(HazeInput.Sources(hazeState), ultraThinBarStyle()).onGloballyPositioned { coordinates ->
-                // 双轨:maxOf 锁定值给网格页 contentPadding(防振荡,见声明处说明);
-                // 实时值给下载管理页的固定头(它需要跟着顶栏走,且无振荡风险)。
+                // 常驻头部高度恒定,直接量一次即可(锁不锁都一样,保留 maxOf 语义无害)
                 val measured = with(density) { coordinates.size.height.toDp() }
                 topAppBarHeight = maxOf(topAppBarHeight, measured)
-                topBarLiveHeight = measured
             },
     ) {
-        // 标题行随内容滚动收起(与首页顶栏同款):下滑深入内容时只剩 chip 行贴顶,
-        // 回滑到顶时标题行展开;收起态由同尺寸的状态栏 Spacer 占位,chip 行不钻到
-        // 状态栏下面。padding 锁定展开高度,标题收/展是纯覆盖层——内容零位移、
-        // 也不会反过来触发滚动上报(振荡根源已断)。
-        AnimatedVisibility(
-            visible = showTitleBar,
-            enter = fadeIn() + expandVertically(),
-            exit = fadeOut() + shrinkVertically(),
+        // 主页式常驻头部(2026-10-28 统一):头像(源账号,44dp,菜单=通知/登录) +
+        // chips 行(滚动+渐隐)+ Listen Together。滚走后整个顶栏只剩这条模糊条。
+        Box(Modifier.windowInsetsPadding(WindowInsets.statusBars))
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, end = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = stringResource(Res.string.library),
-                        style = typo().titleMedium,
-                        color = MaterialTheme.colorScheme.onBackground,
-                    )
-                },
-                colors =
-                    TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.Transparent,
-                    ),
-                navigationIcon = {
-                    AnimatedVisibility(
-                        !accountThumbnail.isNullOrEmpty(),
-                        modifier = Modifier.padding(horizontal = 12.dp),
-                        enter = fadeIn() + expandHorizontally(),
-                        exit = fadeOut() + shrinkVertically(),
-                    ) {
-                        AsyncImage(
-                            model =
-                                ImageRequest
-                                    .Builder(LocalPlatformContext.current)
-                                    .data(accountThumbnail)
-                                    .crossfade(550)
-                                    .build(),
-                            placeholder = rememberVectorPainter(SimpIcons.PeopleAlt),
-                            error = rememberVectorPainter(SimpIcons.PeopleAlt),
-                            contentDescription = null,
-                            modifier =
-                                Modifier
-                                    .size(26.dp)
-                                    .clip(CircleShape),
-                        )
+            LibraryAccountButton(
+                thumbnailUrl = accountThumbnail,
+                navController = navController,
+            )
+            BoxWithConstraints(
+                Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
+            ) {
+                val chipHeadFade by animateFloatAsState(if (chipRowState.canScrollBackward) 1f else 0f)
+                val chipTailFade by animateFloatAsState(if (chipRowState.canScrollForward) 1f else 0f)
+                LazyRow(
+                    state = chipRowState,
+                    modifier =
+                        Modifier
+                            .fillMaxHeight()
+                            .chipStripEdgeFades(32.dp, start = { chipHeadFade }, end = { chipTailFade }),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    // LazyRow(UI-CR-15):配合上面的 LaunchedEffect 保证程序性变化后选中项滚入
+                    // 视野;rememberLazyListState 同样 saveable,切页返回保留滚动位置。
+                ) {
+                    items(visibleLibraryChips, key = { it }) { type ->
+                        Chip(
+                            isAnimated = false,
+                            isSelected = type == currentFilter,
+                            text =
+                                when (type) {
+                                    LibraryChipType.YOUR_LIBRARY -> stringResource(Res.string.your_library)
+                                    LibraryChipType.YOUTUBE_MUSIC_PLAYLIST -> stringResource(Res.string.your_youtube_music)
+                                    LibraryChipType.NETEASE_PLAYLIST -> stringResource(Res.string.your_netease)
+                                    LibraryChipType.NETEASE_PODCAST -> stringResource(Res.string.netease_podcast)
+                                    LibraryChipType.YOUTUBE_MIX_FOR_YOU -> stringResource(Res.string.mix_for_you)
+                                    LibraryChipType.LOCAL_PLAYLIST -> stringResource(Res.string.your_playlists)
+                                    LibraryChipType.FAVORITE_PLAYLIST -> stringResource(Res.string.favorite_playlists)
+                                    LibraryChipType.DOWNLOADED_PLAYLIST -> stringResource(Res.string.download_management)
+                                    LibraryChipType.FAVORITE_PODCAST -> stringResource(Res.string.favorite_podcasts)
+                                    LibraryChipType.CHART -> stringResource(Res.string.simpmusic_charts)
+                                    LibraryChipType.WRAPPED -> stringResource(Res.string.wrapped)
+                                },
+                            backdrop = chipBackdrop,
+                        ) {
+                            viewModel.setCurrentScreen(type)
+                        }
                     }
-                },
-                // The Library bar had no actions slot at all — added for the Listen Together entry,
-                // which the design canvas puts on Home AND Library.
-                actions = {
-                    ListenTogetherIconButton(
-                        contentDescription = stringResource(Res.string.listen_together),
-                    ) { navController.navigate(ListenTogetherDestination) }
-                },
-            )
+                }
+            }
+            ListenTogetherIconButton(
+                contentDescription = stringResource(Res.string.listen_together),
+            ) { navController.navigate(ListenTogetherDestination) }
         }
-        AnimatedVisibility(
-            visible = !showTitleBar,
-            enter = fadeIn() + expandVertically(),
-            exit = fadeOut() + shrinkVertically(),
-        ) {
-            Spacer(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .windowInsetsPadding(WindowInsets.statusBars),
-            )
-        }
+        Spacer(Modifier.height(8.dp))
         AnimatedVisibility(visible = selectionState.isActive) {
             SongSelectionTopAppBar(
                 state = selectionState,
-                // Stacked BELOW the Library TopAppBar in the same Column, which already consumed
-                // the status-bar inset — leaving the default here reserved it twice and opened a
-                // status-bar-sized band of dead blur between the two bars. Same fix as Search;
-                // the overlay-style call sites (Album, Artist, Recently…) keep the default because
-                // they COVER their normal bar instead of standing under it.
+                // Stacked BELOW the header row in the same Column, which already consumed
+                // the status-bar inset — leaving the default here reserved it twice.
                 windowInsets = WindowInsets(0),
                 onSelectAll = {
                     selectionState.toggleSelectAll(
@@ -748,41 +701,6 @@ fun LibraryScreen(
                 containerColor = Color.Transparent,
                 contentColor = MaterialTheme.colorScheme.onBackground,
             )
-        }
-        LazyRow(
-            state = chipRowState,
-            modifier =
-                Modifier
-                    .padding(horizontal = 15.dp)
-                    .padding(bottom = 8.dp)
-                    .background(Color.Transparent),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            // LazyRow(UI-CR-15):配合上面的 LaunchedEffect 保证程序性变化后选中项滚入
-            // 视野;rememberLazyListState 同样 saveable,切页返回保留滚动位置。
-        ) {
-            items(visibleLibraryChips, key = { it }) { type ->
-                Chip(
-                    isAnimated = false,
-                    isSelected = type == currentFilter,
-                    text =
-                        when (type) {
-                            LibraryChipType.YOUR_LIBRARY -> stringResource(Res.string.your_library)
-                            LibraryChipType.YOUTUBE_MUSIC_PLAYLIST -> stringResource(Res.string.your_youtube_music)
-                            LibraryChipType.NETEASE_PLAYLIST -> stringResource(Res.string.your_netease)
-                            LibraryChipType.NETEASE_PODCAST -> stringResource(Res.string.netease_podcast)
-                            LibraryChipType.YOUTUBE_MIX_FOR_YOU -> stringResource(Res.string.mix_for_you)
-                            LibraryChipType.LOCAL_PLAYLIST -> stringResource(Res.string.your_playlists)
-                            LibraryChipType.FAVORITE_PLAYLIST -> stringResource(Res.string.favorite_playlists)
-                            LibraryChipType.DOWNLOADED_PLAYLIST -> stringResource(Res.string.download_management)
-                            LibraryChipType.FAVORITE_PODCAST -> stringResource(Res.string.favorite_podcasts)
-                            LibraryChipType.CHART -> stringResource(Res.string.simpmusic_charts)
-                            LibraryChipType.WRAPPED -> stringResource(Res.string.wrapped)
-                        },
-                    backdrop = chipBackdrop,
-                ) {
-                    viewModel.setCurrentScreen(type)
-                }
-            }
         }
         if (showSelectionSheet) {
             val selectedIds = selectionState.selected.toList()
@@ -849,6 +767,72 @@ fun LibraryScreen(
         }
     }
 }
+
+/** 库页头像钮(主页式常驻头部):当前音源登录账号头像,菜单=通知+未登录登录项(按源路由) */
+@Composable
+private fun LibraryAccountButton(
+    thumbnailUrl: String?,
+    navController: NavController,
+) {
+    var menuOpen by remember { mutableStateOf(false) }
+    val sharedViewModel: com.maxrave.simpmusic.viewModel.SharedViewModel = koinInject()
+    val isNeteaseSource by sharedViewModel.selectedSource
+        .collectAsStateWithLifecycle(initialValue = com.maxrave.domain.source.MusicSource.YOUTUBE_MUSIC.name)
+    val signedIn = !thumbnailUrl.isNullOrBlank()
+    Box {
+        com.maxrave.simpmusic.ui.screen.home.AccountAvatar(
+            signedIn = signedIn,
+            thumbnailUrl = thumbnailUrl,
+            size = 44.dp,
+            contentDescription = null,
+            modifier = Modifier.clickable { menuOpen = true },
+        )
+        DropdownMenu(
+            expanded = menuOpen,
+            onDismissRequest = { menuOpen = false },
+            modifier =
+                Modifier
+                    .widthIn(max = 280.dp)
+                    .fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+        ) {
+            DropdownMenuItem(
+                text = { Text(stringResource(Res.string.notification), style = typo().bodyMedium) },
+                leadingIcon = { Icon(SimpIcons.Notifications, contentDescription = null) },
+                onClick = {
+                    menuOpen = false
+                    navController.navigate(NotificationDestination)
+                },
+            )
+            if (!signedIn) {
+                Button(
+                    onClick = {
+                        menuOpen = false
+                        navController.navigate(
+                            if (isNeteaseSource == com.maxrave.domain.source.MusicSource.NETEASE.name) {
+                                NeteaseLoginDestination
+                            } else {
+                                LoginDestination
+                            },
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                ) {
+                    Text(
+                        stringResource(
+                            if (isNeteaseSource == com.maxrave.domain.source.MusicSource.NETEASE.name) {
+                                Res.string.log_in_to_netease
+                            } else {
+                                Res.string.log_in
+                            },
+                        ),
+                    )
+                }
+            }
+        }
+    }
+}
+
 
 @Composable
 private fun LibrarySectionHeader(
