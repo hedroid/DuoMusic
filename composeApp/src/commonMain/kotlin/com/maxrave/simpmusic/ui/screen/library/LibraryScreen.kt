@@ -1,5 +1,8 @@
 package com.maxrave.simpmusic.ui.screen.library
 
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import com.maxrave.simpmusic.ui.icon.KeyboardArrowDown
 import kotlin.math.roundToInt
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -22,6 +25,7 @@ import com.maxrave.simpmusic.ui.navigation.destination.login.LoginDestination
 import com.maxrave.simpmusic.ui.navigation.destination.login.NeteaseLoginDestination
 import com.maxrave.simpmusic.ui.navigation.destination.home.NotificationDestination
 import com.maxrave.simpmusic.ui.icon.Notifications
+import simpmusic.composeapp.generated.resources.category
 import simpmusic.composeapp.generated.resources.log_in_to_netease
 import simpmusic.composeapp.generated.resources.log_in
 import simpmusic.composeapp.generated.resources.notification
@@ -237,6 +241,9 @@ fun LibraryScreen(
         with(density) { WindowInsets.statusBars.getTop(this).toDp() } + 56.dp + 8.dp
     // 顶栏背景态(主页同款):true=在顶(透明)/false=滚走(hazeBlur 模糊条淡入)
     var headerAtTop by remember { mutableStateOf(true) }
+    // chips 收起/展开(用户 2026-10-28 定):休息态只显当前标签(收缩);点当前标签或
+    // 左右滑动→展开全部;展开态点任意标签(含当前)→选中并收缩回休息态
+    var chipsExpanded by rememberSaveable { mutableStateOf(false) }
     // 各 chip 列表的底部留白:锁定"展开态"底栏高度(maxOf),不跟随底栏形变动画。
     // 液态玻璃底栏随 isScrolledToTop 在两行(迷你条+导航)与一行(沉到导航行)间形变,
     // innerPadding.bottom 逐帧变——若列表 contentPadding.bottom 跟随,贴底位置每次
@@ -681,6 +688,64 @@ fun LibraryScreen(
             ) {
                 val chipHeadFade by animateFloatAsState(if (chipRowState.canScrollBackward) 1f else 0f)
                 val chipTailFade by animateFloatAsState(if (chipRowState.canScrollForward) 1f else 0f)
+                val chipLabel: (@Composable (LibraryChipType) -> String) = { type ->
+                    stringResource(
+                        when (type) {
+                            LibraryChipType.YOUR_LIBRARY -> Res.string.your_library
+                            LibraryChipType.YOUTUBE_MUSIC_PLAYLIST -> Res.string.your_youtube_music
+                            LibraryChipType.NETEASE_PLAYLIST -> Res.string.your_netease
+                            LibraryChipType.NETEASE_PODCAST -> Res.string.netease_podcast
+                            LibraryChipType.YOUTUBE_MIX_FOR_YOU -> Res.string.mix_for_you
+                            LibraryChipType.LOCAL_PLAYLIST -> Res.string.your_playlists
+                            LibraryChipType.FAVORITE_PLAYLIST -> Res.string.favorite_playlists
+                            LibraryChipType.DOWNLOADED_PLAYLIST -> Res.string.download_management
+                            LibraryChipType.FAVORITE_PODCAST -> Res.string.favorite_podcasts
+                            LibraryChipType.CHART -> Res.string.simpmusic_charts
+                            LibraryChipType.WRAPPED -> Res.string.wrapped
+                        },
+                    )
+                }
+                Crossfade(targetState = chipsExpanded, label = "libraryChips") { expanded ->
+                if (!expanded) {
+                    // 收缩态:当前标签(选中样式,点击=展开)+ 展开指示小钮;横滑也可展开
+                    Row(
+                        modifier =
+                            Modifier
+                                .fillMaxHeight()
+                                .pointerInput(Unit) {
+                                    detectHorizontalDragGestures(
+                                        onHorizontalDrag = { change, _ ->
+                                            change.consume()
+                                            chipsExpanded = true
+                                        },
+                                    )
+                                },
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Chip(
+                            isAnimated = false,
+                            isSelected = true,
+                            text = chipLabel(currentFilter),
+                            backdrop = chipBackdrop,
+                        ) { chipsExpanded = true }
+                        Box(
+                            modifier =
+                                Modifier
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .clickable { chipsExpanded = true },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = SimpIcons.KeyboardArrowDown,
+                                contentDescription = stringResource(Res.string.category),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                    }
+                } else {
                 Row(
                     modifier =
                         Modifier
@@ -701,26 +766,17 @@ fun LibraryScreen(
                         Chip(
                             isAnimated = false,
                             isSelected = type == currentFilter,
-                            text =
-                                when (type) {
-                                    LibraryChipType.YOUR_LIBRARY -> stringResource(Res.string.your_library)
-                                    LibraryChipType.YOUTUBE_MUSIC_PLAYLIST -> stringResource(Res.string.your_youtube_music)
-                                    LibraryChipType.NETEASE_PLAYLIST -> stringResource(Res.string.your_netease)
-                                    LibraryChipType.NETEASE_PODCAST -> stringResource(Res.string.netease_podcast)
-                                    LibraryChipType.YOUTUBE_MIX_FOR_YOU -> stringResource(Res.string.mix_for_you)
-                                    LibraryChipType.LOCAL_PLAYLIST -> stringResource(Res.string.your_playlists)
-                                    LibraryChipType.FAVORITE_PLAYLIST -> stringResource(Res.string.favorite_playlists)
-                                    LibraryChipType.DOWNLOADED_PLAYLIST -> stringResource(Res.string.download_management)
-                                    LibraryChipType.FAVORITE_PODCAST -> stringResource(Res.string.favorite_podcasts)
-                                    LibraryChipType.CHART -> stringResource(Res.string.simpmusic_charts)
-                                    LibraryChipType.WRAPPED -> stringResource(Res.string.wrapped)
-                                },
+                            text = chipLabel(type),
                             backdrop = chipBackdrop,
                         ) {
+                            // 展开态点任意标签(含当前=纯切换收起):选中并收缩回休息态
                             viewModel.setCurrentScreen(type)
+                            chipsExpanded = false
                         }
                         }
                     }
+                }
+                }
                 }
             }
             Box(Modifier.padding(start = 8.dp, end = 16.dp)) {
