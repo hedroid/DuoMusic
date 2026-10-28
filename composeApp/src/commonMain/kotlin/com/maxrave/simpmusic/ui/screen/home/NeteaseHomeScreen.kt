@@ -264,10 +264,12 @@ fun NeteaseHomeScreen(
                     )
                 }
                 // 行级懒加载:固定行序,每行独立槽位(Loading 占位→滚到才拉→Ready/Failed)
-                NeteaseHomeViewModel.Row.entries.forEach { row ->
+                NeteaseHomeViewModel.Row.entries.forEachIndexed { rowIndex, row ->
                     item(key = row.name) {
                         NeteaseHomeRowSlot(
                             row = row,
+                            // 第一行带账号名眉题(YT:个人栏目名小字在标题上方,头像已在头部)
+                            eyebrow = if (rowIndex == 0) accountInfo?.first?.takeIf { it.isNotBlank() } else null,
                             ui = state.rows[row] ?: NeteaseHomeViewModel.RowUi.Loading,
                             viewModel = viewModel,
                             navController = navController,
@@ -398,9 +400,18 @@ private fun NeteaseHomeRow(
     contents: List<com.maxrave.domain.data.model.home.Content?>,
     navController: NavController,
     onSongClick: (com.maxrave.domain.data.model.home.Content) -> Unit,
+    // 眉题(YT 货架 subtitle 同款):账号名小字画在行标题上方——头部头像之外的账号存在感
+    eyebrow: String? = null,
 ) {
     Column(Modifier.padding(horizontal = 15.dp)) {
         val songContents = contents.filterNotNull().filter { it.videoId != null }
+        eyebrow?.let {
+            Text(
+                text = it,
+                style = typo().bodySmall,
+                modifier = Modifier.padding(bottom = 2.dp),
+            )
+        }
         // 更多按钮只在真能跳二级页时显示(三轮修订,占位已拆)
         ShelfTitleRow(
             title = title,
@@ -721,6 +732,7 @@ private fun NeteaseHomeRowSlot(
     onPlayMv: (com.maxrave.domain.data.model.browse.album.Track) -> Unit,
     onSongLongClick: (com.maxrave.domain.data.model.home.Content) -> Unit,
     onMvLongClick: (com.maxrave.domain.data.model.browse.album.Track) -> Unit,
+    eyebrow: String? = null,
 ) {
     when (ui) {
         is NeteaseHomeViewModel.RowUi.Loading -> {
@@ -792,6 +804,7 @@ private fun NeteaseHomeRowSlot(
                             contents = content.item.contents,
                             navController = navController,
                             onSongClick = viewModel::playSong,
+                            eyebrow = eyebrow,
                         )
                     }
 
