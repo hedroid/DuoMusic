@@ -392,13 +392,16 @@ internal fun AppleMusicHeaderActions(
     ) {
         val likeBurst = rememberHeartBurstState()
         // 红心(星)=云端账号喜欢态;未登录源置灰,点击提示登录。
-        // 24dp=与同排评论/更多钮(AppleMusicGlyphButton 默认)同大(2026-10-28 用户定案)
+        // 图标 24dp=与同排评论/更多钮(AppleMusicGlyphButton 默认)视觉同大(2026-10-28 用户定案);
+        // 容器 32dp 只做命中区(2026-10-29 CR P2:裸 Box+clickable 不像 IconButton 有最小触控
+        // 保障,size 24 会把命中区也钉死在 24dp,比改动前 32dp 明显难点中)。32dp=10-28 改动
+        // 前的几何,compact 头部在该布局下长期无恙。
         run {
             Box(
                 modifier =
                     Modifier
                         .appleMusicPressInflate()
-                        .size(24.dp)
+                        .size(32.dp)
                         .heartBurst(likeBurst)
                         .alpha(if (state.likeEnabled) 1f else 0.38f)
                         .clip(CircleShape)
