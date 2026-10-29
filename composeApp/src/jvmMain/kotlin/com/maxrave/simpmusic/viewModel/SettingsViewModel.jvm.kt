@@ -55,11 +55,11 @@ actual suspend fun restoreNative(
                 }
 
                 entry.name == DB_NAME -> {
-                    runBlocking(Dispatchers.IO) {
-                        commonRepository.databaseDaoCheckpoint()
-                        commonRepository.closeDatabase()
-                    }
-                    FileOutputStream(commonRepository.getDatabasePath()).use { outputStream ->
+                    // 先落到临时文件:关库必须压缩到退出前的最后一瞬,否则窗口期里任何
+                    // 在跑的 Room 收集器都会 "Database is closed"(Android 端真机实证)
+                    FileOutputStream(
+                        commonRepository.getDatabasePath() + ".restore-tmp",
+                    ).use { outputStream ->
                         inputStream.copyTo(outputStream)
                     }
                 }
@@ -70,8 +70,23 @@ actual suspend fun restoreNative(
             showToast(getString(Res.string.restore_success), ToastGravity.Bottom)
             showToast("App will restart to apply changes", ToastGravity.Bottom)
             delay(2000)
-            exitProcess(0)
         }
+        val staged = File(commonRepository.getDatabasePath() + ".restore-tmp")
+        if (staged.exists()) {
+            withContext(Dispatchers.IO) {
+                runBlocking {
+                    commonRepository.databaseDaoCheckpoint()
+                    commonRepository.closeDatabase()
+                }
+                FileOutputStream(commonRepository.getDatabasePath()).use { outputStream ->
+                    staged.inputStream().use { it.copyTo(outputStream) }
+                }
+                staged.delete()
+                File(commonRepository.getDatabasePath() + "-wal").delete()
+                File(commonRepository.getDatabasePath() + "-shm").delete()
+            }
+        }
+        exitProcess(0)
     }
 }
 

@@ -113,6 +113,7 @@ actual suspend fun restoreNative(
     getData: () -> Unit,
 ) {
     val application: Context = getKoin().get()
+    val stagedDatabase = File(application.filesDir, "restore_music_db.tmp")
     application.applicationContext.contentResolver.openInputStream(uri.toAndroidUri())?.use {
         it.zipInputStream().use { inputStream ->
             var entry =
@@ -136,11 +137,12 @@ actual suspend fun restoreNative(
                     }
 
                     entry.name == DB_NAME -> {
-                        runBlocking(Dispatchers.IO) {
-                            commonRepository.databaseDaoCheckpoint()
-                            commonRepository.closeDatabase()
-                        }
-                        FileOutputStream(commonRepository.getDatabasePath()).use { outputStream ->
+                        // Stage to a temp file instead of checkpoint+close here: closing the live
+                        // database mid-loop leaves every running Room collector a crash window that
+                        // lasts the whole rest of the restore (download folder can take minutes) —
+                        // "Database is closed" crash on real device, 2026-10-29. The swap happens
+                        // right before the process exits instead.
+                        stagedDatabase.outputStream().use { outputStream ->
                             inputStream.copyTo(outputStream)
                         }
                     }
@@ -182,15 +184,32 @@ actual suspend fun restoreNative(
 
     withContext(Dispatchers.Main) {
         showToast(getString(Res.string.restore_success), ToastGravity.Bottom)
-//                        mediaPlayerHandler.stopMediaService(application)
+    }
+    if (stagedDatabase.exists()) {
+        // 换库与退出之间不留任何 DAO 调用窗口:checkpoint+close 之后,连本函数自己的
+        // getData() 都会摸库("Database is closed" 真机崩溃实证),进程在下一拍就死。
         stopService(application)
-        getData()
-        val ctx = application.applicationContext
-        val pm: PackageManager = ctx.packageManager
-        val intent = pm.getLaunchIntentForPackage(ctx.packageName)
-        val mainIntent = Intent.makeRestartActivityTask(intent?.component)
-        ctx.startActivity(mainIntent)
-        Runtime.getRuntime().exit(0)
+        withContext(Dispatchers.IO) {
+            runBlocking {
+                commonRepository.databaseDaoCheckpoint()
+                commonRepository.closeDatabase()
+            }
+            FileOutputStream(commonRepository.getDatabasePath()).use { outputStream ->
+                stagedDatabase.inputStream().use { it.copyTo(outputStream) }
+            }
+            stagedDatabase.delete()
+            // 旧库的 wal/shm 属于被替换掉的那份数据,恢复后的主文件必须干净地重新打开
+            File(commonRepository.getDatabasePath() + "-wal").delete()
+            File(commonRepository.getDatabasePath() + "-shm").delete()
+        }
+        withContext(Dispatchers.Main) {
+            val ctx = application.applicationContext
+            val pm: PackageManager = ctx.packageManager
+            val intent = pm.getLaunchIntentForPackage(ctx.packageName)
+            val mainIntent = Intent.makeRestartActivityTask(intent?.component)
+            ctx.startActivity(mainIntent)
+            Runtime.getRuntime().exit(0)
+        }
     }
 }
 
