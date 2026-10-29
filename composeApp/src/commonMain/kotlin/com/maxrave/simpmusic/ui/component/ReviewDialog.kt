@@ -35,7 +35,7 @@ fun ReviewDialog(
         confirmButton = {
             TextButton(onClick = {
                 onDoneReview.invoke()
-                uriHandler.openUri("https://github.com/hedroid/SimpMusic")
+                uriHandler.openUri("https://github.com/hedroid/DuoMusic")
             }) {
                 Text(
                     stringResource(Res.string.give_a_star),

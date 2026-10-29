@@ -5,7 +5,7 @@ name: Fork Release (arm64 APK)
 # 本工作流按 fork 打包定案执行:只打 arm64-v8a full release、跳过 Sentry 上传、
 # zipalign+apksigner 手动签名(与本地 build_and_sign 流程一致)、直接创建 GitHub
 # Release 并附 APK。所需 secrets:KEYSTORE_BASE64 / KEYSTORE_PASSWORD / KEY_ALIAS
-# / KEY_PASSWORD(已配在 hedroid/SimpMusic)。
+# / KEY_PASSWORD(已配在 hedroid/DuoMusic)。
 
 on:
   push:

@@ -991,7 +991,7 @@ fun App(
                                 onClick = {
                                     shouldShowUpdateDialog = false
                                     viewModel.showedUpdateDialog = false
-                                    openUrl("https://github.com/hedroid/SimpMusic/releases/latest")
+                                    openUrl("https://github.com/hedroid/DuoMusic/releases/latest")
                                 },
                             ) {
                                 Text(

@@ -113,7 +113,7 @@ fun CreditScreen(
             textDecoration = TextDecoration.Underline,
             modifier =
                 Modifier.clickable {
-                    openUrl("https://github.com/hedroid/SimpMusic")
+                    openUrl("https://github.com/hedroid/DuoMusic")
                 },
         )
 
@@ -136,7 +136,7 @@ fun CreditScreen(
             // GitHub button
             TextButton(
                 onClick = {
-                    openUrl("https://github.com/hedroid/SimpMusic")
+                    openUrl("https://github.com/hedroid/DuoMusic")
                 },
                 modifier =
                     Modifier
@@ -150,7 +150,7 @@ fun CreditScreen(
             // Issue tracker button
             TextButton(
                 onClick = {
-                    openUrl("https://github.com/hedroid/SimpMusic/issues")
+                    openUrl("https://github.com/hedroid/DuoMusic/issues")
                 },
                 modifier =
                     Modifier
