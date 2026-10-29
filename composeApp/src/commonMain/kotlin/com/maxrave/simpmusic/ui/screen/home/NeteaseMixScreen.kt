@@ -3,13 +3,10 @@ package com.maxrave.simpmusic.ui.screen.home
 import com.maxrave.simpmusic.ui.component.rememberCardHover
 import com.maxrave.simpmusic.ui.component.hoverZoom
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -40,7 +37,6 @@ import androidx.compose.foundation.lazy.grid.LazyHorizontalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -80,9 +76,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
-import coil3.compose.LocalPlatformContext
-import coil3.request.ImageRequest
-import coil3.request.crossfade
 import com.maxrave.domain.data.model.home.Content
 import com.maxrave.simpmusic.extension.scrollReportingEffect
 import com.maxrave.simpmusic.extension.smoothScrimBrush
@@ -90,9 +83,7 @@ import com.maxrave.simpmusic.ui.component.Chip
 import com.maxrave.simpmusic.ui.component.EndOfPage
 import com.maxrave.simpmusic.ui.component.HomeShimmer
 import com.maxrave.simpmusic.ui.component.ShelfTitleRow
-import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import com.maxrave.simpmusic.ui.icon.SimpIcons
-import com.maxrave.simpmusic.ui.icon.PeopleAlt
 import com.maxrave.simpmusic.ui.icon.Favorite
 import com.maxrave.simpmusic.ui.icon.Pause
 import com.maxrave.simpmusic.ui.icon.PlayArrow
@@ -100,7 +91,6 @@ import com.maxrave.simpmusic.ui.theme.ForceDarkContent
 import com.maxrave.simpmusic.ui.theme.typo
 import com.maxrave.simpmusic.ui.utils.toHiResArtworkUrl
 import com.maxrave.simpmusic.viewModel.NeteaseMixViewModel
-import com.maxrave.simpmusic.viewModel.SharedViewModel
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import simpmusic.composeapp.generated.resources.Res
@@ -128,9 +118,6 @@ fun NeteaseMixScreen(
     onScrolling: (onTop: Boolean) -> Unit = {},
     viewModel: NeteaseMixViewModel = koinInject(),
 ) {
-    // 头像=当前音源登录账号(SharedViewModel 共享流,与库页同一套口径)
-    val sharedViewModel: SharedViewModel = koinInject()
-    val accountThumbnail by sharedViewModel.sourceAccountThumbnail.collectAsStateWithLifecycle()
     val state by viewModel.state.collectAsStateWithLifecycle()
     val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
     val heartLoading by viewModel.heartLoading.collectAsStateWithLifecycle()
@@ -358,35 +345,16 @@ fun NeteaseMixScreen(
                             .fillMaxWidth()
                             .windowInsetsPadding(WindowInsets.statusBars),
                 )
-                // 标题左侧头像=当前音源登录账号(用户 2026-09-30,与库页同款设计:
-                // 26dp 圆形+crossfade,空串隐藏;标题 titleMedium 与库页顶栏同字号;
-                // 本页无 TopAppBar,手排 Row)
+                // 上游混合页顶栏无头像(2026-10-29 还原上游):最左即标题;
+                // 高度对齐主页=56dp 固定行(原 10dp 垂直 padding + 26dp 头像行 ≈46dp 已弃)
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(horizontal = 15.dp, vertical = 10.dp),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .height(56.dp)
+                            .padding(horizontal = 16.dp),
                 ) {
-                    AnimatedVisibility(
-                        !accountThumbnail.isNullOrEmpty(),
-                        modifier = Modifier.padding(end = 12.dp),
-                        enter = fadeIn() + expandHorizontally(),
-                        exit = fadeOut() + shrinkVertically(),
-                    ) {
-                        AsyncImage(
-                            model =
-                                ImageRequest
-                                    .Builder(LocalPlatformContext.current)
-                                    .data(accountThumbnail)
-                                    .crossfade(550)
-                                    .build(),
-                            placeholder = rememberVectorPainter(SimpIcons.PeopleAlt),
-                            error = rememberVectorPainter(SimpIcons.PeopleAlt),
-                            contentDescription = null,
-                            modifier =
-                                Modifier
-                                    .size(26.dp)
-                                    .clip(CircleShape),
-                        )
-                    }
                     Text(
                         text = stringResource(Res.string.personal_fm),
                         style = typo().titleMedium,

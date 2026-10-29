@@ -1,29 +1,26 @@
 package com.maxrave.simpmusic.ui.screen.library
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -34,21 +31,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
-import coil3.compose.AsyncImage
-import coil3.compose.LocalPlatformContext
-import coil3.request.ImageRequest
-import coil3.request.crossfade
 import com.kmpalette.loader.rememberNetworkLoader
 import com.kmpalette.rememberDominantColorState
 import com.maxrave.simpmusic.Platform
@@ -60,12 +51,9 @@ import com.maxrave.simpmusic.extension.rgbFactor
 import com.maxrave.simpmusic.getPlatform
 import com.maxrave.simpmusic.ui.component.AmbientGlowHeight
 import com.maxrave.simpmusic.ui.component.GridLibraryPlaylist
-import com.maxrave.simpmusic.ui.icon.PeopleAlt
-import com.maxrave.simpmusic.ui.icon.SimpIcons
 import com.maxrave.simpmusic.ui.theme.desktopPanelDark
 import com.maxrave.simpmusic.ui.theme.typo
 import com.maxrave.simpmusic.viewModel.LibraryViewModel
-import com.maxrave.simpmusic.viewModel.SharedViewModel
 import dev.chrisbanes.haze.HazeInput
 import dev.chrisbanes.haze.blur.hazeBlur
 import dev.chrisbanes.haze.hazeSource
@@ -74,7 +62,6 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.http.Url
 import org.jetbrains.compose.resources.stringResource
-import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import simpmusic.composeapp.generated.resources.Res
 import simpmusic.composeapp.generated.resources.mix_for_you
@@ -90,7 +77,6 @@ import simpmusic.composeapp.generated.resources.no_mixes_found
  * The tab is hidden while signed out (see `App.kt`), which is what the chip did too — YouTube has
  * no mixes to give an anonymous session.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MixForYouScreen(
     innerPadding: PaddingValues,
@@ -98,9 +84,6 @@ fun MixForYouScreen(
     navController: NavController,
     onScrolling: (onTop: Boolean) -> Unit = {},
 ) {
-    // 头像=当前音源登录账号(SharedViewModel 共享流,与库页同一套口径)
-    val sharedViewModel: SharedViewModel = koinInject()
-    val accountThumbnail by sharedViewModel.sourceAccountThumbnail.collectAsStateWithLifecycle()
     val density = LocalDensity.current
     val mixForYou by viewModel.youTubeMixForYou.collectAsStateWithLifecycle()
     val hazeState = rememberHazeState()
@@ -214,44 +197,28 @@ fun MixForYouScreen(
                     topAppBarHeight = with(density) { coordinates.size.height.toDp() }
                 },
         ) {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = stringResource(Res.string.mix_for_you),
-                        style = typo().titleMedium,
-                        color = MaterialTheme.colorScheme.onBackground,
-                    )
-                },
-                // 标题左侧头像=当前音源登录账号(用户 2026-09-30,与库页同款设计)
-                navigationIcon = {
-                    AnimatedVisibility(
-                        !accountThumbnail.isNullOrEmpty(),
-                        modifier = Modifier.padding(horizontal = 12.dp),
-                        enter = fadeIn() + expandHorizontally(),
-                        exit = fadeOut() + shrinkVertically(),
-                    ) {
-                        AsyncImage(
-                            model =
-                                ImageRequest
-                                    .Builder(LocalPlatformContext.current)
-                                    .data(accountThumbnail)
-                                    .crossfade(550)
-                                    .build(),
-                            placeholder = rememberVectorPainter(SimpIcons.PeopleAlt),
-                            error = rememberVectorPainter(SimpIcons.PeopleAlt),
-                            contentDescription = null,
-                            modifier =
-                                Modifier
-                                    .size(26.dp)
-                                    .clip(CircleShape),
-                        )
-                    }
-                },
-                colors =
-                    TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.Transparent,
-                    ),
+            // 上游混合页顶栏无头像(2026-10-29 还原上游):最左即标题;
+            // 高度对齐主页=状态栏 + 56dp 固定行(TopAppBar 的 64dp 档已弃)
+            Spacer(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .windowInsetsPadding(WindowInsets.statusBars),
             )
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                        .padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(Res.string.mix_for_you),
+                    style = typo().titleMedium,
+                    color = MaterialTheme.colorScheme.onBackground,
+                )
+            }
         }
     }
 }
