@@ -61,7 +61,7 @@
         </intent>
     </queries>
     <queries>
-        <package android:name="com.maxrave.simpmusic" />
+        <package android:name="com.github.hedroid.duomusic" />
     </queries>
     <queries>
         <intent>
@@ -236,6 +236,12 @@
         <meta-data
             android:name="androidx.car.app.TintableAttributionIcon"
             android:resource="@drawable/monochrome" />
+
+        <!-- Samsung Now Bar (One UI 7+ ongoing-activity route): declares support for the
+             lyrics Live Update notification posted by NowBarLyricsNotifier. Harmless elsewhere. -->
+        <meta-data
+            android:name="com.samsung.android.support.ongoing_activity"
+            android:value="true" />
 
         <service
             android:name="androidx.appcompat.app.AppLocalesMetadataHolderService"

@@ -309,7 +309,7 @@
     <string name="downloaded_collections">已下載的專輯與播放清單</string>
     <string name="your_youtube_music">您的 YouTube Music</string>
     <string name="youtube_collection_sync">播放清單與專輯收藏同步到 YouTube Music</string>
-    <string name="youtube_collection_sync_description">在 SimpMusic 收藏或取消收藏播放清單、專輯時，同步到 YouTube Music 帳號；關閉後僅修改本機</string>
+    <string name="youtube_collection_sync_description">在 DuoMusic 收藏或取消收藏播放清單、專輯時，同步到 YouTube Music 帳號；關閉後僅修改本機</string>
     <string name="fans_count">%1$s 粉絲</string>
     <string name="comments_count">%1$s 則留言</string>
     <string name="likes_count">%1$s 個讚</string>
@@ -339,7 +339,7 @@
     <string name="albums_inArtist">專輯</string>
     <string name="singles_inArtist">單曲</string>
     <string name="fans_might_also_like_inArtist">您也可能喜歡</string>
-    <string name="crash_log">SimpMusic 當機了\n將當機報告傳送給開發者</string>
+    <string name="crash_log">DuoMusic 當機了\n將當機報告傳送給開發者</string>
     <string name="crash">當機</string>
     <string name="send">傳送</string>
     <string name="mail_subject">回報</string>
@@ -402,12 +402,12 @@
     <string name="save">儲存</string>
     <string name="crop_cover">修剪</string>
     <string name="saved">已儲存</string>
-    <string name="sponsor_block_intro">SponsorBlock 是一個免費開源的插件，用於跳過 YouTube 影片中煩人的部分。\n更多資訊： https://sponsor.ajay.app/\n在 SimpMusic 中，SponsorBlock 僅在裝置線上時可用</string>
+    <string name="sponsor_block_intro">SponsorBlock 是一個免費開源的插件，用於跳過 YouTube 影片中煩人的部分。\n更多資訊： https://sponsor.ajay.app/\n在 DuoMusic 中，SponsorBlock 僅在裝置線上時可用</string>
     <string name="skip_sponsor_part_of_video">跳過影片中的贊助商部分</string>
     <string name="customactivityoncrash_error_activity_error_occurred_explanation">發生意外錯誤。請稍後再試。</string>
     <string name="customactivityoncrash_error_activity_restart_app">重啟應用程式</string>
-    <string name="help_build_lyrics_database">協助 SimpMusic 建立歌詞資料庫</string>
-    <string name="help_build_lyrics_database_description">將您儲存的歌詞上傳至 SimpMusic 的資料庫</string>
+    <string name="help_build_lyrics_database">協助 DuoMusic 建立歌詞資料庫</string>
+    <string name="help_build_lyrics_database_description">將您儲存的歌詞上傳至 DuoMusic 的資料庫</string>
     <string name="customactivityoncrash_error_activity_close_app">關閉應用程式</string>
     <string name="customactivityoncrash_error_activity_error_details">錯誤訊息</string>
     <string name="customactivityoncrash_error_activity_error_details_title">錯誤訊息</string>
@@ -443,7 +443,7 @@
     <string name="saved_to_local_playlist">已儲存到裝置播放清單</string>
     <string name="if_you_want_to_unsync_this_playlist_please_go_to_local_playlist">如果您想取消同步此播放列表，請前往裝置播放列表</string>
     <string name="log_in_to_get_YouTube_playlist">登入以取得 YouTube 播放清單</string>
-    <string name="sync_playlist_warning">SimpMusic 將在 YouTube Music 與網易雲自動建立或更新歌單（各自平台的曲目各建各的）。確定嗎？</string>
+    <string name="sync_playlist_warning">DuoMusic 將在 YouTube Music 與網易雲自動建立或更新歌單（各自平台的曲目各建各的）。確定嗎？</string>
     <string name="syncing">正在同步</string>
     <string name="unsync_playlist_warning">"取消同步此播放清單？ 該播放清單不會從 YouTube Music 中刪除 "</string>
     <string name="unsyncing">正取消同步</string>
@@ -551,7 +551,7 @@
     <string name="reverb_help_predelay_meaning">前延遲代表在混響開始前的安靜時間。較長的空隙會讓原聲顯得更加清晰並將虛擬牆面模擬得更遠。</string>
     <string name="reverb_help_damping_meaning">衰減是指聲音尾部開始失去高頻部分。隨著衰減，聲音會進一步變暗、便低沉，就像空氣和柔軟的表面吸收高頻一樣。</string>
     <string name="reverb_help_mix">混音指的是經處理後的音樂訊號的比例：滑桿用來設定你聽到的房間混響與原始音訊的比例，在 Android 和桌面端的邏輯是相同的。</string>
-    <string name="sync_follow_to_youtube_description">在 SimpMusic 上追蹤某位歌手，也請在您的 YouTube 帳號上訂閱他們的頻道。</string>
+    <string name="sync_follow_to_youtube_description">在 DuoMusic 上追蹤某位歌手，也請在您的 YouTube 帳號上訂閱他們的頻道。</string>
     <string name="sync_follow_failed">無法更新您的 YouTube 訂閱</string>
     <string name="subscribed_on_youtube">到 YouTube 上訂閱</string>
     <string name="unsubscribed_on_youtube">到 YouTube 上取消訂閱</string>
@@ -572,7 +572,7 @@
     <string name="enable_spotify_lyrics">啟用 Spotify 歌詞</string>
     <string name="spotify_lyrícs_info">更多原始歌詞</string>
     <string name="enable_canvas">啟用 Canvas</string>
-    <string name="canvas_info">在 SimpMusic 中顯示 Spotify Canvas</string>
+    <string name="canvas_info">在 DuoMusic 中顯示 Spotify Canvas</string>
     <string name="enable_animated_artwork">動態專輯封面</string>
     <string name="animated_artwork_info">播放專輯的動態封面，而非 Canvas 封面。無需註冊帳號。沒有動態封面的專輯將保留靜態封面。</string>
     <string name="spotify_lyrics_provider">歌詞由 Spotify 提供</string>
@@ -645,7 +645,7 @@
     <string name="loading">載入中</string>
     <string name="updating">更新中</string>
     <string name="go_to_log_in_page">前往登入頁面</string>
-    <string name="log_in_warning">前端替代有時無法工作，現在只有您登入 Youtube 才能在 SimpMusic 播放音樂。</string>
+    <string name="log_in_warning">前端替代有時無法工作，現在只有您登入 Youtube 才能在 DuoMusic 播放音樂。</string>
     <string name="spotify_canvas_cache">Spotify Canvas 快取</string>
     <string name="clear_canvas_cache">清理 Spotify Canvas 快取</string>
     <string name="listening_history">聆聽紀錄</string>
@@ -696,12 +696,12 @@
     <string name="other_version">其他版本</string>
     <string name="later">以後再說</string>
     <string name="give_a_star">給個星吧</string>
-    <string name="enjoying_simpmusic">享受 SimpMusic</string>
-    <string name="if_you_enjoy_using_simpmusic_star_simpmusic_on_github_or_leave_a_review_on">如果你享受使用 SimpMusic，就在 GitHub 給個星或者評論吧</string>
+    <string name="enjoying_simpmusic">享受 DuoMusic</string>
+    <string name="if_you_enjoy_using_simpmusic_star_simpmusic_on_github_or_leave_a_review_on">如果你享受使用 DuoMusic，就在 GitHub 給個星或者評論吧</string>
     <string name="if_you_love_my_work_consider">"若你認可我的工作，考慮 "</string>
     <string name="buying_me_a_coffee">請我喝杯咖啡。</string>
     <string name="footguns_promo_title">我跌入的每個陷阱</string>
-    <string name="footguns_promo_message">SimpMusic 讓我浪費了無數個夜晚在 Kotlin 和 Compose 的陷阱上，而這些陷阱沒有任何文件警告過我。我把它們全都記錄在了 kotlin-footguns 裡，這樣你們就不會白白浪費時間了。如果它能幫你們節省哪怕一個夜晚，我都會非常感激。</string>
+    <string name="footguns_promo_message">DuoMusic 讓我浪費了無數個夜晚在 Kotlin 和 Compose 的陷阱上，而這些陷阱沒有任何文件警告過我。我把它們全都記錄在了 kotlin-footguns 裡，這樣你們就不會白白浪費時間了。如果它能幫你們節省哪怕一個夜晚，我都會非常感激。</string>
     <string name="fade_audio_effect">淡入/淡出音頻效果</string>
     <string name="disabled">停用</string>
     <string name="fade_audio_effect_duration">音訊淡入淡出效果持續時間（毫秒）（設為 0 表示停用）</string>
@@ -766,8 +766,8 @@
     <string name="contributor_name">貢獻者姓名或稱謂</string>
     <string name="contributor_email">貢獻者電子郵件</string>
     <string name="anonymous">匿名</string>
-    <string name="simpmusic_lyrics">SimpMusic 歌詞資料庫</string>
-    <string name="lyrics_provider_simpmusic">歌詞由 SimpMusic 歌詞資料庫提供</string>
+    <string name="simpmusic_lyrics">DuoMusic 歌詞資料庫</string>
+    <string name="lyrics_provider_simpmusic">歌詞由 DuoMusic 歌詞資料庫提供</string>
     <string name="backup_in_progress">正在準備備份</string>
     <string name="restore_in_progress">正在準備還原</string>
     <string name="backup_downloaded">備份已下載的資料</string>
@@ -816,8 +816,8 @@
     <string name="intro_login_to_lastfm">登入以記錄您的收聽記錄</string>
     <string name="enable_scrobbling">啟用 Scrobbling</string>
     <string name="scrobbling_info">將您的播放記錄傳送至您的 Last.fm 個人檔案</string>
-    <string name="lastfm_login_step_1">開啟 Last.fm 頁面，並授予 SimpMusic 存取您帳戶的權限。</string>
-    <string name="lastfm_login_step_2">授予存取權限後，SimpMusic 將會自動重新開啟。</string>
+    <string name="lastfm_login_step_1">開啟 Last.fm 頁面，並授予 DuoMusic 存取您帳戶的權限。</string>
+    <string name="lastfm_login_step_2">授予存取權限後，DuoMusic 將會自動重新開啟。</string>
     <string name="lastfm_open_authorize_page">開啟 Last.fm</string>
     <string name="lastfm_login_failed">無法登入 Last.fm。請再試一次。</string>
     <string name="lastfm_paste_callback_title">沒有自動恢復嗎？</string>
@@ -888,7 +888,7 @@
     <string name="downvote">倒讚</string>
     <string name="vote_submitted">感謝你的投票！</string>
     <string name="vote_error">提交失敗</string>
-    <string name="open_app">打開 SimpMusic</string>
+    <string name="open_app">打開 DuoMusic</string>
     <string name="close_miniplayer">關閉迷你播放器</string>
     <string name="open_miniplayer">開啟迷你播放器</string>
     <string name="quit_app">退出 app</string>
@@ -896,7 +896,7 @@
     <string name="local_tracking_description">將您的收聽歷史記錄到本機資料庫</string>
     <string name="blog_notification_title">部落格文章通知</string>
     <string name="blog_notification_description">在新文章發佈時接收通知</string>
-    <string name="simpmusic_charts">SimpMusic 排行榜</string>
+    <string name="simpmusic_charts">DuoMusic 排行榜</string>
     <string name="wrapped">年度回顧</string>
     <string name="crossfading">交叉淡入淡出</string>
     <string name="your_320kbps_url">您的 320kbps URL</string>
@@ -923,13 +923,13 @@
     <string name="audio_output_hdmi">HDMI 裝置</string>
     <string name="import_data">匯入播放清單</string>
     <string name="import_playlists_from_other_apps">從其他軟體匯入播放清單</string>
-    <string name="import_data_intro">匯入功能可將 Spotify 或其他 YouTube 音樂用戶端套用轉換後的播放清單匯入 SimpMusic。 \n轉換工具：https://www.simpmusic.org/tools\nSimpMusic 僅支援匯入我們自身格式的播放清單檔案</string>
+    <string name="import_data_intro">匯入功能可將 Spotify 或其他 YouTube 音樂用戶端套用轉換後的播放清單匯入 DuoMusic。 \n轉換工具：https://www.simpmusic.org/tools\nDuoMusic 僅支援匯入我們自身格式的播放清單檔案</string>
     <string name="import_reading_file">正在讀取檔案…</string>
     <string name="import_progress_songs">%1$d 首/%2$d 首</string>
     <string name="import_result">創建了 %1$d 個播放列表，並匯入了 %2$d 首歌曲。</string>
     <string name="import_result_skipped">有 %1$d 個條目被跳過，因為檔案中缺少對應的歌曲。</string>
     <string name="import_failed">匯入失敗</string>
-    <string name="import_invalid_file">該文件不是有效的 SimpMusic 匯入文件。請先在 simpmusic.org 轉換您的媒體庫。</string>
+    <string name="import_invalid_file">該文件不是有效的 DuoMusic 匯入文件。請先在 simpmusic.org 轉換您的媒體庫。</string>
     <string name="analytics">聆聽分析</string>
     <string name="select_all">選擇全部</string>
     <string name="n_selected">已選取 %1$d 項</string>
@@ -948,9 +948,9 @@
     <!-- 上游 v2.2.0 新增：歌詞偏移/首選音軌/等化器類型/登入同步 -->
     <string name="login_sync_section">裝置</string>
     <string name="login_sync_android_title">傳送登入狀態到桌面版</string>
-    <string name="login_sync_android_description">掃描電腦上 SimpMusic 顯示的 QR Code，把手機上已登入的帳號傳送過去</string>
+    <string name="login_sync_android_description">掃描電腦上 DuoMusic 顯示的 QR Code，把手機上已登入的帳號傳送過去</string>
     <string name="login_sync_desktop_title">從手機端登入</string>
-    <string name="login_sync_desktop_description">用 Android 版 SimpMusic 掃描 QR Code，把登入狀態帶到桌面版</string>
+    <string name="login_sync_desktop_description">用 Android 版 DuoMusic 掃描 QR Code，把登入狀態帶到桌面版</string>
     <string name="login_sync_scan_hint">將相機對準電腦上的 QR Code</string>
     <string name="login_sync_connecting">正在連線你的電腦…</string>
     <string name="login_sync_trust_title">信任這台電腦？</string>
@@ -961,9 +961,9 @@
     <string name="login_sync_sending">傳送中…</string>
     <string name="login_sync_sent">已在 %1$s 上登入：%2$s</string>
     <string name="login_sync_nothing_signed_in">你還沒有登入任何服務。</string>
-    <string name="login_sync_camera_needed">SimpMusic 僅在掃描電腦上顯示的 QR Code 時使用相機。</string>
+    <string name="login_sync_camera_needed">DuoMusic 僅在掃描電腦上顯示的 QR Code 時使用相機。</string>
     <string name="login_sync_allow_camera">允許使用相機</string>
-    <string name="login_sync_camera_blocked">SimpMusic 的相機權限已被關閉。請在系統設定中開啟後再掃碼。</string>
+    <string name="login_sync_camera_blocked">DuoMusic 的相機權限已被關閉。請在系統設定中開啟後再掃碼。</string>
     <string name="login_sync_open_settings">開啟設定</string>
     <string name="login_sync_no_camera">沒有可用的相機來掃描 QR Code。</string>
     <string name="login_sync_unreachable">無法連線到電腦。請確認手機與電腦在同一網路（或 Tailscale）後重試。</string>
@@ -983,7 +983,7 @@
     <string name="download_file_name_title_artist">標題-藝人</string>
     <string name="simultaneous_downloads">同時下載數量</string>
     <string name="download_artist_album_folder">按「歌手/專輯」整理目錄</string>
-    <string name="download_artist_album_folder_description">儲存到 Music/SimpMusic/歌手/專輯</string>
+    <string name="download_artist_album_folder_description">儲存到 Music/DuoMusic/歌手/專輯</string>
     <string name="download_save_lrc">同時儲存歌詞檔案</string>
     <string name="download_save_lrc_description">在音訊旁寫入原文時間軸 .lrc</string>
     <string name="download_ai_tags">補全音樂標籤</string>
@@ -1019,7 +1019,7 @@
     <string name="download_no_completed">暫無已完成的下載</string>
     <string name="download_clear_all">清除全部下載</string>
     <string name="download_clear_all_description">刪除所有已下載的音訊與影片檔案</string>
-    <string name="download_artist_album_folder_description_off">儲存到 Music/SimpMusic</string>
+    <string name="download_artist_album_folder_description_off">儲存到 Music/DuoMusic</string>
     <string name="download_no_space">儲存空間不足，無法下載</string>
     <!-- 無障礙：純圖示控制語義 (UI-CR-07) -->
     <string name="pause">暫停</string>
@@ -1089,7 +1089,7 @@
     <string name="wrapped_share">分享</string>
     <string name="wrapped_save">儲存</string>
     <string name="wrapped_opening_title">您的樂齡</string>
-    <string name="wrapped_opening_lead">您開啟 SimpMusic 的時機</string>
+    <string name="wrapped_opening_lead">您開啟 DuoMusic 的時機</string>
     <string name="wrapped_opening_days">已累積 %1$s / %2$s 天</string>
     <string name="wrapped_opening_tracks">過去播放了%1$s首歌。</string>
     <string name="wrapped_minutes_title">您今年花費了如此多的時間來聽歌</string>
@@ -1157,7 +1157,7 @@
     <string name="month_full_oct">十月</string>
     <string name="month_full_nov">十一月</string>
     <string name="month_full_dec">十二月</string>
-    <string name="login_sync_desktop_instructions">在您手機上的 SimpMusic 打開設定頁面→%1$s，然後掃描這個 QR 碼。</string>
+    <string name="login_sync_desktop_instructions">在您手機上的 DuoMusic 打開設定頁面→%1$s，然後掃描這個 QR 碼。</string>
     <string name="login_sync_pick_address">選擇一個能讓您手機連線到電腦的裝置，無論是同一個區域網路、或是通過 Tailscale 內網穿透。</string>
     <string name="login_sync_phone_connected">手機已成功連線。請在您的手機上確認以繼續登入。</string>
     <string name="login_sync_received">已登入為 %1$s</string>
@@ -1166,7 +1166,7 @@
     <string name="login_sync_start_failed">無法啟動: %1$s</string>
     <string name="login_sync_receive_failed">無法收到登入資訊: %1$s</string>
     <string name="modified_build_title">非官方應用程式</string>
-    <string name="modified_build_message">您使用的是非官方的 SimpMusic 版本，該版本經過他人修改或重新打包，無法使用。請從 simpmusic.org 下載官方版本。</string>
+    <string name="modified_build_message">您使用的是非官方的 DuoMusic 版本，該版本經過他人修改或重新打包，無法使用。請從 simpmusic.org 下載官方版本。</string>
     <string name="taste_title">你的音樂品味為？</string>
     <string name="taste_invite">讓 AI 分析你近一年聆聽的曲子，然後告訴你。</string>
     <string name="taste_loading_title">正在分析你的音樂品味......</string>
@@ -1182,7 +1182,7 @@
     <string name="taste_regenerate">重新生成</string>
     <string name="taste_share_title">分享你的音樂品味</string>
     <string name="taste_card_title">我所喜歡的音樂</string>
-    <string name="taste_card_subtitle">在 SimpMusic 上的一年</string>
+    <string name="taste_card_subtitle">在 DuoMusic 上的一年</string>
     <string name="receipt_open">收聽明細</string>
     <string name="receipt_share_title">分享這張明細</string>
     <string name="receipt_order">%2$s 的訂單 #%1$s</string>
@@ -1216,7 +1216,7 @@
     <string name="library_favorite_empty_hint">點亮任意歌曲的紅心，它就會保存在這裡。</string>
     <string name="play_all">播放全部</string>
     <string name="mood">心情</string>
-    <string name="blog_promo_message">我的 SimpMusic 部落格上線了：simpmusic.org——分享 SimpMusic 背後的故事、音樂技術深度文章和工程筆記，有興趣的話歡迎閱讀 ✨</string>
+    <string name="blog_promo_message">我的 DuoMusic 部落格上線了：simpmusic.org——分享 DuoMusic 背後的故事、音樂技術深度文章和工程筆記，有興趣的話歡迎閱讀 ✨</string>
     <string name="radio_mix_upper">電台/混播</string>
     <string name="radio_mix">電台/混播</string>
     <string name="save_all_your_playlist_data">儲存全部歌單資料</string>
@@ -1231,7 +1231,7 @@
     <string name="smart_downloads_size_value">%1$d 首</string>
     <string name="smart_downloads_downloading">智慧下載：正在下載 %1$d 首</string>
     <string name="smart_downloads_waiting_for_wifi">下次在 Wi-Fi 下開啟應用時開始智慧下載</string>
-    <string name="backup_default_folder_name">Documents/SimpMusic</string>
+    <string name="backup_default_folder_name">Documents/DuoMusic</string>
     <string name="move_to_play_next">移到下一首播放</string>
     <string name="custom_base_url">自訂 Base URL</string>
     <string name="base_url">Base URL</string>

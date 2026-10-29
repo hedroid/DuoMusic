@@ -65,7 +65,7 @@ jobs:
           BT="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -n1)"
           SRC="androidApp/build/outputs/apk/release/androidApp-arm64-v8a-release-unsigned.apk"
           test -f "$SRC" || { echo "::error::$SRC not found"; exit 1; }
-          OUT="SimpMusic-v${{ steps.ver.outputs.version }}-arm64-release.apk"
+          OUT="DuoMusic-v${{ steps.ver.outputs.version }}-arm64-release.apk"
           "$BT/zipalign" -f -p 4 "$SRC" "$OUT"
           "$BT/apksigner" sign \
             --ks simpmusic.jks \
@@ -84,6 +84,6 @@ jobs:
           # action-gh-release creates a missing tag on the repository default branch even though
           # the APK above was built from github.sha, leaving the Release tag and binary mismatched.
           target_commitish: ${{ github.sha }}
-          name: SimpMusic ${{ steps.ver.outputs.version }}
-          files: SimpMusic-*.apk
+          name: DuoMusic ${{ steps.ver.outputs.version }}
+          files: DuoMusic-*.apk
           generate_release_notes: true

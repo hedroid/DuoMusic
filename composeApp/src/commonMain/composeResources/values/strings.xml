@@ -172,7 +172,7 @@
     <string name="developer_blog">Developer Blog</string>
     <string name="developer_blog_tagline">Read dev notes, tutorials &amp; behind-the-scenes</string>
     <string name="blog_promo_title">Something new from the dev</string>
-    <string name="blog_promo_message">I just launched the SimpMusic blog at simpmusic.org — sharing the story behind SimpMusic, music-tech deep dives, and engineering notes. Give it a read if you're curious ✨</string>
+    <string name="blog_promo_message">I just launched the DuoMusic blog at simpmusic.org — sharing the story behind DuoMusic, music-tech deep dives, and engineering notes. Give it a read if you're curious ✨</string>
     <string name="visit_blog">Visit blog</string>
     <string name="paypal">PayPal</string>
     <string name="title">Title</string>
@@ -211,7 +211,7 @@
     <string name="albums_inArtist">Albums</string>
     <string name="singles_inArtist">Singles</string>
     <string name="fans_might_also_like_inArtist">Fans might also like</string>
-    <string name="crash_log">SimpMusic crashed. Sorry for this problem.\nSend crash-log to developer</string>
+    <string name="crash_log">DuoMusic crashed. Sorry for this problem.\nSend crash-log to developer</string>
     <string name="crash">Crash</string>
     <string name="send">Send</string>
     <string name="mail_subject">Report Crash</string>
@@ -245,7 +245,7 @@
     <string name="description">Description</string>
     <string name="playback">Playback</string>
     <string name="footguns_promo_title">Every trap I fell into</string>
-    <string name="footguns_promo_message">SimpMusic cost me a lot of nights on Kotlin and Compose traps that no doc ever warned me about. I wrote every one of them down in kotlin-footguns, so you don't lose the same nights. If it saves even one of yours, a star would mean a lot to me.</string>
+    <string name="footguns_promo_message">DuoMusic cost me a lot of nights on Kotlin and Compose traps that no doc ever warned me about. I wrote every one of them down in kotlin-footguns, so you don't lose the same nights. If it saves even one of yours, a star would mean a lot to me.</string>
     <string name="save_all_your_playlist_data">Save all your playlist data</string>
     <string name="save_playback_state">Save Playback State</string>
     <string name="save_shuffle_and_repeat_mode">Save shuffle and repeat mode</string>
@@ -278,12 +278,12 @@
     <string name="save">Save</string>
     <string name="crop_cover">Crop cover</string>
     <string name="saved">Saved</string>
-    <string name="sponsor_block_intro">SponsorBlock is a crowd-sourced system for skipping annoying parts of YouTube videos.\nMore information: https://sponsor.ajay.app/\nIn SimpMusic, SponsorBlock is only available when the device is online</string>
+    <string name="sponsor_block_intro">SponsorBlock is a crowd-sourced system for skipping annoying parts of YouTube videos.\nMore information: https://sponsor.ajay.app/\nIn DuoMusic, SponsorBlock is only available when the device is online</string>
     <string name="skip_sponsor_part_of_video">Skip sponsor part of video</string>
     <string name="customactivityoncrash_error_activity_error_occurred_explanation">An unexpected error occurred. Sorry for the inconvenience.</string>
     <string name="customactivityoncrash_error_activity_restart_app">Restart app</string>
-    <string name="help_build_lyrics_database">Help SimpMusic lyrics build the lyrics database</string>
-    <string name="help_build_lyrics_database_description">Send your saved lyrics to SimpMusic lyrics's database</string>
+    <string name="help_build_lyrics_database">Help DuoMusic lyrics build the lyrics database</string>
+    <string name="help_build_lyrics_database_description">Send your saved lyrics to DuoMusic lyrics's database</string>
     <string name="notification_lyrics">Lyrics in notification</string>
     <string name="notification_lyrics_description">Show the current lyric line live in the media notification</string>
     <string name="notification_lyrics_content">Notification lyrics content</string>
@@ -306,7 +306,7 @@
     <string name="sleep_timer_set_error">Please set the correct format time</string>
     <string name="sleep_timer_warning">Remove sleep timer?</string>
     <string name="yes">Yes</string>
-    <string name="notification_channel_name" translatable="false">SimpMusic Playback Notification</string>
+    <string name="notification_channel_name" translatable="false">DuoMusic Playback Notification</string>
     <string name="welcome_back">Welcome back,</string>
     <string name="upload_your_listening_history_to_youtube_music_server_it_will_make_yt_music_recommendation_system_better_working_only_if_logged_in">Upload your listening history to YouTube Music server, it will make YT Music recommendation system better. Working only if logged in</string>
     <string name="send_back_listening_data_to_google">Send back listening data to Google</string>
@@ -325,7 +325,7 @@
     <string name="saved_to_local_playlist">Saved to local playlist</string>
     <string name="if_you_want_to_unsync_this_playlist_please_go_to_local_playlist">if you want to unsync this playlist, please go to local playlist</string>
     <string name="log_in_to_get_YouTube_playlist">Log in to get YouTube Playlist</string>
-    <string name="sync_playlist_warning">SimpMusic will create or update playlists on YouTube Music and NetEase Cloud Music (each with that platform\'s own tracks). Continue?</string>
+    <string name="sync_playlist_warning">DuoMusic will create or update playlists on YouTube Music and NetEase Cloud Music (each with that platform\'s own tracks). Continue?</string>
     <string name="syncing">Syncing</string>
     <string name="unsync_playlist_warning">"Unsync this playlist? This playlist will not be removed from YouTube Music "</string>
     <string name="unsyncing">Unsyncing</string>
@@ -362,7 +362,7 @@
     <string name="older_first">Older First</string>
     <string name="newer_first">Newer First</string>
     <string name="added_date">Added date</string>
-    <string name="credit_app">A simple music app powered by YouTube Music and NetEase Cloud Music \n\nSimpMusic is an open source project to stream music from YouTube and YouTube Music without ads and tracking, or play directly from NetEase Cloud Music with your account. SimpMusic provides many features:\n\n - Streaming music \n - Synced lyrics\n - Personalize data\n - etc…</string>
+    <string name="credit_app">A simple music app powered by YouTube Music and NetEase Cloud Music \n\nDuoMusic is an open source project to stream music from YouTube and YouTube Music without ads and tracking, or play directly from NetEase Cloud Music with your account. DuoMusic provides many features:\n\n - Streaming music \n - Synced lyrics\n - Personalize data\n - etc…</string>
     <string name="issue_tracker">Issue Tracker</string>
     <string name="copyright" translatable="false">©2023-%1$s Tuan Minh Nguyen Duc (maxrave-dev)</string>
     <string name="featured_playlists">Featured Playlists</string>
@@ -475,7 +475,7 @@
     <string name="enable_spotify_lyrics">Enable Spotify Lyrics</string>
     <string name="spotify_lyrícs_info">More lyrics without translation</string>
     <string name="enable_canvas">Enable Canvas</string>
-    <string name="canvas_info">Show Spotify Canvas in SimpMusic</string>
+    <string name="canvas_info">Show Spotify Canvas in DuoMusic</string>
     <string name="enable_animated_artwork">Animated artwork</string>
     <string name="animated_artwork_info">Play the album's animated cover instead of a Canvas. No account needed. Albums without one keep the still cover.</string>
     <string name="spotify_lyrics_provider">Lyrics provided by Spotify</string>
@@ -567,7 +567,7 @@
     <string name="loading">Loading</string>
     <string name="updating">Updating</string>
     <string name="go_to_log_in_page">Go to log in page</string>
-    <string name="log_in_warning">YouTube Music now requires you to log in to stream music, Piped Instance sometime can't work too. You should log in to YouTube to get better experience with SimpMusic.</string>
+    <string name="log_in_warning">YouTube Music now requires you to log in to stream music, Piped Instance sometime can't work too. You should log in to YouTube to get better experience with DuoMusic.</string>
     <string name="spotify_canvas_cache">Spotify Canvas Cache</string>
     <string name="clear_canvas_cache">Clear canvas cache</string>
     <string name="listening_history">Listening history</string>
@@ -621,8 +621,8 @@
     <string name="other_version">Other version</string>
     <string name="later">Later</string>
     <string name="give_a_star">Give a star</string>
-    <string name="enjoying_simpmusic">Enjoying SimpMusic</string>
-    <string name="if_you_enjoy_using_simpmusic_star_simpmusic_on_github_or_leave_a_review_on">If you enjoy using SimpMusic, star SimpMusic on GitHub or leave a review on</string>
+    <string name="enjoying_simpmusic">Enjoying DuoMusic</string>
+    <string name="if_you_enjoy_using_simpmusic_star_simpmusic_on_github_or_leave_a_review_on">If you enjoy using DuoMusic, star DuoMusic on GitHub or leave a review on</string>
     <string name="if_you_love_my_work_consider">"If you love my work, consider "</string>
     <string name="buying_me_a_coffee">buying me a coffee.</string>
     <string name="fade_audio_effect">Fade audio effect</string>
@@ -696,8 +696,8 @@
     <string name="contributor_name">Contributor name</string>
     <string name="contributor_email">Contributor email</string>
     <string name="anonymous">Anonymous</string>
-    <string name="simpmusic_lyrics">SimpMusic Lyrics</string>
-    <string name="lyrics_provider_simpmusic">Lyrics provided by SimpMusic Lyrics</string>
+    <string name="simpmusic_lyrics">DuoMusic Lyrics</string>
+    <string name="lyrics_provider_simpmusic">Lyrics provided by DuoMusic Lyrics</string>
     <string name="backup_in_progress">Backup in progress</string>
     <string name="restore_in_progress">Restore in progress</string>
     <string name="backup_downloaded">Backup downloaded data</string>
@@ -746,8 +746,8 @@
     <string name="intro_login_to_lastfm">Log in to scrobble what you listen to</string>
     <string name="enable_scrobbling">Enable scrobbling</string>
     <string name="scrobbling_info">Send what you play to your Last.fm profile</string>
-    <string name="lastfm_login_step_1">Open the Last.fm page and grant SimpMusic access to your account.</string>
-    <string name="lastfm_login_step_2">SimpMusic opens again on its own once you have granted access.</string>
+    <string name="lastfm_login_step_1">Open the Last.fm page and grant DuoMusic access to your account.</string>
+    <string name="lastfm_login_step_2">DuoMusic opens again on its own once you have granted access.</string>
     <string name="lastfm_open_authorize_page">Open Last.fm</string>
     <string name="lastfm_login_failed">Could not log in to Last.fm. Please try again.</string>
     <string name="lastfm_paste_callback_title">Did not come back automatically?</string>
@@ -819,7 +819,7 @@
     <string name="downvote">Downvote</string>
     <string name="vote_submitted">Thank you for voting this lyrics!</string>
     <string name="vote_error">Failed to submit</string>
-    <string name="open_app">Open SimpMusic</string>
+    <string name="open_app">Open DuoMusic</string>
     <string name="close_miniplayer">Close Mini-player</string>
     <string name="open_miniplayer">Open Mini-player</string>
     <string name="quit_app">Quit app</string>
@@ -827,7 +827,7 @@
     <string name="local_tracking_description">Log your listening history to local database</string>
     <string name="blog_notification_title">Blog post notifications</string>
     <string name="blog_notification_description">Get notified when a new blog post is published</string>
-    <string name="simpmusic_charts">SimpMusic Charts</string>
+    <string name="simpmusic_charts">DuoMusic Charts</string>
     <string name="crossfading">Crossfading</string>
     <string name="your_320kbps_url">Your 320kbps URL</string>
     <string name="your_320kbps_url_description">Leave empty to auto-choose a working URL from the uptime checker.</string>
@@ -853,13 +853,13 @@
     <string name="audio_output_hdmi">HDMI</string>
     <string name="import_data">Import playlists</string>
     <string name="import_playlists_from_other_apps">Import playlists from another app</string>
-    <string name="import_data_intro">Import brings in playlists converted from Spotify or another YT Music client app.\nConverting tool: https://www.simpmusic.org/tools\nIn SimpMusic, only playlist files in our own format can be imported</string>
+    <string name="import_data_intro">Import brings in playlists converted from Spotify or another YT Music client app.\nConverting tool: https://www.simpmusic.org/tools\nIn DuoMusic, only playlist files in our own format can be imported</string>
     <string name="import_reading_file">Reading file…</string>
     <string name="import_progress_songs">%1$d of %2$d songs</string>
     <string name="import_result">Created %1$d playlists and imported %2$d songs.</string>
     <string name="import_result_skipped">%1$d entries were skipped because their song was missing from the file.</string>
     <string name="import_failed">Import failed</string>
-    <string name="import_invalid_file">This file is not a valid SimpMusic import file. Convert your library at simpmusic.org first.</string>
+    <string name="import_invalid_file">This file is not a valid DuoMusic import file. Convert your library at simpmusic.org first.</string>
     <string name="analytics">Analytics</string>
     <string name="select_all">Select all</string>
     <string name="n_selected">%1$d selected</string>
@@ -933,7 +933,7 @@
     <string name="wrapped_share">Share</string>
     <string name="wrapped_save">Save</string>
     <string name="wrapped_opening_title">Your year in music</string>
-    <string name="wrapped_opening_lead">You opened SimpMusic on</string>
+    <string name="wrapped_opening_lead">You opened DuoMusic on</string>
     <string name="wrapped_opening_days">%1$s of %2$s days</string>
     <string name="wrapped_opening_tracks">%1$s tracks went past.</string>
     <string name="wrapped_minutes_title">You spent this much of the year listening</string>
@@ -1002,8 +1002,8 @@
     <string name="month_full_nov">November</string>
     <string name="month_full_dec">December</string>
     <string name="backup_location">Backup location</string>
-    <string name="backup_location_default">Documents/SimpMusic (default)</string>
-    <string name="backup_default_folder_name">Documents/SimpMusic</string>
+    <string name="backup_location_default">Documents/DuoMusic (default)</string>
+    <string name="backup_default_folder_name">Documents/DuoMusic</string>
     <string name="language_follow_system">Follow system</string>
     <string name="language_follow_system_current">Follow system (current: %1$s)</string>
     <!-- NetEase source (feat/netease-source) -->
@@ -1135,7 +1135,7 @@
     <string name="downloaded_collections">Downloaded albums and playlists</string>
     <string name="your_youtube_music">Your YouTube Music</string>
     <string name="youtube_collection_sync">Sync playlists and albums with YouTube Music</string>
-    <string name="youtube_collection_sync_description">Mirror playlist and album favorite changes made in SimpMusic to your YouTube Music account; when off, changes stay local</string>
+    <string name="youtube_collection_sync_description">Mirror playlist and album favorite changes made in DuoMusic to your YouTube Music account; when off, changes stay local</string>
     <string name="netease_login_qr">QR code</string>
     <string name="netease_login_phone">Phone</string>
     <string name="netease_login_web">Web</string>
@@ -1179,10 +1179,10 @@
 
     <string name="login_sync_section">Devices</string>
     <string name="login_sync_desktop_title">Sign in from your phone</string>
-    <string name="login_sync_desktop_description">Scan a QR code with SimpMusic on Android to bring your sign-ins here</string>
+    <string name="login_sync_desktop_description">Scan a QR code with DuoMusic on Android to bring your sign-ins here</string>
     <string name="login_sync_android_title">Send sign-ins to desktop</string>
-    <string name="login_sync_android_description">Scan the QR code shown by SimpMusic on your computer</string>
-    <string name="login_sync_desktop_instructions">On your phone, open SimpMusic → Settings → %1$s, then scan this code.</string>
+    <string name="login_sync_android_description">Scan the QR code shown by DuoMusic on your computer</string>
+    <string name="login_sync_desktop_instructions">On your phone, open DuoMusic → Settings → %1$s, then scan this code.</string>
     <string name="login_sync_pick_address">Pick an address your phone can reach — on the same network, or over Tailscale.</string>
     <string name="login_sync_phone_connected">Phone connected. Confirm on your phone to continue.</string>
     <string name="login_sync_received">Signed in to %1$s</string>
@@ -1201,16 +1201,16 @@
     <string name="login_sync_sending">Sending…</string>
     <string name="login_sync_sent">Signed in on %1$s: %2$s</string>
     <string name="login_sync_nothing_signed_in">You're not signed in to any service yet.</string>
-    <string name="login_sync_camera_needed">SimpMusic uses the camera only to scan the code shown on your computer.</string>
+    <string name="login_sync_camera_needed">DuoMusic uses the camera only to scan the code shown on your computer.</string>
     <string name="login_sync_allow_camera">Allow camera</string>
-    <string name="login_sync_camera_blocked">Camera access is turned off for SimpMusic. Turn it on in Settings to scan the code.</string>
+    <string name="login_sync_camera_blocked">Camera access is turned off for DuoMusic. Turn it on in Settings to scan the code.</string>
     <string name="login_sync_open_settings">Open settings</string>
     <string name="login_sync_no_camera">No camera is available to scan the code.</string>
     <string name="login_sync_unreachable">Couldn't reach the computer. Make sure your phone is on the same network or tailnet, then try again.</string>
     <string name="login_sync_code_expired">The code on your computer has expired. Show a new one and scan again.</string>
     <string name="login_sync_failed">Something went wrong. Please try again.</string>
     <string name="modified_build_title">Unofficial app</string>
-    <string name="modified_build_message">You are using an unofficial copy of SimpMusic that was modified or repackaged by someone else. It cannot be used. Download the official version from simpmusic.org.</string>
+    <string name="modified_build_message">You are using an unofficial copy of DuoMusic that was modified or repackaged by someone else. It cannot be used. Download the official version from simpmusic.org.</string>
 
     <!-- File-based downloads (gen 2) -->
     <string name="download_section_title">Download</string>
@@ -1224,7 +1224,7 @@
     <string name="download_file_name_title_artist">Title-Artist</string>
     <string name="simultaneous_downloads">Simultaneous downloads</string>
     <string name="download_artist_album_folder">Folder by artist/album</string>
-    <string name="download_artist_album_folder_description">Save under Music/SimpMusic/Artist/Album</string>
+    <string name="download_artist_album_folder_description">Save under Music/DuoMusic/Artist/Album</string>
     <string name="download_save_lrc">Save lyrics (.lrc)</string>
     <string name="download_save_lrc_description">Write original timed lyrics next to the audio file</string>
     <string name="download_ai_tags">Music tag completion</string>
@@ -1260,7 +1260,7 @@
     <string name="download_no_completed">No completed downloads</string>
     <string name="download_clear_all">Clear all downloads</string>
     <string name="download_clear_all_description">Delete all downloaded audio and video files</string>
-    <string name="download_artist_album_folder_description_off">Save under Music/SimpMusic</string>
+    <string name="download_artist_album_folder_description_off">Save under Music/DuoMusic</string>
     <string name="download_no_space">Not enough storage to download</string>
     <!-- Accessibility labels for icon-only controls (UI-CR-07) -->
     <string name="pause">Pause</string>
@@ -1284,7 +1284,7 @@
     <string name="taste_regenerate">Regenerate</string>
     <string name="taste_share_title">Share your music taste</string>
     <string name="taste_card_title">My music taste</string>
-    <string name="taste_card_subtitle">12 months on SimpMusic</string>
+    <string name="taste_card_subtitle">12 months on DuoMusic</string>
     <string name="receipt_open">Listening receipt</string>
     <string name="receipt_share_title">Share your receipt</string>
     <string name="receipt_order">Order #%1$s for %2$s</string>

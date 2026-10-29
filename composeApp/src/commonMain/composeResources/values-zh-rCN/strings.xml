@@ -191,7 +191,7 @@
     <string name="albums_inArtist">专辑</string>
     <string name="singles_inArtist">单曲</string>
     <string name="fans_might_also_like_inArtist">粉丝可能也喜欢</string>
-    <string name="crash_log">SimpMusic 崩溃了。很抱歉出现此问题。\n将崩溃日志发给开发人员</string>
+    <string name="crash_log">DuoMusic 崩溃了。很抱歉出现此问题。\n将崩溃日志发给开发人员</string>
     <string name="crash">崩溃</string>
     <string name="send">发送</string>
     <string name="mail_subject">报告崩溃</string>
@@ -249,12 +249,12 @@
     <string name="what_segments_will_be_skipped">将跳过哪些段</string>
     <string name="save">保存</string>
     <string name="saved">已保存</string>
-    <string name="sponsor_block_intro">SponsorBlock 是一个由众人组成的系统，用于跳过烦人的 YouTube 视频的部分。\n更多信息：https://sponsor.ajay.app/\n在 SimpMusic 中，SponsorBlock 仅在设备在线时可用</string>
+    <string name="sponsor_block_intro">SponsorBlock 是一个由众人组成的系统，用于跳过烦人的 YouTube 视频的部分。\n更多信息：https://sponsor.ajay.app/\n在 DuoMusic 中，SponsorBlock 仅在设备在线时可用</string>
     <string name="skip_sponsor_part_of_video">跳过视频赞助部分</string>
     <string name="customactivityoncrash_error_activity_error_occurred_explanation">发生意外错误。很抱歉给您带来不便。</string>
     <string name="customactivityoncrash_error_activity_restart_app">重启应用</string>
-    <string name="help_build_lyrics_database">帮助 SimpMusic 歌词建立歌词数据库</string>
-    <string name="help_build_lyrics_database_description">将您保存的歌词发送到 SimpMusic 歌词数据库中</string>
+    <string name="help_build_lyrics_database">帮助 DuoMusic 歌词建立歌词数据库</string>
+    <string name="help_build_lyrics_database_description">将您保存的歌词发送到 DuoMusic 歌词数据库中</string>
     <string name="notification_lyrics">通知栏歌词</string>
     <string name="notification_lyrics_description">在媒体通知中实时滚动显示当前歌词行</string>
     <string name="notification_lyrics_content">通知栏歌词内容</string>
@@ -295,7 +295,7 @@
     <string name="saved_to_local_playlist">已保存到本地歌单</string>
     <string name="if_you_want_to_unsync_this_playlist_please_go_to_local_playlist">如果您想要取消同步此歌单，请转到本地歌单</string>
     <string name="log_in_to_get_YouTube_playlist">登录以获取 YouTube 歌单</string>
-    <string name="sync_playlist_warning">SimpMusic 将在 YouTube Music 与网易云自动创建或更新歌单（各自平台的曲目各建各的）。确定吗？</string>
+    <string name="sync_playlist_warning">DuoMusic 将在 YouTube Music 与网易云自动创建或更新歌单（各自平台的曲目各建各的）。确定吗？</string>
     <string name="syncing">同步中</string>
     <string name="unsync_playlist_warning">"取消同步此歌单吗？此歌单将不会从 YouTube Music 中删除 "</string>
     <string name="unsyncing">取消同步中</string>
@@ -332,7 +332,7 @@
     <string name="older_first">较早的优先</string>
     <string name="newer_first">较新的在前</string>
     <string name="added_date">已添加日期</string>
-    <string name="credit_app">使用 YouTube Music 与网易云音乐作为音源的简单音乐应用 \n\nSimpMusic 是一个开源项目，可以在没有广告和跟踪的情况下从 YouTube 和 YouTube Music 中流式播放音乐，也可以登录网易云账号直接播放网易云音乐。SimpMusic 提供许多功能：\n\n - 流媒体音乐 \n - 同步歌词 \n - 个性化数据 \n - 等等…</string>
+    <string name="credit_app">使用 YouTube Music 与网易云音乐作为音源的简单音乐应用 \n\nDuoMusic 是一个开源项目，可以在没有广告和跟踪的情况下从 YouTube 和 YouTube Music 中流式播放音乐，也可以登录网易云账号直接播放网易云音乐。DuoMusic 提供许多功能：\n\n - 流媒体音乐 \n - 同步歌词 \n - 个性化数据 \n - 等等…</string>
     <string name="issue_tracker">问题跟踪</string>
     <string name="featured_playlists">精选歌单</string>
     <string name="featured_inArtist">精选开启</string>
@@ -374,7 +374,7 @@
     <string name="enable_spotify_lyrics">启用 Spotify 歌词</string>
     <string name="spotify_lyrícs_info">更多没有翻译的歌词</string>
     <string name="enable_canvas">启用 Canvas</string>
-    <string name="canvas_info">在 SimpMusic 中显示 Spotify Canvas</string>
+    <string name="canvas_info">在 DuoMusic 中显示 Spotify Canvas</string>
     <string name="spotify_lyrics_provider">由 Spotify 提供的歌词</string>
     <string name="offline_mode">离线模式</string>
     <string name="added_to_youtube_liked">添加到 YouTube 赞过</string>
@@ -431,7 +431,7 @@
     <string name="loading">加载中</string>
     <string name="updating">更新中</string>
     <string name="go_to_log_in_page">转到登录页面</string>
-    <string name="log_in_warning">YouTube Music 现在要求您登录以串流音乐，Piped 实例有时也无法正常工作。 您应该登录到 YouTube 以获得更好的 SimpMusic 体验。</string>
+    <string name="log_in_warning">YouTube Music 现在要求您登录以串流音乐，Piped 实例有时也无法正常工作。 您应该登录到 YouTube 以获得更好的 DuoMusic 体验。</string>
     <string name="spotify_canvas_cache">Spotify Canvas 缓存</string>
     <string name="clear_canvas_cache">清除 canvas 缓存</string>
     <string name="proxy">代理</string>
@@ -475,8 +475,8 @@
     <string name="other_version">其他版本</string>
     <string name="later">稍后询问</string>
     <string name="give_a_star">给颗星星</string>
-    <string name="enjoying_simpmusic">享受 SimpMusic 吧</string>
-    <string name="if_you_enjoy_using_simpmusic_star_simpmusic_on_github_or_leave_a_review_on">如果你喜欢 SimpMusic，别忘了在 Github 给 SimpMusic 点星星或留好评</string>
+    <string name="enjoying_simpmusic">享受 DuoMusic 吧</string>
+    <string name="if_you_enjoy_using_simpmusic_star_simpmusic_on_github_or_leave_a_review_on">如果你喜欢 DuoMusic，别忘了在 Github 给 DuoMusic 点星星或留好评</string>
     <string name="if_you_love_my_work_consider">"如果你喜欢我的工作，请考虑： "</string>
     <string name="buying_me_a_coffee">软件称心多雅意，薄酬一杯解劳辛。</string>
     <string name="fade_audio_effect">音频淡入淡出</string>
@@ -535,7 +535,7 @@
     <string name="contributor_name">贡献者名称</string>
     <string name="contributor_email">贡献者邮箱</string>
     <string name="anonymous">匿名</string>
-    <string name="simpmusic_lyrics">SimpMusic 歌词</string>
+    <string name="simpmusic_lyrics">DuoMusic 歌词</string>
     <string name="lyrics_provider_simpmusic">歌词由 BetterLyrics 提供</string>
     <string name="backup_in_progress">正在备份</string>
     <string name="restore_in_progress">正在还原</string>
@@ -584,8 +584,8 @@
     <string name="intro_login_to_lastfm">登录以记录您听到的内容</string>
     <string name="enable_scrobbling">启用播放记录</string>
     <string name="scrobbling_info">将您播放的内容发送到您的 Last.fm </string>
-    <string name="lastfm_login_step_1">打开 Last.fm 页面并授予 SimpMusic 对您账户的访问权限。</string>
-    <string name="lastfm_login_step_2">若您授予访问权限，SimpMusic 将再次打开 last.fm 登录页。</string>
+    <string name="lastfm_login_step_1">打开 Last.fm 页面并授予 DuoMusic 对您账户的访问权限。</string>
+    <string name="lastfm_login_step_2">若您授予访问权限，DuoMusic 将再次打开 last.fm 登录页。</string>
     <string name="lastfm_open_authorize_page">打开 Last.fm</string>
     <string name="lastfm_login_failed">无法登录到 Last.fm，请重试。</string>
     <string name="lastfm_paste_callback_title">没有自动返回？</string>
@@ -616,7 +616,7 @@
     <string name="downvote">点踩</string>
     <string name="vote_submitted">感谢您为这份歌词投票！</string>
     <string name="vote_error">发送失败</string>
-    <string name="open_app">打开 SimpMusic</string>
+    <string name="open_app">打开 DuoMusic</string>
     <string name="close_miniplayer">关闭迷你播放器</string>
     <string name="open_miniplayer">打开迷你播放器</string>
     <string name="quit_app">退出应用</string>
@@ -624,7 +624,7 @@
     <string name="local_tracking_description">将您的收听历史记录到本地数据库</string>
     <string name="blog_notification_title">博客文章通知</string>
     <string name="blog_notification_description">在开发者发布新博文时接收通知</string>
-    <string name="simpmusic_charts">SimpMusic 排行榜</string>
+    <string name="simpmusic_charts">DuoMusic 排行榜</string>
     <string name="crossfading">交叉淡入淡出</string>
     <string name="your_320kbps_url">您的 320kbps URL</string>
     <string name="your_320kbps_url_description">留空则由可用性检查程序自动选择一个有效的 URL。</string>
@@ -643,7 +643,7 @@
     <string name="import_result">已创建 %1$d 播放列表并导入了 %2$d 首歌曲。</string>
     <string name="import_result_skipped">已跳过 %1$d 条目，因为文件中缺少相应的歌曲。</string>
     <string name="import_failed">导入失败</string>
-    <string name="import_invalid_file">此文件不是一个有效的 SimpMusic 导入文件。请先在 simpmusic.org 转换您的库。</string>
+    <string name="import_invalid_file">此文件不是一个有效的 DuoMusic 导入文件。请先在 simpmusic.org 转换您的库。</string>
     <string name="extract_source">提取来源</string>
     <string name="crop_cover">裁剪封面</string>
     <string name="radio_audio_only">电台仅播放音频</string>
@@ -779,7 +779,7 @@
     <string name="key">调性</string>
     <string name="scale">调式</string>
     <string name="import_playlists_from_other_apps">从其他应用导入歌单</string>
-    <string name="import_data_intro">导入功能支持导入从 Spotify 或其他 YT Music 客户端应用转换而来的歌单。\n转换工具：https://www.simpmusic.org/tools\n在 SimpMusic 中只能导入本应用格式的歌单文件</string>
+    <string name="import_data_intro">导入功能支持导入从 Spotify 或其他 YT Music 客户端应用转换而来的歌单。\n转换工具：https://www.simpmusic.org/tools\n在 DuoMusic 中只能导入本应用格式的歌单文件</string>
     <string name="analytics">听歌分析</string>
     <string name="select_all">全选</string>
     <string name="n_selected">已选 %1$d 项</string>
@@ -849,7 +849,7 @@
     <string name="wrapped_share">分享</string>
     <string name="wrapped_save">保存</string>
     <string name="wrapped_opening_title">你的音乐年度</string>
-    <string name="wrapped_opening_lead">你打开 SimpMusic 的日子是</string>
+    <string name="wrapped_opening_lead">你打开 DuoMusic 的日子是</string>
     <string name="wrapped_opening_days">%2$s 天中的 %1$s 天</string>
     <string name="wrapped_opening_tracks">%1$s 首歌曲从耳边流过。</string>
     <string name="wrapped_minutes_title">这一年你听了这么久</string>
@@ -918,7 +918,7 @@
     <string name="month_full_nov">十一月</string>
     <string name="month_full_dec">十二月</string>
     <string name="backup_location">备份位置</string>
-    <string name="backup_location_default">Documents/SimpMusic（默认）</string>
+    <string name="backup_location_default">Documents/DuoMusic（默认）</string>
     <string name="language_follow_system">跟随系统</string>
     <string name="language_follow_system_current">跟随系统（当前：%1$s）</string>
     <!-- Listen Together -->
@@ -1051,7 +1051,7 @@
     <string name="downloaded_collections">已下载的专辑与歌单</string>
     <string name="your_youtube_music">您的 YouTube Music</string>
     <string name="youtube_collection_sync">歌单与专辑收藏同步到 YouTube Music</string>
-    <string name="youtube_collection_sync_description">在 SimpMusic 收藏或取消收藏歌单、专辑时，同步到 YouTube Music 账号；关闭后仅修改本地</string>
+    <string name="youtube_collection_sync_description">在 DuoMusic 收藏或取消收藏歌单、专辑时，同步到 YouTube Music 账号；关闭后仅修改本地</string>
     <string name="netease_login_qr">扫码</string>
     <string name="netease_login_phone">手机号</string>
     <string name="netease_login_web">网页</string>
@@ -1106,9 +1106,9 @@
     <string name="equalizer_type_system">系统</string>
     <string name="login_sync_section">设备</string>
     <string name="login_sync_android_title">发送登录态到桌面端</string>
-    <string name="login_sync_android_description">扫描电脑上 SimpMusic 显示的二维码，把手机上已登录的账号发送过去</string>
+    <string name="login_sync_android_description">扫描电脑上 DuoMusic 显示的二维码，把手机上已登录的账号发送过去</string>
     <string name="login_sync_desktop_title">从手机端登录</string>
-    <string name="login_sync_desktop_description">用 Android 版 SimpMusic 扫描二维码，把登录状态带到桌面端</string>
+    <string name="login_sync_desktop_description">用 Android 版 DuoMusic 扫描二维码，把登录状态带到桌面端</string>
     <string name="login_sync_scan_hint">将相机对准电脑上的二维码</string>
     <string name="login_sync_connecting">正在连接你的电脑…</string>
     <string name="login_sync_trust_title">信任这台电脑？</string>
@@ -1119,9 +1119,9 @@
     <string name="login_sync_sending">发送中…</string>
     <string name="login_sync_sent">已在 %1$s 上登录：%2$s</string>
     <string name="login_sync_nothing_signed_in">你还没有登录任何服务。</string>
-    <string name="login_sync_camera_needed">SimpMusic 仅在扫描电脑上显示的二维码时使用相机。</string>
+    <string name="login_sync_camera_needed">DuoMusic 仅在扫描电脑上显示的二维码时使用相机。</string>
     <string name="login_sync_allow_camera">允许使用相机</string>
-    <string name="login_sync_camera_blocked">SimpMusic 的相机权限已被关闭。请在系统设置中打开后再扫码。</string>
+    <string name="login_sync_camera_blocked">DuoMusic 的相机权限已被关闭。请在系统设置中打开后再扫码。</string>
     <string name="login_sync_open_settings">打开设置</string>
     <string name="login_sync_no_camera">没有可用的相机来扫描二维码。</string>
     <string name="login_sync_unreachable">无法连接到电脑。请确认手机与电脑在同一网络（或 Tailscale）后重试。</string>
@@ -1141,7 +1141,7 @@
     <string name="download_file_name_title_artist">标题-艺人</string>
     <string name="simultaneous_downloads">同时下载数量</string>
     <string name="download_artist_album_folder">按「歌手/专辑」整理目录</string>
-    <string name="download_artist_album_folder_description">保存到 Music/SimpMusic/歌手/专辑</string>
+    <string name="download_artist_album_folder_description">保存到 Music/DuoMusic/歌手/专辑</string>
     <string name="download_save_lrc">同时保存歌词文件</string>
     <string name="download_save_lrc_description">在音频旁写入原文时间轴 .lrc</string>
     <string name="download_ai_tags">补全音乐标签</string>
@@ -1177,7 +1177,7 @@
     <string name="download_no_completed">暂无已完成的下载</string>
     <string name="download_clear_all">清除全部下载</string>
     <string name="download_clear_all_description">删除所有已下载的音频与视频文件</string>
-    <string name="download_artist_album_folder_description_off">保存到 Music/SimpMusic</string>
+    <string name="download_artist_album_folder_description_off">保存到 Music/DuoMusic</string>
     <string name="download_no_space">存储空间不足，无法下载</string>
     <!-- 无障碍：纯图标控件语义 (UI-CR-07) -->
     <string name="pause">暂停</string>
@@ -1198,14 +1198,14 @@
     <string name="play_all">播放全部</string>
     <string name="mood">心情</string>
     <string name="follow_me_on_x">在 X 上关注我</string>
-    <string name="blog_promo_message">我的 SimpMusic 博客上线了：simpmusic.org——分享 SimpMusic 背后的故事、音乐技术深度文章和工程笔记，感兴趣的话欢迎阅读 ✨</string>
+    <string name="blog_promo_message">我的 DuoMusic 博客上线了：simpmusic.org——分享 DuoMusic 背后的故事、音乐技术深度文章和工程笔记，感兴趣的话欢迎阅读 ✨</string>
     <string name="radio_mix_upper">电台/混播</string>
     <string name="radio_mix">电台/混播</string>
     <string name="no_equalizer">你的设备没有均衡器</string>
     <string name="open_system_equalizer">打开系统均衡器</string>
     <string name="use_your_system_equalizer">使用系统均衡器</string>
     <string name="footguns_promo_title">我踩过的每一个坑</string>
-    <string name="footguns_promo_message">SimpMusic 让我在 Kotlin 和 Compose 的坑上熬了很多夜——没有任何文档警告过。我把它们全部写进了 kotlin-footguns，让你不必熬同样的夜。如果它帮到了你，一颗星对我意义重大。</string>
+    <string name="footguns_promo_message">DuoMusic 让我在 Kotlin 和 Compose 的坑上熬了很多夜——没有任何文档警告过。我把它们全部写进了 kotlin-footguns，让你不必熬同样的夜。如果它帮到了你，一颗星对我意义重大。</string>
     <string name="save_all_your_playlist_data">保存全部歌单数据</string>
     <string name="download_disabled_live">下载（直播不可下载）</string>
     <string name="dislike_on_youtube">踩（YouTube Music 将减少推荐这首歌）</string>
@@ -1227,8 +1227,8 @@
     <string name="audio_output_bluetooth">蓝牙</string>
     <string name="audio_output_usb">USB 音频</string>
     <string name="audio_output_hdmi">HDMI</string>
-    <string name="backup_default_folder_name">Documents/SimpMusic</string>
-    <string name="login_sync_desktop_instructions">在手机上打开 SimpMusic → 设置 → %1$s，然后扫描此二维码。</string>
+    <string name="backup_default_folder_name">Documents/DuoMusic</string>
+    <string name="login_sync_desktop_instructions">在手机上打开 DuoMusic → 设置 → %1$s，然后扫描此二维码。</string>
     <string name="login_sync_pick_address">选择手机能访问到的地址——同一局域网，或经 Tailscale。</string>
     <string name="login_sync_phone_connected">手机已连接。请在手机上确认以继续。</string>
     <string name="login_sync_received">已登录 %1$s</string>
@@ -1237,7 +1237,7 @@
     <string name="login_sync_start_failed">无法启动：%1$s</string>
     <string name="login_sync_receive_failed">无法接收登录：%1$s</string>
     <string name="modified_build_title">非官方应用</string>
-    <string name="modified_build_message">你正在使用他人修改或重新打包的 SimpMusic 非官方副本，无法使用。请从 simpmusic.org 下载官方版本。</string>
+    <string name="modified_build_message">你正在使用他人修改或重新打包的 DuoMusic 非官方副本，无法使用。请从 simpmusic.org 下载官方版本。</string>
     <string name="taste_title">你的音乐口味是什么？</string>
     <string name="taste_invite">让 AI 读完你最近 12 个月的收听，告诉你答案。</string>
     <string name="taste_loading_title">正在读取你的音乐口味…</string>
@@ -1253,7 +1253,7 @@
     <string name="taste_regenerate">重新生成</string>
     <string name="taste_share_title">分享你的音乐口味</string>
     <string name="taste_card_title">我的音乐口味</string>
-    <string name="taste_card_subtitle">SimpMusic 上的 12 个月</string>
+    <string name="taste_card_subtitle">DuoMusic 上的 12 个月</string>
     <string name="receipt_open">收听小票</string>
     <string name="receipt_share_title">分享你的收听小票</string>
     <string name="receipt_order">订单 #%1$s · %2$s</string>

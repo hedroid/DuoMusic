@@ -2,7 +2,7 @@
 
 <img src="https://raw.githubusercontent.com/maxrave-dev/SimpMusic/dev/fastlane/metadata/android/en-US/images/featureGraphic.png">
 
-# SimpMusic 双源版
+# DuoMusic 双源版（原 SimpMusic 双源版）
 
 **YouTube Music + 网易云音乐，一个 FOSS 客户端全都有。**
 
@@ -141,7 +141,7 @@ cd SimpMusic
 ./gradlew :composeApp:assembleDebug
 ```
 
-- Android 端为主要适配与验证平台（`com.maxrave.simpmusic.dev` 为 debug 包名）；桌面端沿用上游能力，网易源未做专门验证。
+- Android 端为主要适配与验证平台（`com.github.hedroid.duomusic.dev` 为 debug 包名，2026-10-29 由 `com.maxrave.simpmusic.dev` 更名，旧包数据可用 app 内备份恢复）；桌面端沿用上游能力，网易源未做专门验证。
 - core 子模块：[hedroid/SimpMusic-Core](https://github.com/hedroid/SimpMusic-Core)（fork 自 [maxrave-dev/core](https://github.com/maxrave-dev/core)）。
 
 ## 🙏 致谢
