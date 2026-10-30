@@ -211,15 +211,16 @@ fun NeteaseHomeScreen(
     // 跨天则静默刷新一轮(行保持内容原位替换),同一天内零重拉
     LaunchedEffect(Unit) { viewModel.onScreenShown() }
 
-    // 切源跳主页+刷新的落点(2026-10-13):消费与 YT 主页同一信号,静默刷新(行原地替换)
+    // 切源跳主页+刷新的落点(2026-10-13):消费与 YT 主页同一信号,静默刷新(行原地替换)。
+    // 滚顶与刷新不再互斥(2026-10-30):切源落地时若只滚顶,恢复的深滚动位置会让新源
+    // 主页停留在上次访问的缓存内容上——切源必须换内容,两个动作都要做。
     val reloadDestination by sharedViewModel.reloadDestination.collectAsStateWithLifecycle()
     LaunchedEffect(reloadDestination) {
         if (reloadDestination == HomeDestination::class) {
             if (scrollState.firstVisibleItemIndex > 1) {
                 scrollState.animateScrollToItem(0)
-            } else {
-                viewModel.refresh()
             }
+            viewModel.refresh()
             sharedViewModel.reloadDestinationDone()
         }
     }

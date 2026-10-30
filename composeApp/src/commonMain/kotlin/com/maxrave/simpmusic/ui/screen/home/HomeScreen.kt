@@ -392,14 +392,16 @@ fun HomeScreen(
     }
     LaunchedEffect(key1 = reloadDestination) {
         if (reloadDestination == HomeDestination::class) {
+            // 滚顶与刷新不再互斥(2026-10-30):切源落地时若只滚顶,恢复的深滚动位置会
+            // 让主页停留在上次访问的缓存内容上——两个动作都要做(与网易主页对齐)。
+            // 信号消费完必须清(原实现只有滚顶分支清,刷新分支不清=残留信号在下次
+            // 进入主页组合时误触发刷新)。
+            Logger.w("HomeScreen", "reload signal, firstVisibleItemIndex: ${scrollState.firstVisibleItemIndex}")
             if (scrollState.firstVisibleItemIndex > 1) {
-                Logger.w("HomeScreen", "scrollState.firstVisibleItemIndex: ${scrollState.firstVisibleItemIndex}")
                 scrollState.animateScrollToItem(0)
-                sharedViewModel.reloadDestinationDone()
-            } else {
-                Logger.w("HomeScreen", "scrollState.firstVisibleItemIndex: ${scrollState.firstVisibleItemIndex}")
-                onRefresh.invoke()
             }
+            onRefresh.invoke()
+            sharedViewModel.reloadDestinationDone()
         }
     }
     LaunchedEffect(key1 = loading) {
