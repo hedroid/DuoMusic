@@ -980,7 +980,7 @@ sealed class NowPlayingBottomSheetUIEvent {
 
     data object Download : NowPlayingBottomSheetUIEvent()
 
-    /** 视频文件下载(文件式,仅 YT 歌):音视频双流 merge mp4 落 Music/SimpMusic[/主艺人/专辑](与音频同树,回落 Movies) */
+    /** 视频文件下载(文件式,仅 YT 歌):音视频双流 merge mp4 落 Music/DuoMusic[/主艺人/专辑](与音频同树,回落 Movies) */
     data object DownloadVideo : NowPlayingBottomSheetUIEvent()
 
     /** 取消视频下载(只撤视频条目,音频任务/已落文件不动) */

@@ -1200,8 +1200,8 @@ fun InfoPlayerBottomSheet(
                     textAlign = TextAlign.Center,
                 )
                 // "下载到设备"按钮已移除(2026-10 定稿):音频侧由三点菜单"下载"(文件式,落
-                // Music/SimpMusic 带 tag)承接,视频侧由三点菜单"下载视频"(merge mp4 落
-                // Movies/SimpMusic)承接;旧 downloadFile 导出管线保留在 VM 不删,回滚只需
+                // Music/DuoMusic 带 tag)承接,视频侧由三点菜单"下载视频"(merge mp4 落
+                // Movies/DuoMusic)承接;旧 downloadFile 导出管线保留在 VM 不删,回滚只需
                 // 恢复此按钮。
                 Spacer(modifier = Modifier.height(10.dp))
 
@@ -2587,7 +2587,7 @@ fun NowPlayingBottomSheet(
                         }
                     }
                     // 视频文件下载(2026-10 文件式,仅 YT 歌且真有视频流):merge mp4 落
-                    // Music/SimpMusic[/主艺人/专辑](与音频同树,回落 Movies)。ATV=纯音频
+                    // Music/DuoMusic[/主艺人/专辑](与音频同树,回落 Movies)。ATV=纯音频
                     // 曲目(player 响应无视频 format),下了也只能 merge 出"只有声音的
                     // mp4"——不显示入口(2026-10-01 用户反馈)。
                     // 真正的视频曲目按钮与网易 MV 共用歌曲下载的图标/文案三态:
