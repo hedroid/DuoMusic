@@ -101,6 +101,7 @@ import simpmusic.composeapp.generated.resources.cancel
 import simpmusic.composeapp.generated.resources.delete
 import simpmusic.composeapp.generated.resources.favorite
 import simpmusic.composeapp.generated.resources.followed
+import simpmusic.composeapp.generated.resources.downloaded
 import simpmusic.composeapp.generated.resources.liked_songs
 import simpmusic.composeapp.generated.resources.liked_songs_count
 import simpmusic.composeapp.generated.resources.lower_plays
@@ -149,6 +150,8 @@ fun LibraryDynamicPlaylistScreen(
     var tempFollowed by remember { mutableStateOf(emptyList<ArtistEntity>()) }
     val mostPlayed by viewModel.listMostPlayedSong.collectAsStateWithLifecycle()
     var tempMostPlayed by remember { mutableStateOf(emptyList<SongEntity>()) }
+    val downloaded by viewModel.listDownloadedSong.collectAsStateWithLifecycle()
+    var tempDownloaded by remember { mutableStateOf(emptyList<SongEntity>()) }
     val monthlyRecap by viewModel.listMonthlyRecapSong.collectAsStateWithLifecycle()
     var tempMonthlyRecap by remember { mutableStateOf(emptyList<SongEntity>()) }
     val artistLiked by viewModel.listArtistLikedSong.collectAsStateWithLifecycle()
@@ -183,6 +186,7 @@ fun LibraryDynamicPlaylistScreen(
         tempFavorite = favorite.filter { it.matches(query) }
         tempFollowed = followed.filter { it.name.contains(query, ignoreCase = true) }
         tempMostPlayed = mostPlayed.filter { it.matches(query) }
+        tempDownloaded = downloaded.filter { it.matches(query) }
         tempMonthlyRecap = monthlyRecap.filter { it.matches(query) }
         tempArtistLiked = artistLiked.filter { it.matches(query) }
         tempTopTracks =
@@ -392,6 +396,14 @@ fun LibraryDynamicPlaylistScreen(
                         }
                     }
 
+                    LibraryDynamicPlaylistType.Downloaded -> {
+                        if (query.isNotEmpty() && showSearchBar) {
+                            tempDownloaded
+                        } else {
+                            downloaded
+                        }
+                    }
+
                     // Kept as an explicit branch rather than an `else`: the three cases above are
                     // reachable only because the `if` chain around this block has already ruled
                     // out every other object, and an `else` here would silently swallow the next
@@ -530,6 +542,8 @@ fun LibraryDynamicPlaylistScreen(
                     stringResource(Res.string.album_length, favorite.size.toString(), "")
                 LibraryDynamicPlaylistType.MostPlayed ->
                     stringResource(Res.string.album_length, mostPlayed.size.toString(), "")
+                LibraryDynamicPlaylistType.Downloaded ->
+                    stringResource(Res.string.album_length, downloaded.size.toString(), "")
                 LibraryDynamicPlaylistType.Followed ->
                     "${followed.size} ${stringResource(Res.string.artists)}"
                 is LibraryDynamicPlaylistType.MonthlyRecap ->
@@ -688,6 +702,10 @@ fun LibraryDynamicPlaylistScreen(
                                     (if (query.isNotEmpty() && showSearchBar) tempMostPlayed else mostPlayed)
                                         .map { it.videoId }
 
+                                LibraryDynamicPlaylistType.Downloaded ->
+                                    (if (query.isNotEmpty() && showSearchBar) tempDownloaded else downloaded)
+                                        .map { it.videoId }
+
                                 is LibraryDynamicPlaylistType.ArtistLiked ->
                                     (if (query.isNotEmpty() && showSearchBar) tempArtistLiked else artistLiked)
                                         .map { it.videoId }
@@ -745,6 +763,9 @@ sealed class LibraryDynamicPlaylistType {
     data object Followed : LibraryDynamicPlaylistType()
 
     data object MostPlayed : LibraryDynamicPlaylistType()
+
+    /** 已下载歌曲(桌面侧边栏 Pinned 入口),列表来自实时下载流 */
+    data object Downloaded : LibraryDynamicPlaylistType()
 
     /**
      * The three top lists carry the period they were opened for, so the list on screen is the one
@@ -813,6 +834,7 @@ sealed class LibraryDynamicPlaylistType {
             Favorite -> Res.string.favorite
             Followed -> Res.string.followed
             MostPlayed -> Res.string.most_played
+            Downloaded -> Res.string.downloaded
             is TopAlbums -> Res.string.your_top_albums
             is TopArtists -> Res.string.your_top_artists
             is TopTracks -> Res.string.your_top_tracks
@@ -882,6 +904,7 @@ sealed class LibraryDynamicPlaylistType {
             Favorite -> "favorite"
             Followed -> "followed"
             MostPlayed -> "most_played"
+            Downloaded -> "downloaded"
             is TopAlbums -> TOP_ALBUMS + periodSuffix()
             is TopArtists -> TOP_ARTISTS + periodSuffix()
             is TopTracks -> TOP_TRACKS + periodSuffix()
@@ -903,6 +926,7 @@ sealed class LibraryDynamicPlaylistType {
                 "favorite" -> Favorite
                 "followed" -> Followed
                 "most_played" -> MostPlayed
+                "downloaded" -> Downloaded
                 TOP_ALBUMS -> TopAlbums()
                 TOP_ARTISTS -> TopArtists()
                 TOP_TRACKS -> TopTracks()

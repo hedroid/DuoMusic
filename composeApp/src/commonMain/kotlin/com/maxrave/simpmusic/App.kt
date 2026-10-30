@@ -81,6 +81,7 @@ import com.maxrave.simpmusic.expect.ui.rememberBackdrop
 import com.maxrave.simpmusic.extension.copy
 import com.maxrave.simpmusic.ui.component.AppBottomNavigationBar
 import com.maxrave.simpmusic.ui.component.AppNavigationRail
+import com.maxrave.simpmusic.ui.component.DesktopSidebar
 import com.maxrave.simpmusic.ui.component.LiquidGlassAppBottomNavigationBar
 import com.maxrave.simpmusic.ui.component.LocalAppBottomOverlayPadding
 import com.maxrave.simpmusic.ui.component.LocalAppContentPadding
@@ -751,37 +752,74 @@ fun App(
                         Modifier.fillMaxSize(),
                     ) {
                         if (isTablet && !isInFullscreen) {
-                            AppNavigationRail(
-                                navController = navController,
-                                showAnalyticsTab = showAnalyticsTab,
-                                showMixForYouTab = showMixForYouTab,
-                                // 横屏 rail 搜索项长按弹音源菜单,与竖屏底栏同款交互(用户 2026-09-24)
-                                selectedSource = runCatching { com.maxrave.domain.source.MusicSource.valueOf(selectedSourceValue) }.getOrDefault(com.maxrave.domain.source.MusicSource.YOUTUBE_MUSIC),
-                                neteaseLoggedIn = neteaseLoggedInValue,
-                                onSourceSelected = { source ->
-                                    if (selectedSourceValue != source.name) {
-                                        // 横屏 rail 同款:切源不停播,跳主页+刷新(2026-10-13)
-                                        // 同上(CR P1):切换成功才导航
-                                        viewModel.switchSource(source) { switched ->
-                                            if (switched) {
-                                                viewModel.navigateHomeAndRefresh(navController)
+                            if (isDesktopShell) {
+                                // 桌面=上游 2.4.0 Spotify 式侧栏(折叠 72/展开 280dp,记忆折叠态);
+                                // fork 补长按 Search 切音源,与旧 rail/竖屏底栏同款交互
+                                DesktopSidebar(
+                                    navController = navController,
+                                    containerColor = desktopPanel,
+                                    showAnalyticsTab = showAnalyticsTab,
+                                    showMixForYouTab = showMixForYouTab,
+                                    selectedSource = runCatching { com.maxrave.domain.source.MusicSource.valueOf(selectedSourceValue) }.getOrDefault(com.maxrave.domain.source.MusicSource.YOUTUBE_MUSIC),
+                                    neteaseLoggedIn = neteaseLoggedInValue,
+                                    onSourceSelected = { source ->
+                                        if (selectedSourceValue != source.name) {
+                                            // 同 rail:切源不停播,跳主页+刷新;切换成功才导航
+                                            viewModel.switchSource(source) { switched ->
+                                                if (switched) {
+                                                    viewModel.navigateHomeAndRefresh(navController)
+                                                }
                                             }
                                         }
-                                    }
-                                },
-                                reloadDestinationIfNeeded = { klass ->
-                                    viewModel.reloadDestination(klass)
-                                },
-                            )
+                                    },
+                                    reloadDestinationIfNeeded = { klass ->
+                                        viewModel.reloadDestination(klass)
+                                    },
+                                )
+                            } else {
+                                AppNavigationRail(
+                                    navController = navController,
+                                    showAnalyticsTab = showAnalyticsTab,
+                                    showMixForYouTab = showMixForYouTab,
+                                    // 横屏 rail 搜索项长按弹音源菜单,与竖屏底栏同款交互(用户 2026-09-24)
+                                    selectedSource = runCatching { com.maxrave.domain.source.MusicSource.valueOf(selectedSourceValue) }.getOrDefault(com.maxrave.domain.source.MusicSource.YOUTUBE_MUSIC),
+                                    neteaseLoggedIn = neteaseLoggedInValue,
+                                    onSourceSelected = { source ->
+                                        if (selectedSourceValue != source.name) {
+                                            // 横屏 rail 同款:切源不停播,跳主页+刷新(2026-10-13)
+                                            // 同上(CR P1):切换成功才导航
+                                            viewModel.switchSource(source) { switched ->
+                                                if (switched) {
+                                                    viewModel.navigateHomeAndRefresh(navController)
+                                                }
+                                            }
+                                        }
+                                    },
+                                    reloadDestinationIfNeeded = { klass ->
+                                        viewModel.reloadDestination(klass)
+                                    },
+                                )
+                            }
                         }
                         // Desktop only: the content sits in its own rounded panel floating on a
-                        // pure black window, Spotify style, while the rail stays flat black
-                        // outside it. Phones keep one continuous surface — the inset only reads
+                        // pure black window, Spotify style, with the sidebar outside the panel.
+                        // Phones keep one continuous surface — the inset only reads
                         // as deliberate when there is a window frame around it.
                         Box(
                             Modifier
                                 .weight(1f)
-                                .fillMaxHeight(),
+                                .fillMaxHeight()
+                                .then(
+                                    if (isDesktopShell && isTablet && !isInFullscreen) {
+                                        // 上游配套视觉:内容面板化(Spotify 式圆角浮层),侧栏在面板外
+                                        Modifier
+                                            .padding(8.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(desktopPanel)
+                                    } else {
+                                        Modifier
+                                    },
+                                ),
                         ) {
                             Row(
                                 Modifier
