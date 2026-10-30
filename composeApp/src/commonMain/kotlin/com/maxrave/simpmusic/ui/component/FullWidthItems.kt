@@ -55,6 +55,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
@@ -377,7 +378,16 @@ fun SongFullWidthItems(
                                 text = (index + 1).toString(),
                                 color = contentColor,
                                 style = typo().titleMedium,
-                                modifier = Modifier.align(Alignment.Center),
+                                textAlign = TextAlign.Start,
+                                // 数字列左对齐(垂直仍居中):外层 Box 的 contentAlignment=
+                                // Center 会把窄字符("1")与宽字符("2"/"10")一起按中点收,
+                                // 左缘差 5-6px 顺列看参差。Text 在 Crossfade 内容 lambda 里,
+                                // align() 对着包裹内容的盒子无效——必须 fillMaxWidth 撑满
+                                // 槽宽后由 textAlign 起点对齐,垂直交给 wrapContentHeight。
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .wrapContentHeight(align = Alignment.CenterVertically),
                             )
                         }
                     }
