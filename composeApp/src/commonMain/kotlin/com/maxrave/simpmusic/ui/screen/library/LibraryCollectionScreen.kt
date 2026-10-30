@@ -800,8 +800,8 @@ private fun DownloadManagementRowItem(
 }
 
 /** 下载管理页两视角(2026-10-01 用户定):下载中/已完成,行混排不按内容分类 */
-// 已缓存 tab(2026-10-28 上游 Cached 数据层):用户定"用处不大"暂隐藏;管线全保留
-private const val SHOW_CACHED_TAB = false
+// 已缓存 tab(2026-10-28 上游 Cached 数据层):2026-10-31 用户拍板恢复显示
+private const val SHOW_CACHED_TAB = true
 
 internal enum class DownloadedSection {
     InProgress,
