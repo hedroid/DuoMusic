@@ -486,7 +486,7 @@
     <string name="featured_playlists">精選播放清單</string>
     <string name="featured_inArtist">精選合輯</string>
     <string name="audio_quality">音訊品質</string>
-    <string name="play_video_for_video_track_instead_of_audio_only">影片曲目播放畫面，而非僅播放聲音</string>
+    <string name="play_video_for_video_track_instead_of_audio_only">影片曲目播放畫面而非僅聲音</string>
     <string name="such_as_music_video_lyrics_video_podcasts_and_more">例如 MV、歌詞影片、Podcast 等</string>
     <string name="radio_audio_only">在電台中播放歌曲而非影片</string>
     <string name="radio_audio_only_description">在有可用的音樂供播放時，播放它而非播放 MV。同時跳過只存在於影片的 Remix 與混音。這不會影響到播放清單與專輯</string>

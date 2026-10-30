@@ -337,7 +337,7 @@
     <string name="featured_playlists">精选歌单</string>
     <string name="featured_inArtist">精选合辑</string>
     <string name="audio_quality">音质</string>
-    <string name="play_video_for_video_track_instead_of_audio_only">视频曲目播放画面，而非仅播放声音</string>
+    <string name="play_video_for_video_track_instead_of_audio_only">视频曲目播放画面而非仅声音</string>
     <string name="such_as_music_video_lyrics_video_podcasts_and_more">例如 MV、歌词视频、播客等</string>
     <string name="video_quality">视频质量</string>
     <plurals name="n_song">
