@@ -11,6 +11,7 @@ import androidx.compose.foundation.MarqueeAnimationMode
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
@@ -298,6 +299,8 @@ import simpmusic.composeapp.generated.resources.no_comments
 import simpmusic.composeapp.generated.resources.post_comment_hint
 import simpmusic.composeapp.generated.resources.post_comment_success
 import simpmusic.composeapp.generated.resources.comment_waiting_to_sync
+import simpmusic.composeapp.generated.resources.delete_comment_message
+import simpmusic.composeapp.generated.resources.delete_comment_title
 import simpmusic.composeapp.generated.resources.published_at
 import simpmusic.composeapp.generated.resources.publish
 import simpmusic.composeapp.generated.resources.reply_hint
@@ -5521,6 +5524,89 @@ fun NeteaseCommentsSheet(
     val postSuccessText = stringResource(Res.string.post_comment_success)
     val waitingToSyncText = stringResource(Res.string.comment_waiting_to_sync)
 
+    // 删除自己发的评论:入口=长按自己的评论(服务端 userId 比对)或本会话刚发的回显条
+    // (timeStr=等待同步标记)。ghost(xeapi 偶不回 id)只做本地摘除,无 id 删不了服务端
+    var currentUserId by remember(songId, commentThreadId) { mutableStateOf<Long?>(null) }
+    LaunchedEffect(songId, commentThreadId) {
+        currentUserId = runCatching { neteaseRepository.currentNeteaseUserId() }.getOrNull()
+    }
+    var pendingDelete by remember(songId, commentThreadId) {
+        mutableStateOf<com.maxrave.domain.data.entities.NeteaseSongInfoEntity.HotComment?>(null)
+    }
+    var deletePending by remember(songId, commentThreadId) { mutableStateOf(false) }
+    val deleteTitleText = stringResource(Res.string.delete_comment_title)
+    val deleteMessageText = stringResource(Res.string.delete_comment_message)
+    val deleteConfirmText = stringResource(Res.string.delete)
+    val deleteCancelText = stringResource(Res.string.cancel)
+
+    fun isOwnComment(comment: com.maxrave.domain.data.entities.NeteaseSongInfoEntity.HotComment): Boolean =
+        (comment.userId != null && comment.userId == currentUserId) ||
+            comment.timeStr == waitingToSyncText
+
+    fun confirmDelete() {
+        val comment = pendingDelete ?: return
+        pendingDelete = null
+        if (deletePending) return
+        // 弹窗期间列表可能已被重载/收起,目标不在了就不再处理
+        val isFloor = floorComments.any { it === comment }
+        if (!isFloor && (pendingLocalComments + comments).none { it === comment }) return
+        if (isPodcast && commentThreadId == null) {
+            showToast(
+                message = runBlocking { getString(Res.string.netease_action_failed) },
+                duration = ToastDuration.Short,
+                gravity = ToastGravity.Bottom,
+            )
+            return
+        }
+        val floorIndex = floorComments.indexOf(comment)
+        val topLevelIndex = (pendingLocalComments + comments).indexOf(comment)
+        // 乐观摘除
+        pendingLocalComments = pendingLocalComments.filterNot { it === comment }
+        comments = comments.filterNot { it === comment }
+        floorComments = floorComments.filterNot { it === comment }
+        if (isFloor) {
+            // 楼层删除:父评论 replyCount-1(与乐观回复 +1 对称)
+            comments =
+                comments.map {
+                    if (it.commentId == expandedCommentId && it.replyCount > 0) {
+                        it.copy(replyCount = it.replyCount - 1)
+                    } else {
+                        it
+                    }
+                }
+        } else {
+            // 顶层删除:本地计数叠层-1(与发评 +1 对称),下次进弹窗以服务端计数为准
+            localCountFloor = maxOf(displayTotalCount, localCountFloor ?: 0) - 1
+        }
+        val id = comment.commentId ?: return
+        deletePending = true
+        coroutineScope.launch {
+            neteaseRepository
+                .deleteSongComment(songId, id, threadId = commentThreadId)
+                .onFailure { e ->
+                    // 失败回插原位(越界钳尾)+计数回滚
+                    if (isFloor) {
+                        val at = floorIndex.coerceIn(0, floorComments.size)
+                        floorComments = floorComments.toMutableList().apply { add(at, comment) }
+                        comments =
+                            comments.map {
+                                if (it.commentId == expandedCommentId) it.copy(replyCount = it.replyCount + 1) else it
+                            }
+                    } else {
+                        val at = (topLevelIndex - pendingLocalComments.size).coerceIn(0, comments.size)
+                        comments = comments.toMutableList().apply { add(at, comment) }
+                        localCountFloor = maxOf(displayTotalCount, localCountFloor ?: 0) + 1
+                    }
+                    showToast(
+                        message = e.message ?: "failed",
+                        duration = ToastDuration.Short,
+                        gravity = ToastGravity.Bottom,
+                    )
+                }
+            deletePending = false
+        }
+    }
+
     fun submitPost() {
         if (isPodcast && commentThreadId == null) return
         val text = postText.trim()
@@ -5753,18 +5839,21 @@ fun NeteaseCommentsSheet(
                                             .clip(RoundedCornerShape(50)),
                                 )
                                 Spacer(modifier = Modifier.width(12.dp))
-                                // 点评论=回复该条(官方交互);点赞按钮在右侧独立处理点击
+                                // 点评论=回复该条(官方交互);长按自己的评论=删除;点赞按钮在右侧独立处理点击
                                 Column(
                                     Modifier
                                         .weight(1f)
                                         .clip(RoundedCornerShape(8.dp))
-                                        .clickable {
-                                            if (comment.commentId != null) {
-                                                replyTarget = comment
-                                                postText = ""
-                                                showPostDialog = true
-                                            }
-                                        },
+                                        .combinedClickable(
+                                            onClick = {
+                                                if (comment.commentId != null) {
+                                                    replyTarget = comment
+                                                    postText = ""
+                                                    showPostDialog = true
+                                                }
+                                            },
+                                            onLongClick = { if (isOwnComment(comment)) pendingDelete = comment },
+                                        ),
                                 ) {
                                     Text(
                                         text =
@@ -5865,13 +5954,16 @@ fun NeteaseCommentsSheet(
                                                 Modifier
                                                     .weight(1f)
                                                     .clip(RoundedCornerShape(8.dp))
-                                                    .clickable {
-                                                        if (reply.commentId != null) {
-                                                            replyTarget = reply
-                                                            postText = ""
-                                                            showPostDialog = true
-                                                        }
-                                                    },
+                                                    .combinedClickable(
+                                                        onClick = {
+                                                            if (reply.commentId != null) {
+                                                                replyTarget = reply
+                                                                postText = ""
+                                                                showPostDialog = true
+                                                            }
+                                                        },
+                                                        onLongClick = { if (isOwnComment(reply)) pendingDelete = reply },
+                                                    ),
                                             ) {
                                                 Text(
                                                     text =
@@ -6079,6 +6171,29 @@ fun NeteaseCommentsSheet(
             }
         }
         }
+    }
+    // 删除确认:居中 AlertDialog(sheet 内不需要输入,天然避开 IME/inset 限制)
+    pendingDelete?.let {
+        AlertDialog(
+            onDismissRequest = { if (!deletePending) pendingDelete = null },
+            title = {
+                Text(text = deleteTitleText, style = typo().titleMedium, color = dark.content)
+            },
+            text = {
+                Text(text = deleteMessageText, style = typo().bodyMedium, color = dark.subtitle)
+            },
+            confirmButton = {
+                TextButton(onClick = { confirmDelete() }) {
+                    Text(text = deleteConfirmText, style = typo().labelLarge, color = Color(0xFFEC4141))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDelete = null }) {
+                    Text(text = deleteCancelText, style = typo().labelLarge, color = dark.content)
+                }
+            },
+            containerColor = dark.container,
+        )
     }
 }
 /** The YouTube Dislike action's three states, for the song sheet and the player rows. */

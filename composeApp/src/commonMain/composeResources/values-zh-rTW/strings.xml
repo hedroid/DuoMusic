@@ -1268,6 +1268,8 @@
     <string name="comments_turned_off">留言已關閉</string>
     <string name="comments_load_error">留言載入失敗</string>
     <string name="comment_post_error">留言發布失敗</string>
+    <string name="delete_comment_title">刪除這則留言？</string>
+    <string name="delete_comment_message">留言將被永久刪除，且無法復原。</string>
     <string name="comments_need_channel">需建立 YouTube 頻道後才能留言</string>
     <string name="local_playlist">本機歌單</string>
     <string name="create_playlist_description">在此裝置上建立歌單</string>

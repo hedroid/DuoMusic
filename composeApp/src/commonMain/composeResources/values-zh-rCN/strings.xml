@@ -1313,6 +1313,8 @@
     <string name="comments_turned_off">评论已关闭</string>
     <string name="comments_load_error">评论加载失败</string>
     <string name="comment_post_error">评论发布失败</string>
+    <string name="delete_comment_title">删除这条评论？</string>
+    <string name="delete_comment_message">评论将被永久删除，且无法恢复。</string>
     <string name="comments_need_channel">需创建 YouTube 频道后才能评论</string>
     <string name="local_playlist">本地歌单</string>
     <string name="create_playlist_description">在本设备上创建歌单</string>
