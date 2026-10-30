@@ -2,16 +2,15 @@
 
 <img src="https://raw.githubusercontent.com/maxrave-dev/SimpMusic/dev/fastlane/metadata/android/en-US/images/featureGraphic.png">
 
-# DuoMusic 双源版（原 SimpMusic 双源版）
+# DuoMusic 双源版
 
 **YouTube Music + 网易云音乐，一个 FOSS 客户端全都有。**
 
-在 [SimpMusic](https://github.com/maxrave-dev/SimpMusic) 的基础上完整接入网易云音乐音源，
+完整接入网易云音乐音源，双源并存、切换不打断播放，
 并做了大量播放稳定性、性能与本地体验优化。
 
 <p>
 <a href="https://github.com/hedroid/DuoMusic/releases"><img src="https://img.shields.io/github/v/release/hedroid/DuoMusic?label=%E5%8F%91%E7%89%88&logo=github" alt="release"></a>
-<a href="https://github.com/maxrave-dev/SimpMusic"><img src="https://img.shields.io/badge/%E4%B8%8A%E6%B8%B8-maxrave--dev%2FSimpMusic-blue" alt="upstream"></a>
 <a href="https://github.com/hedroid/DuoMusic"><img src="https://img.shields.io/github/stars/hedroid/DuoMusic?style=social" alt="stars"></a>
 <a href="https://github.com/cwuom/NeriPlayer"><img src="https://img.shields.io/badge/%E5%8F%82%E8%80%83%E9%A1%B9%E7%9B%AE-NeriPlayer-orange" alt="NeriPlayer"></a>
 </p>
@@ -21,10 +20,8 @@
 </div>
 
 > **相关项目**
-> - 上游原版 SimpMusic（YouTube Music 客户端本体）：**https://github.com/maxrave-dev/SimpMusic**
-> - 本 fork：**https://github.com/hedroid/DuoMusic**（core 子模块在 [hedroid/DuoMusic-Core](https://github.com/hedroid/DuoMusic-Core)）
-> - 参考项目 NeriPlayer（多源流媒体 + 本地管理 + 自建同步的开源音乐播放器）：**https://github.com/cwuom/NeriPlayer**，
->   本 fork 的播放错误恢复、物理洗牌等多处设计参考了它的实现。
+> - 参考项目 [NeriPlayer](https://github.com/cwuom/NeriPlayer)（多源流媒体 + 本地管理 + 自建同步的开源音乐播放器）——
+>   本项目的播放错误恢复、物理洗牌等多处设计参考了它的实现。
 
 ## 📥 下载
 
@@ -67,7 +64,7 @@
 
 ## ✨ 功能一览
 
-### 🎵 网易云音乐音源（本 fork 最大的增量）
+### 🎵 网易云音乐音源（本项目最大的增量）
 
 **浏览与发现**
 
@@ -132,7 +129,7 @@
 
 ### 🔇 相对上游隐藏 / 下线的功能
 
-出于「双源云端化」的设计取舍，部分上游功能在本 fork 中被隐藏或下线（本地歌单入口改为云端歌单、
+出于「双源云端化」的设计取舍，部分上游开源功能在本项目中被隐藏或下线（本地歌单入口改为云端歌单、
 Discord 集成、导入播放列表等），完整清单与恢复方法见 [docs/HIDDEN_FEATURES.md](docs/HIDDEN_FEATURES.md)。
 
 ## 🛠 构建
@@ -143,8 +140,8 @@ cd DuoMusic
 ./gradlew :composeApp:assembleDebug
 ```
 
-- Android 端为主要适配与验证平台（`com.github.hedroid.duomusic.dev` 为 debug 包名，2026-10-29 由 `com.maxrave.simpmusic.dev` 更名，旧包数据可用 app 内备份恢复）；桌面端沿用上游能力，网易源未做专门验证。
-- core 子模块：[hedroid/DuoMusic-Core](https://github.com/hedroid/DuoMusic-Core)（fork 自 [maxrave-dev/core](https://github.com/maxrave-dev/core)）。
+- Android 端为主要适配与验证平台（debug 包名 `com.github.hedroid.duomusic.dev`）；桌面端沿用开源社区能力，网易源未做专门验证。
+- core 子模块：[hedroid/DuoMusic-Core](https://github.com/hedroid/DuoMusic-Core)。
 
 ## 🙏 致谢
 
