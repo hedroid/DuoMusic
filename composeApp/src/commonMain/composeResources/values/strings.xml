@@ -284,9 +284,9 @@
     <string name="customactivityoncrash_error_activity_restart_app">Restart app</string>
     <string name="help_build_lyrics_database">Help DuoMusic lyrics build the lyrics database</string>
     <string name="help_build_lyrics_database_description">Send your saved lyrics to DuoMusic lyrics's database</string>
-    <string name="notification_lyrics">Lyrics in notification</string>
-    <string name="notification_lyrics_description">Show the current lyric line live in the media notification</string>
-    <string name="notification_lyrics_content">Notification lyrics content</string>
+    <string name="notification_lyrics">System media lyrics</string>
+    <string name="notification_lyrics_description">Show lyrics in the system music card and supported music capsules. Turn off to show the song title and artist.</string>
+    <string name="notification_lyrics_content">System media lyrics content</string>
     <string name="notification_lyrics_content_original">Original</string>
     <string name="notification_lyrics_content_original_and_translation">Original with translation</string>
     <string name="customactivityoncrash_error_activity_close_app">Close app</string>
