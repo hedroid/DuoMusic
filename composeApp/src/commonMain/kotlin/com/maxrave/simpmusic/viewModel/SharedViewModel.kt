@@ -3093,15 +3093,20 @@ class SharedViewModel(
         _reloadDestination.value = destination
     }
 
-    /** 切源后的统一落点(用户 2026-10-13 定案,替代 2026-09-22"留当前页"):切到主页 tab
-     *  (底栏同款导航参数,save/restore 状态)并触发主页刷新信号——YT 主页消费
-     *  reloadDestination 滚顶+重拉,网易主页同款消费走 refresh()。 */
+    /** 切源后的统一落点(用户 2026-10-13 定案,替代 2026-09-22"留当前页"):回到主页并触发
+     *  主页刷新信号——YT 主页消费 reloadDestination 滚顶+重拉,网易主页同款消费走 refresh()。
+     *  实现=popBackStack 到 Home(2026-10-30):此前用 navigate(HomeDestination)+popUpTo(start)
+     *  {saveState}+launchSingleTop+restoreState,从歌单详情页触发时是**完整空操作**
+     *  (探针实证:返回栈前后纹丝不动;底栏 tab 同款参数好使是因为该路径实际走 plain
+     *  navigate)。Home 是 start 必在栈内,popBackStack(route,inclusive=false) 任意深度
+     *  一步到位;已在 Home 时无栈可弹是天然 no-op,不会误退 app。 */
     fun navigateHomeAndRefresh(navController: androidx.navigation.NavHostController) {
-        navController.navigate(com.maxrave.simpmusic.ui.navigation.destination.home.HomeDestination) {
-            popUpTo(navController.graph.startDestinationId) { saveState = true }
-            launchSingleTop = true
-            restoreState = true
-        }
+        val popped =
+            navController.popBackStack(
+                com.maxrave.simpmusic.ui.navigation.destination.home.HomeDestination,
+                inclusive = false,
+            )
+        Logger.w("SRCPROBE", "navigateHomeAndRefresh: popped=$popped, current=${navController.currentDestination?.route}")
         reloadDestination(com.maxrave.simpmusic.ui.navigation.destination.home.HomeDestination::class)
     }
 
