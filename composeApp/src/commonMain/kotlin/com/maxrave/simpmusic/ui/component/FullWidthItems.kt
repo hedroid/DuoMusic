@@ -309,8 +309,11 @@ fun SongFullWidthItems(
                 }
                 // 视频行缩略图(2026-10-13 四轮定稿):高与歌曲行一致(48dp,上下占位同
                 // 歌曲卡),宽按 16:9 等比放大(~85dp)——完整画面不裁剪;推翻三轮的
-                // "同宽 48 高 27"与二轮的裁方两版
-                val videoThumb = isVideoRowTrack(track, songEntity)
+                // "同宽 48 高 27"与二轮的裁方两版。
+                // 序号行(index != null)不受视频槽影响:专辑页里视频曲目若撑 85dp 槽,
+                // 序号列与标题会整行右移、序号列参差(2026-10-29 YTM 专辑 Aquarium
+                // 实测,网易专辑页全普通行所以无感);数字列必须统一 48dp 方槽。
+                val videoThumb = index == null && isVideoRowTrack(track, songEntity)
                 Box(
                     modifier =
                         if (videoThumb) {
