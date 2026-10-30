@@ -34,6 +34,9 @@ actual suspend fun restoreNative(
     uri: Uri,
     getData: () -> Unit,
 ) {
+    // 上一次恢复失败可能遗留临时库:先删掉,防止下一次恢复的备份 zip 不含 DB 条目时
+    // 把陈旧临时库当成本次数据换入(与 Android 端同款防护,2026-10-30 CR P2)。
+    File(commonRepository.getDatabasePath() + ".restore-tmp").delete()
     ZipInputStream(
         FileInputStream(File(uri.toString())),
     ).use { inputStream ->

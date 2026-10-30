@@ -114,6 +114,9 @@ actual suspend fun restoreNative(
 ) {
     val application: Context = getKoin().get()
     val stagedDatabase = File(application.filesDir, "restore_music_db.tmp")
+    // 上一次恢复失败(中途中断/异常)可能遗留临时库:先删掉,防止下一次恢复
+    // 的备份 zip 不含 DB 条目时把陈旧临时库当成本次数据换入(2026-10-30 CR P2)。
+    stagedDatabase.delete()
     application.applicationContext.contentResolver.openInputStream(uri.toAndroidUri())?.use {
         it.zipInputStream().use { inputStream ->
             var entry =
@@ -337,14 +340,16 @@ private fun createDefaultBackupTargetUri(
                 ContentValues().apply {
                     put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
                     put(MediaStore.MediaColumns.MIME_TYPE, "application/octet-stream")
-                    put(MediaStore.MediaColumns.RELATIVE_PATH, "Documents/SimpMusic")
+                    // 与设置页展示文案(backup_default_folder_name="Documents/DuoMusic")一致;
+                    // 改名前落到 Documents/SimpMusic 的旧备份不受影响,仍可用文件管理器取用。
+                    put(MediaStore.MediaColumns.RELATIVE_PATH, "Documents/DuoMusic")
                 }
             resolver.insert(MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY), values)?.toKmpUri()
         } else {
             val folder =
                 File(
                     Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS),
-                    "SimpMusic",
+                    "DuoMusic",
                 )
             if (folder.exists() || folder.mkdirs()) android.net.Uri.fromFile(File(folder, fileName)).toKmpUri() else null
         }
