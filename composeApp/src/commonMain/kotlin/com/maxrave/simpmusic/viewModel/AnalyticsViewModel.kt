@@ -91,6 +91,12 @@ class AnalyticsViewModel(
 
     companion object {
         private const val ANALYTICS_DAY_RANGE_KEY = "analytics_day_range"
+
+        /** 近期播放展示几首(去重后的歌曲数) */
+        private const val RECENTLY_PLAYED_COUNT = 5
+
+        /** 去重前的原始事件取数窗口:重复收听的歌会被挤掉名额,窗口太浅会凑不满 5 首 */
+        private const val RECENTLY_PLAYED_FETCH_LIMIT = 30
     }
 
     /**
@@ -336,13 +342,18 @@ class AnalyticsViewModel(
             analyticsRepository
                 .getPlaybackEventsByOffset(
                     offset = 0,
-                    limit = 5,
+                    // playback_event 是收听流水(同一首歌每听一次一行),"近期播放"语义是
+                    // "最近听过的歌"——每首只露最近一次。先多取一段再按歌去重,不然一首
+                    // 重复收听的歌会在 5 条原始事件里占两行(用户实测:星空下的我 ×2)
+                    limit = RECENTLY_PLAYED_FETCH_LIMIT,
                 ).collect { events ->
                     events
+                        .distinctBy { it.videoId }
                         .mapNotNull { event ->
                             val song = songRepository.getSongById(event.videoId).lastOrNull() ?: return@mapNotNull null
                             event to song
-                        }.let {
+                        }.take(RECENTLY_PLAYED_COUNT)
+                        .let {
                             if (it.isNotEmpty()) {
                                 _analyticsUIState.update { state ->
                                     state.copy(
