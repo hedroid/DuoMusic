@@ -849,7 +849,8 @@ private fun CachedSongRow(
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(24.dp),
             )
-            song.thumbnails?.lastOrNull()?.let { thumb ->
+            // thumbnails 是单个 URL 字符串(非列表):lastOrNull 会取到末尾字符,coil 加载失败只露占位
+            song.thumbnails?.takeIf { it.isNotBlank() }?.let { thumb ->
                 coil3.compose.AsyncImage(
                     model = thumb,
                     contentDescription = null,
