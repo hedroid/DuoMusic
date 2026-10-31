@@ -2,10 +2,13 @@ package com.maxrave.simpmusic.ui.screen.library
 
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -82,6 +85,8 @@ import com.maxrave.simpmusic.ui.component.SongFullWidthItems
 import com.maxrave.simpmusic.ui.component.rememberSurfaceDarkColors
 import com.maxrave.simpmusic.ui.icon.ArrowBackIosNew
 import com.maxrave.simpmusic.ui.icon.Check
+import com.maxrave.simpmusic.ui.icon.MusicNote
+import com.maxrave.simpmusic.ui.icon.PlaylistRemove
 import com.maxrave.simpmusic.ui.icon.Close
 import com.maxrave.simpmusic.ui.icon.PlayCircle
 import com.maxrave.simpmusic.ui.icon.Search
@@ -100,6 +105,7 @@ import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import simpmusic.composeapp.generated.resources.cached_empty_hint
 import simpmusic.composeapp.generated.resources.cached
+import simpmusic.composeapp.generated.resources.remove_cached_batch_message
 import simpmusic.composeapp.generated.resources.remove_from_cache
 import simpmusic.composeapp.generated.resources.n_songs_selected
 import simpmusic.composeapp.generated.resources.select_all
@@ -314,39 +320,48 @@ fun DownloadedManagementBody(
             } else {
                 stringResource(Res.string.download_section_in_progress)
             }
-        Row(
+        Column(
             // 库页统一口径:水平边距 15dp 与主页/各 chip 一致(原 10dp 与其它页不同口径)
+            // 两行磁贴(2026-10-31 用户定):第一行=已完成+下载中,第二行=已缓存;三块等大(各半宽)
             modifier = Modifier.fillMaxWidth().padding(horizontal = 15.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Box(modifier = Modifier.weight(1f)) {
-                LibraryTilingItem(
-                    state = LibraryTilingState.DownloadInProgress,
-                    selected = downloadedSection == DownloadedSection.InProgress,
-                    titleString = inProgressTitle,
-                    onClick = { downloadedSection = DownloadedSection.InProgress },
-                )
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box(modifier = Modifier.weight(1f)) {
+                    // 统计直接跟在标题后(2026-10-02 用户定):"已完成 (N)"——只带计数不带容量
+                    // (用户复定:容量可能展示不开);空库只显示"已完成"
+                    val completedWord = stringResource(Res.string.download_section_completed)
+                    LibraryTilingItem(
+                        state = LibraryTilingState.DownloadCompleted,
+                        selected = downloadedSection == DownloadedSection.Completed,
+                        titleString = if (completedCount > 0) "$completedWord ($completedCount)" else completedWord,
+                        onClick = { downloadedSection = DownloadedSection.Completed },
+                    )
+                }
+                Box(modifier = Modifier.weight(1f)) {
+                    LibraryTilingItem(
+                        state = LibraryTilingState.DownloadInProgress,
+                        selected = downloadedSection == DownloadedSection.InProgress,
+                        titleString = inProgressTitle,
+                        onClick = { downloadedSection = DownloadedSection.InProgress },
+                    )
+                }
             }
-            Box(modifier = Modifier.weight(1f)) {
-                // 统计直接跟在标题后(2026-10-02 用户定):"已完成 (N)"——只带计数不带容量
-                // (用户复定:容量可能展示不开);空库只显示"已完成"
-                val completedWord = stringResource(Res.string.download_section_completed)
-                LibraryTilingItem(
-                    state = LibraryTilingState.DownloadCompleted,
-                    selected = downloadedSection == DownloadedSection.Completed,
-                    titleString = if (completedCount > 0) "$completedWord ($completedCount)" else completedWord,
-                    onClick = { downloadedSection = DownloadedSection.Completed },
-                )
-            }
-            if (SHOW_CACHED_TAB) Box(modifier = Modifier.weight(1f)) {
-                // 已缓存未下载(fork 2026-10-28):完整缓存的歌,非下载物;计数同款
-                val cachedWord = stringResource(Res.string.cached)
-                LibraryTilingItem(
-                    state = LibraryTilingState.DownloadCached,
-                    selected = downloadedSection == DownloadedSection.Cached,
-                    titleString = if (cachedSongs.isNotEmpty()) "$cachedWord (${cachedSongs.size})" else cachedWord,
-                    onClick = { downloadedSection = DownloadedSection.Cached },
-                )
+            if (SHOW_CACHED_TAB) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        // 已缓存未下载(fork 2026-10-28):完整缓存的歌,非下载物;计数同款
+                        val cachedWord = stringResource(Res.string.cached)
+                        LibraryTilingItem(
+                            state = LibraryTilingState.DownloadCached,
+                            selected = downloadedSection == DownloadedSection.Cached,
+                            titleString = if (cachedSongs.isNotEmpty()) "$cachedWord (${cachedSongs.size})" else cachedWord,
+                            onClick = { downloadedSection = DownloadedSection.Cached },
+                        )
+                    }
+                    // 右侧占位保持等宽(三块磁贴大小一致)
+                    Spacer(modifier = Modifier.weight(1f))
+                }
             }
         }
         val isInProgressTab = downloadedSection == DownloadedSection.InProgress
@@ -452,9 +467,17 @@ fun DownloadedManagementBody(
                 } else {
                     // 顶栏收起信号:Songs 列表自报(与其它 chip 页同一套口径,
                     // 含几何反馈断路,见 scrollReportingEffect 注释)
-                    val songsListState = rememberLazyListState()
-                    songsListState.scrollReportingEffect(onScrolling)
-                    Column(modifier = Modifier.fillMaxSize()) {
+                    // tab 切换过场(2026-10-31 用户定):三个磁贴页互切 Crossfade;
+                    // 列表态各分支独立(滚动位置/LazyListState 不跨 tab 串)
+                    Crossfade(
+                        targetState = downloadedSection,
+                        animationSpec = tween(220),
+                        label = "downloadedSection",
+                    ) { section ->
+                        val sectionIsCached = SHOW_CACHED_TAB && section == DownloadedSection.Cached
+                        val songsListState = rememberLazyListState()
+                        songsListState.scrollReportingEffect(onScrolling)
+                        Column(modifier = Modifier.fillMaxSize()) {
                         if (selectionMode) {
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(horizontal = 15.dp, vertical = 2.dp),
@@ -463,7 +486,13 @@ fun DownloadedManagementBody(
                             ) {
                                 // 通用全选控件(2026-10-01 用户定):行首圆圈+文字两态切换
                                 // (全选↔清空),视觉与行多选圆圈同款;不再是纯文字按钮
-                                val allIds = tabRows.map { it.song.videoId }.toSet()
+                                // 已缓存 tab 的多选域=缓存歌(与已完成 tab 互不相干)
+                                val allIds =
+                                    if (sectionIsCached) {
+                                        cachedSongs.map { it.videoId }.toSet()
+                                    } else {
+                                        tabRows.map { it.song.videoId }.toSet()
+                                    }
                                 val allSelected = allIds.isNotEmpty() && selectedIds.containsAll(allIds)
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
@@ -509,7 +538,14 @@ fun DownloadedManagementBody(
                                 )
                                 TextButton(
                                     onClick = { if (selectedIds.isNotEmpty()) deleteSelectionConfirm = true },
-                                ) { Text(stringResource(Res.string.delete), style = typo().labelMedium, color = MaterialTheme.colorScheme.error) }
+                                ) {
+                                    // 已缓存 tab 的批量动作=移除缓存(非删除文件)
+                                    Text(
+                                        stringResource(if (sectionIsCached) Res.string.remove_from_cache else Res.string.delete),
+                                        style = typo().labelMedium,
+                                        color = MaterialTheme.colorScheme.error,
+                                    )
+                                }
                                 TextButton(onClick = {
                                     selectionMode = false
                                     selectedIds = emptySet()
@@ -565,9 +601,20 @@ fun DownloadedManagementBody(
                                     }
                                 }
                                 items(cachedSongs, key = { it.videoId }) { song ->
-                                    CachedSongRow(song = song) {
-                                        removeCachedTarget = song.videoId to (song.title ?: "")
-                                    }
+                                    CachedSongRow(
+                                        song = song,
+                                        selectionMode = selectionMode,
+                                        isSelected = song.videoId in selectedIds,
+                                        onToggle = {
+                                            selectedIds =
+                                                if (song.videoId in selectedIds) selectedIds - song.videoId else selectedIds + song.videoId
+                                        },
+                                        onEnterSelection = {
+                                            selectionMode = true
+                                            selectedIds = setOf(song.videoId)
+                                        },
+                                        onRemove = { removeCachedTarget = song.videoId to (song.title ?: "") },
+                                    )
                                 }
                             } else {
                             items(tabRows, key = { it.song.videoId }) { row ->
@@ -606,6 +653,7 @@ fun DownloadedManagementBody(
                             }
                             item { EndOfPage(includeBottomBarPadding = false) }
                         }
+                        }
                     }
                 }
         }
@@ -626,9 +674,14 @@ fun DownloadedManagementBody(
             confirmButton = {
                 TextButton(onClick = {
                     deleteSelectionConfirm = false
-                    // 混排 tab(2026-10-01):删除=整行清理(音视频文件+条目+Room)
-                    selectedIds.forEach { id ->
-                        dynamicPlaylistViewModel.deleteDownload(id)
+                    if (downloadedSection == DownloadedSection.Cached) {
+                        // 已缓存 tab(2026-10-31 多选):批量=移除播放器缓存,不动下载文件
+                        dynamicPlaylistViewModel.removeCachedSongs(selectedIds)
+                    } else {
+                        // 混排 tab(2026-10-01):删除=整行清理(音视频文件+条目+Room)
+                        selectedIds.forEach { id ->
+                            dynamicPlaylistViewModel.deleteDownload(id)
+                        }
                     }
                     selectionMode = false
                     selectedIds = emptySet()
@@ -641,10 +694,19 @@ fun DownloadedManagementBody(
                     Text(stringResource(Res.string.cancel), style = typo().labelSmall)
                 }
             },
-            title = { Text(stringResource(Res.string.remove_download_title), style = typo().labelSmall) },
+            title = {
+                Text(
+                    stringResource(if (downloadedSection == DownloadedSection.Cached) Res.string.remove_from_cache else Res.string.remove_download_title),
+                    style = typo().labelSmall,
+                )
+            },
             text = {
                 Text(
-                    stringResource(Res.string.remove_download_message) + " (" + selectedIds.size + ")",
+                    if (downloadedSection == DownloadedSection.Cached) {
+                        stringResource(Res.string.remove_cached_batch_message, selectedIds.size)
+                    } else {
+                        stringResource(Res.string.remove_download_message) + " (" + selectedIds.size + ")"
+                    },
                     style = typo().bodyMedium,
                 )
             },
@@ -716,29 +778,86 @@ private fun DownloadHeaderPill(
     )
 }
 
-/** 已缓存未下载行(fork 2026-10-28):简洁行(封面/标题/艺人+移除缓存),点击=移除确认 */
+/** 已缓存未下载行(fork 2026-10-28;2026-10-31 用户定:封面占位+行尾移除图标+多选):
+ *  非多选单击=移除确认,长按=进入多选;多选模式单击=勾选 */
 @Composable
 private fun CachedSongRow(
     song: com.maxrave.domain.data.entities.SongEntity,
+    selectionMode: Boolean,
+    isSelected: Boolean,
+    onToggle: () -> Unit,
+    onEnterSelection: () -> Unit,
     onRemove: () -> Unit,
 ) {
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clickable(onClick = onRemove)
+                .combinedClickable(
+                    onClick = { if (selectionMode) onToggle() else onRemove() },
+                    onLongClick = onEnterSelection,
+                )
+                .background(if (isSelected) seed.copy(alpha = 0.18f) else androidx.compose.ui.graphics.Color.Transparent)
                 .padding(horizontal = 15.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        coil3.compose.AsyncImage(
-            model = song.thumbnails?.lastOrNull(),
-            contentDescription = null,
-            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+        Spacer(modifier = Modifier.width(8.dp))
+        // 多选圆圈(与已完成 tab 行内同款)
+        androidx.compose.animation.AnimatedVisibility(
+            visible = selectionMode,
+            enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.expandHorizontally(),
+            exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.shrinkHorizontally(),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier =
+                        Modifier
+                            .size(20.dp)
+                            .clip(androidx.compose.foundation.shape.CircleShape)
+                            .background(if (isSelected) seed else androidx.compose.ui.graphics.Color.Transparent)
+                            .border(
+                                width = 1.5.dp,
+                                color = if (isSelected) seed else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                shape = androidx.compose.foundation.shape.CircleShape,
+                            ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (isSelected) {
+                        Icon(
+                            imageVector = SimpIcons.Check,
+                            contentDescription = null,
+                            tint = Color.Black,
+                            modifier = Modifier.size(14.dp),
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+            }
+        }
+        // 封面:DB 行无缩略图或加载失败时露出底下的音符占位(缓存歌的行可能缺图)
+        Box(
             modifier =
                 Modifier
                     .size(48.dp)
-                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp)),
-        )
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = SimpIcons.MusicNote,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(24.dp),
+            )
+            song.thumbnails?.lastOrNull()?.let { thumb ->
+                coil3.compose.AsyncImage(
+                    model = thumb,
+                    contentDescription = null,
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                    modifier = Modifier.matchParentSize(),
+                )
+            }
+        }
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
@@ -755,11 +874,22 @@ private fun CachedSongRow(
                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
             )
         }
-        Text(
-            text = stringResource(Res.string.remove_from_cache),
-            style = typo().labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        // 行尾移除图标(FM 封面同款 PlaylistRemove;2026-10-31 用户定,替代文字)
+        Box(
+            modifier =
+                Modifier
+                    .size(40.dp)
+                    .clip(androidx.compose.foundation.shape.CircleShape)
+                    .clickable { if (selectionMode) onToggle() else onRemove() },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = SimpIcons.PlaylistRemove,
+                contentDescription = stringResource(Res.string.remove_from_cache),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp),
+            )
+        }
     }
 }
 
@@ -800,9 +930,9 @@ private fun DownloadManagementRowItem(
 }
 
 /** 下载管理页两视角(2026-10-01 用户定):下载中/已完成,行混排不按内容分类 */
-// 已缓存 tab(2026-10-28 上游 Cached 数据层):用户定"用处不大"暂隐藏;管线全保留
-// (2026-10-31 曾随 3.10.3 短暂恢复,用户复核后撤回)
-private const val SHOW_CACHED_TAB = false
+// 已缓存 tab(2026-10-28 上游 Cached 数据层):2026-10-31 用户提四项 UI 优化(磁贴/图标/
+    // 行样式/多选)重新启用并重做样式
+private const val SHOW_CACHED_TAB = true
 
 internal enum class DownloadedSection {
     InProgress,

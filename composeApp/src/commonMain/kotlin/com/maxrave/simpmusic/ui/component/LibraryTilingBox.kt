@@ -25,6 +25,7 @@ import com.maxrave.simpmusic.extension.NonLazyGrid
 import com.maxrave.simpmusic.ui.icon.Cloud
 import com.maxrave.simpmusic.ui.icon.Album
 import com.maxrave.simpmusic.ui.icon.DownloadForOffline
+import com.maxrave.simpmusic.ui.icon.DownloadForOfflineOutlined
 import com.maxrave.simpmusic.ui.icon.Downloading
 import com.maxrave.simpmusic.ui.icon.Favorite
 import com.maxrave.simpmusic.ui.icon.Insights
@@ -255,12 +256,13 @@ data class LibraryTilingState(
                 iconColor = Color.Black,
             )
 
-        /** 下载管理页"已缓存"磁贴(fork 2026-10-28):完整缓存未下载的歌,区别于已完成下载 */
+        /** 下载管理页"已缓存"磁贴(fork 2026-10-28):完整缓存未下载的歌,区别于已完成下载;
+         *  图标与"已完成"同族但轮廓款(2026-10-31 用户定:Cloud 形状不搭) */
         val DownloadCached =
             LibraryTilingState(
                 title = Res.string.cached,
                 containerColor = Color(0xffB2DFDB),
-                icon = SimpIcons.Cloud,
+                icon = SimpIcons.DownloadForOfflineOutlined,
                 iconColor = Color(0xff004D40),
             )
 

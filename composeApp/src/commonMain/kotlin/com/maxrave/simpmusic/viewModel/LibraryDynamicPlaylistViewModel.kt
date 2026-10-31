@@ -67,6 +67,14 @@ class LibraryDynamicPlaylistViewModel(
         }
     }
 
+    /** 批量移除缓存(已缓存列表多选,2026-10-31):逐个清后一次重载,避免 N 次全量刷新 */
+    fun removeCachedSongs(videoIds: Collection<String>) {
+        viewModelScope.launch {
+            videoIds.forEach { cacheRepository.removeCachedSong(it) }
+            _cachedSongs.value = loadCachedSongs(cacheRepository, songRepository)
+        }
+    }
+
     private val downloadUtils: com.maxrave.domain.mediaservice.handler.DownloadHandler by inject()
     private val sharedViewModel: SharedViewModel by inject()
     private val playlistRepository: com.maxrave.domain.repository.PlaylistRepository by inject()

@@ -62,6 +62,7 @@
     <string name="removed_download">Removed download</string>
     <string name="remove_download_title">Remove download?</string>
     <string name="remove_download_message">Downloaded songs will be removed. You can download them again anytime.</string>
+    <string name="remove_cached_batch_message">Remove the playback cache for %1$d songs? Downloaded files are not affected.</string>
     <string name="delete_video_title">Delete video?</string>
     <string name="delete_video_message">The downloaded video file will be removed. You can download it again anytime.</string>
     <string name="cancel_download_title">Cancel download?</string>
