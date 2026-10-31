@@ -37,6 +37,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -84,10 +85,12 @@ import com.maxrave.simpmusic.ui.component.SearchBarExit
 import com.maxrave.simpmusic.ui.component.SongFullWidthItems
 import com.maxrave.simpmusic.ui.component.rememberSurfaceDarkColors
 import com.maxrave.simpmusic.ui.icon.ArrowBackIosNew
+import com.maxrave.simpmusic.ui.icon.SelectAll
 import com.maxrave.simpmusic.ui.icon.Check
 import com.maxrave.simpmusic.ui.icon.MusicNote
 import com.maxrave.simpmusic.ui.icon.PlaylistRemove
 import com.maxrave.simpmusic.ui.icon.Close
+import com.maxrave.simpmusic.ui.icon.PauseCircle
 import com.maxrave.simpmusic.ui.icon.PlayCircle
 import com.maxrave.simpmusic.ui.icon.Search
 import com.maxrave.simpmusic.ui.icon.Shuffle
@@ -130,6 +133,7 @@ import simpmusic.composeapp.generated.resources.no_playlists_downloaded
 import simpmusic.composeapp.generated.resources.no_results_found
 import simpmusic.composeapp.generated.resources.playlist_name
 import simpmusic.composeapp.generated.resources.playlist_name_cannot_be_empty
+import simpmusic.composeapp.generated.resources.pause
 import simpmusic.composeapp.generated.resources.play
 import simpmusic.composeapp.generated.resources.playlists
 import simpmusic.composeapp.generated.resources.remove_download_message
@@ -291,6 +295,13 @@ fun DownloadedManagementBody(
     // 多选模式(用户反馈 2026-10):长按行进入;批量删除所选
     var selectionMode by remember { mutableStateOf(false) }
     var selectedIds by remember { mutableStateOf(setOf<String>()) }
+    // 切磁贴退出多选(2026-10-31 用户定):多选域只属于当前 tab
+    LaunchedEffect(downloadedSection) {
+        if (selectionMode) {
+            selectionMode = false
+            selectedIds = emptySet()
+        }
+    }
     var deleteSelectionConfirm by remember { mutableStateOf(false) }
     // "已完成"标签的搜索(2026-10-07 补齐旧下载页按钮逻辑):搜索图标开合,query 过滤已完成行
     var showSearchBar by rememberSaveable { mutableStateOf(false) }
@@ -322,7 +333,7 @@ fun DownloadedManagementBody(
             }
         Column(
             // 库页统一口径:水平边距 15dp 与主页/各 chip 一致(原 10dp 与其它页不同口径)
-            // 两行磁贴(2026-10-31 用户定):第一行=已完成+下载中,第二行=已缓存;三块等大(各半宽)
+            // 两行磁贴(2026-10-31 用户定):第一行=已完成+已缓存,第二行=下载中;三块等大(各半宽)
             modifier = Modifier.fillMaxWidth().padding(horizontal = 15.dp, vertical = 10.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
@@ -339,6 +350,18 @@ fun DownloadedManagementBody(
                     )
                 }
                 Box(modifier = Modifier.weight(1f)) {
+                    // 已缓存未下载(fork 2026-10-28):完整缓存的歌,非下载物;计数同款
+                    val cachedWord = stringResource(Res.string.cached)
+                    LibraryTilingItem(
+                        state = LibraryTilingState.DownloadCached,
+                        selected = downloadedSection == DownloadedSection.Cached,
+                        titleString = if (cachedSongs.isNotEmpty()) "$cachedWord (${cachedSongs.size})" else cachedWord,
+                        onClick = { downloadedSection = DownloadedSection.Cached },
+                    )
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box(modifier = Modifier.weight(1f)) {
                     LibraryTilingItem(
                         state = LibraryTilingState.DownloadInProgress,
                         selected = downloadedSection == DownloadedSection.InProgress,
@@ -346,22 +369,8 @@ fun DownloadedManagementBody(
                         onClick = { downloadedSection = DownloadedSection.InProgress },
                     )
                 }
-            }
-            if (SHOW_CACHED_TAB) {
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Box(modifier = Modifier.weight(1f)) {
-                        // 已缓存未下载(fork 2026-10-28):完整缓存的歌,非下载物;计数同款
-                        val cachedWord = stringResource(Res.string.cached)
-                        LibraryTilingItem(
-                            state = LibraryTilingState.DownloadCached,
-                            selected = downloadedSection == DownloadedSection.Cached,
-                            titleString = if (cachedSongs.isNotEmpty()) "$cachedWord (${cachedSongs.size})" else cachedWord,
-                            onClick = { downloadedSection = DownloadedSection.Cached },
-                        )
-                    }
-                    // 右侧占位保持等宽(三块磁贴大小一致)
-                    Spacer(modifier = Modifier.weight(1f))
-                }
+                // 右侧占位保持等宽(三块磁贴大小一致)
+                Spacer(modifier = Modifier.weight(1f))
             }
         }
         val isInProgressTab = downloadedSection == DownloadedSection.InProgress
@@ -381,13 +390,34 @@ fun DownloadedManagementBody(
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                // 播放按钮两态(2026-10-31 用户定):正在播本页列表=暂停图标(点击暂停/恢复),
+                // 其余=播放图标(点击装全队列起播)
+                val isPlayingNow by dynamicPlaylistViewModel.isPlaybackPlaying.collectAsStateWithLifecycle()
+                val playingHere =
+                    (nowPlaying?.songEntity?.videoId ?: nowPlaying?.track?.videoId)?.let { playingId ->
+                        completedRows.any { it.song.videoId == playingId }
+                    } == true
                 RippleIconButton(
-                    imageVector = SimpIcons.PlayCircle,
+                    imageVector =
+                        if (playingHere && isPlayingNow) {
+                            SimpIcons.PauseCircle
+                        } else {
+                            SimpIcons.PlayCircle
+                        },
                     modifier = Modifier.size(48.dp),
                     fillMaxSize = true,
                     tint = MaterialTheme.colorScheme.onBackground,
-                    contentDescription = stringResource(Res.string.play),
-                    onClick = dynamicPlaylistViewModel::playAllDownloaded,
+                    contentDescription =
+                        stringResource(
+                            if (playingHere && isPlayingNow) Res.string.pause else Res.string.play,
+                        ),
+                    onClick = {
+                        if (playingHere) {
+                            dynamicPlaylistViewModel.togglePlayPause()
+                        } else {
+                            dynamicPlaylistViewModel.playAllDownloaded()
+                        }
+                    },
                 )
                 RippleIconButton(
                     imageVector = SimpIcons.Shuffle,
@@ -494,41 +524,18 @@ fun DownloadedManagementBody(
                                         tabRows.map { it.song.videoId }.toSet()
                                     }
                                 val allSelected = allIds.isNotEmpty() && selectedIds.containsAll(allIds)
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier =
-                                        Modifier
-                                            .clip(CircleShape)
-                                            .clickable {
-                                                selectedIds = if (allSelected) emptySet() else allIds
-                                            }.padding(vertical = 4.dp, horizontal = 2.dp),
-                                ) {
-                                    Box(
-                                        modifier =
-                                            Modifier
-                                                .size(20.dp)
-                                                .clip(CircleShape)
-                                                .background(if (allSelected) seed else Color.Transparent)
-                                                .border(
-                                                    width = 1.5.dp,
-                                                    color = if (allSelected) seed else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                                                    shape = CircleShape,
-                                                ),
-                                        contentAlignment = Alignment.Center,
-                                    ) {
-                                        if (allSelected) {
-                                            Icon(
-                                                imageVector = SimpIcons.Check,
-                                                contentDescription = null,
-                                                tint = Color.Black,
-                                                modifier = Modifier.size(14.dp),
-                                            )
-                                        }
-                                    }
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = stringResource(Res.string.select_all),
-                                        style = typo().labelMedium,
+                                // 方块全选钮(2026-10-31 用户定):与歌曲多选顶栏同款 SelectAll
+                                // 图标,不带"全选"文字;全选态 primary 提示
+                                IconButton(onClick = { selectedIds = if (allSelected) emptySet() else allIds }) {
+                                    Icon(
+                                        imageVector = SimpIcons.SelectAll,
+                                        contentDescription = stringResource(Res.string.select_all),
+                                        tint =
+                                            if (allSelected) {
+                                                MaterialTheme.colorScheme.primary
+                                            } else {
+                                                MaterialTheme.colorScheme.onSurface
+                                            },
                                     )
                                 }
                                 Text(

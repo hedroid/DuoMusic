@@ -11,6 +11,7 @@ import com.maxrave.domain.data.entities.SongEntity
 import com.maxrave.domain.data.entities.DownloadState
 import com.maxrave.domain.extension.now
 import com.maxrave.domain.mediaservice.handler.PlaylistType
+import com.maxrave.domain.mediaservice.handler.PlayerEvent
 import com.maxrave.domain.mediaservice.handler.QueueData
 import com.maxrave.domain.repository.AnalyticsRepository
 import com.maxrave.domain.repository.ArtistRepository
@@ -27,6 +28,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.lastOrNull
@@ -49,6 +53,17 @@ class LibraryDynamicPlaylistViewModel(
     private val analyticsRepository: AnalyticsRepository,
     private val cacheRepository: com.maxrave.domain.repository.CacheRepository,
 ) : BaseViewModel() {
+
+    /** 播放器是否在播(已完成页播放按钮两态,2026-10-31 用户定) */
+    val isPlaybackPlaying: StateFlow<Boolean> =
+        mediaPlayerHandler.controlState
+            .map { it.isPlaying }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    /** 播放/暂停切换:已在播本页列表时按钮切暂停/恢复 */
+    fun togglePlayPause() {
+        viewModelScope.launch { mediaPlayerHandler.onPlayerEvent(PlayerEvent.PlayPause) }
+    }
 
     // 已缓存未下载(fork 露出,2026-10-28):上游 Cached 自动歌单的数据层,挂在下载管理页
     private val _cachedSongs = MutableStateFlow<List<SongEntity>>(emptyList())
