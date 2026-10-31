@@ -6,7 +6,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Column
@@ -517,15 +516,14 @@ fun DownloadedManagementBody(
                     AnimatedContent(
                         targetState = downloadedSection,
                         transitionSpec = {
+                            // 含蓄版(2026-10-31 用户二定):新页 1/5 屏滑入+淡入,旧页
+                            // 原位快速淡出——有方向感但不整页翻动
                             val forward = sectionOrderOf(targetState) > sectionOrderOf(initialState)
                             val dir = if (forward) 1 else -1
                             (
-                                slideInHorizontally(tween(280)) { it * dir } +
-                                    fadeIn(tween(200))
-                                ) togetherWith (
-                                slideOutHorizontally(tween(280)) { -it * dir } +
-                                    fadeOut(tween(160))
-                                )
+                                slideInHorizontally(tween(260)) { it / 5 * dir } +
+                                    fadeIn(tween(220))
+                                ) togetherWith fadeOut(tween(140))
                         },
                         label = "downloadedSection",
                     ) { section ->
