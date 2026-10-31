@@ -42,6 +42,7 @@ import kotlinx.datetime.atTime
 import kotlinx.datetime.minus
 import kotlinx.datetime.plus
 import simpmusic.composeapp.generated.resources.Res
+import simpmusic.composeapp.generated.resources.cached
 import simpmusic.composeapp.generated.resources.downloaded
 import simpmusic.composeapp.generated.resources.playlist
 import simpmusic.composeapp.generated.resources.wrapped_recap_month
@@ -545,6 +546,57 @@ class LibraryDynamicPlaylistViewModel(
                 firstPlayedTrack = firstTrack.toTrack(),
                 playlistId = null,
                 playlistName = downloadedQueueName(),
+                playlistType = PlaylistType.RADIO,
+                continuation = null,
+            ),
+        )
+        loadMediaItem(
+            firstTrack.toTrack(),
+            Config.PLAYLIST_CLICK,
+            0,
+        )
+    }
+
+    /** 下载管理页"已缓存"标签的队列名,与 downloadedQueueName 同形 */
+    private fun cachedQueueName(): String =
+        "${getString(Res.string.playlist)} ${getString(Res.string.cached)}"
+
+    /**
+     * 下载管理页"已缓存"标签的整体播放/随机(2026-10-31 用户定:对齐"已完成"标签三按钮):
+     * 目标列表 = cachedSongs(播放器完整缓存,行的 DB 数据与已下载同源),队列不挂 playlistId
+     * ——无尽开关开着时到尾同样由无尽钩子转电台续播,与已下载队列同语义
+     */
+    fun playAllCached() {
+        val targetList = _cachedSongs.value
+        val firstTrack = targetList.firstOrNull() ?: return
+        setQueueData(
+            QueueData.Data(
+                listTracks = targetList.toArrayListTrack(),
+                firstPlayedTrack = firstTrack.toTrack(),
+                playlistId = null,
+                playlistName = cachedQueueName(),
+                playlistType = PlaylistType.RADIO,
+                continuation = null,
+            ),
+        )
+        loadMediaItem(
+            firstTrack.toTrack(),
+            Config.PLAYLIST_CLICK,
+            0,
+        )
+    }
+
+    fun shuffleCached() {
+        val targetList = _cachedSongs.value
+        if (targetList.isEmpty()) return
+        val shuffledList = targetList.shuffled()
+        val firstTrack = shuffledList.first()
+        setQueueData(
+            QueueData.Data(
+                listTracks = shuffledList.toArrayListTrack(),
+                firstPlayedTrack = firstTrack.toTrack(),
+                playlistId = null,
+                playlistName = cachedQueueName(),
                 playlistType = PlaylistType.RADIO,
                 continuation = null,
             ),

@@ -94,8 +94,11 @@ import com.maxrave.simpmusic.ui.icon.Check
 import com.maxrave.simpmusic.ui.icon.MusicNote
 import com.maxrave.simpmusic.ui.icon.PlaylistRemove
 import com.maxrave.simpmusic.ui.icon.Close
+import com.maxrave.simpmusic.ui.icon.Pause
 import com.maxrave.simpmusic.ui.icon.PauseCircle
+import com.maxrave.simpmusic.ui.icon.PlayArrow
 import com.maxrave.simpmusic.ui.icon.PlayCircle
+import com.maxrave.simpmusic.ui.icon.RestartAlt
 import com.maxrave.simpmusic.ui.icon.Search
 import com.maxrave.simpmusic.ui.icon.Shuffle
 import com.maxrave.simpmusic.ui.icon.SimpIcons
@@ -299,17 +302,23 @@ fun DownloadedManagementBody(
     // 多选模式(用户反馈 2026-10):长按行进入;批量删除所选
     var selectionMode by remember { mutableStateOf(false) }
     var selectedIds by remember { mutableStateOf(setOf<String>()) }
-    // 切磁贴退出多选(2026-10-31 用户定):多选域只属于当前 tab
+    var deleteSelectionConfirm by remember { mutableStateOf(false) }
+    // "已完成"标签的搜索(2026-10-07 补齐旧下载页按钮逻辑):搜索图标开合,query 过滤已完成行;
+    // 2026-10-31 起已缓存 tab 共用(过滤各自的列表)
+    var showSearchBar by rememberSaveable { mutableStateOf(false) }
+    var query by rememberSaveable { mutableStateOf("") }
+    // 切磁贴退出多选(2026-10-31 用户定):多选域只属于当前 tab;
+    // 搜索条同口径——搜索域也只属于当前 tab,切换时收起并清词(已完成/已缓存各有各的列表)
     LaunchedEffect(downloadedSection) {
         if (selectionMode) {
             selectionMode = false
             selectedIds = emptySet()
         }
+        if (showSearchBar || query.isNotEmpty()) {
+            showSearchBar = false
+            query = ""
+        }
     }
-    var deleteSelectionConfirm by remember { mutableStateOf(false) }
-    // "已完成"标签的搜索(2026-10-07 补齐旧下载页按钮逻辑):搜索图标开合,query 过滤已完成行
-    var showSearchBar by rememberSaveable { mutableStateOf(false) }
-    var query by rememberSaveable { mutableStateOf("") }
     // 暂停全部只对 DownloadManager 在途(下载中/排队)有效;转存中(EXPORTING)不走队列停不了
     val hasPausable = managementRows.any { row ->
         !row.directMvActive && listOf(row.audioStatus.sortRank(), row.videoStatus?.sortRank() ?: 9).any { r -> r == 0 || r == 2 }
@@ -325,6 +334,21 @@ fun DownloadedManagementBody(
     val completedRows = managementRows.filter { rankOf(it) >= 5 }
     // “已完成”磁贴统计:只数真完成(文件在=rank 6,丢失行不计也不数)
     val completedCount = completedRows.count { rankOf(it) == 6 }
+
+    // 磁贴页的屏幕顺序,用于切换滑动方向判定
+    val sectionOrderOf: (DownloadedSection) -> Int = {
+        when (it) {
+            DownloadedSection.Completed -> 0
+            DownloadedSection.Cached -> 1
+            DownloadedSection.InProgress -> 2
+        }
+    }
+    val isInProgressTab = downloadedSection == DownloadedSection.InProgress
+    val isCachedTab = SHOW_CACHED_TAB && downloadedSection == DownloadedSection.Cached
+    // 磁贴右侧操作区的播放按钮两态(2026-10-31 用户定):正在播当前 tab 的列表=暂停图标
+    //(点击暂停/恢复),其余=播放图标(点击装全队列起播)
+    val isPlayingNow by dynamicPlaylistViewModel.isPlaybackPlaying.collectAsStateWithLifecycle()
+    val playingId = nowPlaying?.songEntity?.videoId ?: nowPlaying?.track?.videoId
 
     Column(modifier = Modifier.fillMaxSize().padding(top = topPadding)) {
         // "下载中"磁贴标题带动态计数(2026-10-02 用户定:页内不再有"下载中 (N)"文案,
@@ -373,84 +397,121 @@ fun DownloadedManagementBody(
                         onClick = { downloadedSection = DownloadedSection.InProgress },
                     )
                 }
-                // 右侧占位保持等宽(三块磁贴大小一致)
-                Spacer(modifier = Modifier.weight(1f))
+                // 右侧空白区(2026-10-31 用户定):操作按钮常驻区,内容随选中磁贴分流,整体居中。
+                // 已完成/已缓存=播放/随机/搜索三钮(原"已完成"标签下的操作行迁入);
+                // 下载中=全部暂停/全部继续/重试失败图标(替代原列表节头的文字 pills)
+                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    if (isInProgressTab) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            if (hasPausable) {
+                                RippleIconButton(
+                                    imageVector = SimpIcons.Pause,
+                                    modifier = Modifier.size(32.dp),
+                                    fillMaxSize = true,
+                                    tint = MaterialTheme.colorScheme.onBackground,
+                                    contentDescription = stringResource(Res.string.download_action_pause_all),
+                                    onClick = dynamicPlaylistViewModel::pauseAllDownloads,
+                                )
+                            }
+                            if (hasPaused) {
+                                RippleIconButton(
+                                    imageVector = SimpIcons.PlayArrow,
+                                    modifier = Modifier.size(32.dp),
+                                    fillMaxSize = true,
+                                    tint = MaterialTheme.colorScheme.onBackground,
+                                    contentDescription = stringResource(Res.string.download_action_resume_all),
+                                    onClick = dynamicPlaylistViewModel::resumeAllDownloads,
+                                )
+                            }
+                            if (hasFailed) {
+                                RippleIconButton(
+                                    imageVector = SimpIcons.RestartAlt,
+                                    modifier = Modifier.size(32.dp),
+                                    fillMaxSize = true,
+                                    tint = MaterialTheme.colorScheme.onBackground,
+                                    contentDescription = stringResource(Res.string.download_action_retry_failed),
+                                    onClick = dynamicPlaylistViewModel::retryFailedDownloads,
+                                )
+                            }
+                        }
+                    } else {
+                        val playingHere =
+                            if (isCachedTab) {
+                                cachedSongs.any { it.videoId == playingId }
+                            } else {
+                                completedRows.any { it.song.videoId == playingId }
+                            }
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            // 播放按钮两态,行内垂直居中,48dp 大一档(2026-10-07 用户定,迁入操作区保留)
+                            RippleIconButton(
+                                imageVector =
+                                    if (playingHere && isPlayingNow) {
+                                        SimpIcons.PauseCircle
+                                    } else {
+                                        SimpIcons.PlayCircle
+                                    },
+                                modifier = Modifier.size(48.dp),
+                                fillMaxSize = true,
+                                tint = MaterialTheme.colorScheme.onBackground,
+                                contentDescription =
+                                    stringResource(
+                                        if (playingHere && isPlayingNow) Res.string.pause else Res.string.play,
+                                    ),
+                                onClick = {
+                                    if (playingHere) {
+                                        dynamicPlaylistViewModel.togglePlayPause()
+                                    } else if (isCachedTab) {
+                                        dynamicPlaylistViewModel.playAllCached()
+                                    } else {
+                                        dynamicPlaylistViewModel.playAllDownloaded()
+                                    }
+                                },
+                            )
+                            RippleIconButton(
+                                imageVector = SimpIcons.Shuffle,
+                                modifier = Modifier.size(32.dp),
+                                fillMaxSize = true,
+                                tint = MaterialTheme.colorScheme.onBackground,
+                                contentDescription = stringResource(Res.string.shuffle),
+                                onClick = {
+                                    if (isCachedTab) {
+                                        dynamicPlaylistViewModel.shuffleCached()
+                                    } else {
+                                        dynamicPlaylistViewModel.shuffleDownloaded()
+                                    }
+                                },
+                            )
+                            RippleIconButton(
+                                imageVector = if (showSearchBar) SimpIcons.Close else SimpIcons.Search,
+                                modifier = Modifier.size(32.dp),
+                                fillMaxSize = true,
+                                tint = MaterialTheme.colorScheme.onBackground,
+                                contentDescription = stringResource(Res.string.search),
+                                onClick = { showSearchBar = !showSearchBar },
+                            )
+                        }
+                    }
+                }
             }
         }
-        // 磁贴页的屏幕顺序,用于切换滑动方向判定
-        val sectionOrderOf: (DownloadedSection) -> Int = {
-            when (it) {
-                DownloadedSection.Completed -> 0
-                DownloadedSection.Cached -> 1
-                DownloadedSection.InProgress -> 2
-            }
-        }
-        val isInProgressTab = downloadedSection == DownloadedSection.InProgress
-        val isCachedTab = SHOW_CACHED_TAB && downloadedSection == DownloadedSection.Cached
-        // 搜索只作用于"已完成"标签(旧下载页同款判定:标题/任一艺人包含即命中)
+        // 搜索作用于"已完成/已缓存"两个标签(标题/任一艺人包含即命中);下载中 tab 不参与。
+        // tabRows 只装已完成口径的行;已缓存列表在下面分支直接用 cachedRows,别混进这里
+        val cachedRows =
+            if (showSearchBar && query.isNotEmpty()) cachedSongs.filter { it.matches(query) } else cachedSongs
         val tabRows =
             when {
                 isInProgressTab -> inFlightRows
                 showSearchBar && query.isNotEmpty() -> completedRows.filter { it.song.matches(query) }
                 else -> completedRows
             }
-        // "已完成"标签操作行(2026-10-07 用户定:补齐旧下载页的播放/随机/搜索按钮,逻辑同款;
-        // 播放 48dp 大一档,行内垂直居中对齐——用户 2026-10-07 定)
-        if (!isInProgressTab && !isCachedTab) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 15.dp),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                // 播放按钮两态(2026-10-31 用户定):正在播本页列表=暂停图标(点击暂停/恢复),
-                // 其余=播放图标(点击装全队列起播)
-                val isPlayingNow by dynamicPlaylistViewModel.isPlaybackPlaying.collectAsStateWithLifecycle()
-                val playingHere =
-                    (nowPlaying?.songEntity?.videoId ?: nowPlaying?.track?.videoId)?.let { playingId ->
-                        completedRows.any { it.song.videoId == playingId }
-                    } == true
-                RippleIconButton(
-                    imageVector =
-                        if (playingHere && isPlayingNow) {
-                            SimpIcons.PauseCircle
-                        } else {
-                            SimpIcons.PlayCircle
-                        },
-                    modifier = Modifier.size(48.dp),
-                    fillMaxSize = true,
-                    tint = MaterialTheme.colorScheme.onBackground,
-                    contentDescription =
-                        stringResource(
-                            if (playingHere && isPlayingNow) Res.string.pause else Res.string.play,
-                        ),
-                    onClick = {
-                        if (playingHere) {
-                            dynamicPlaylistViewModel.togglePlayPause()
-                        } else {
-                            dynamicPlaylistViewModel.playAllDownloaded()
-                        }
-                    },
-                )
-                RippleIconButton(
-                    imageVector = SimpIcons.Shuffle,
-                    modifier = Modifier.size(32.dp),
-                    fillMaxSize = true,
-                    tint = MaterialTheme.colorScheme.onBackground,
-                    contentDescription = stringResource(Res.string.shuffle),
-                    onClick = dynamicPlaylistViewModel::shuffleDownloaded,
-                )
-                Box(Modifier.padding(horizontal = 5.dp)) {
-                    RippleIconButton(
-                        imageVector = if (showSearchBar) SimpIcons.Close else SimpIcons.Search,
-                        modifier = Modifier.size(32.dp),
-                        fillMaxSize = true,
-                        tint = MaterialTheme.colorScheme.onBackground,
-                        contentDescription = stringResource(Res.string.search),
-                        onClick = { showSearchBar = !showSearchBar },
-                    )
-                }
-            }
-            AnimatedVisibility(showSearchBar, enter = SearchBarEnter, exit = SearchBarExit) {
+        // 搜索条(磁贴右侧操作区的搜索钮开合):已完成/已缓存共用,过滤各自的列表
+        AnimatedVisibility(showSearchBar, enter = SearchBarEnter, exit = SearchBarExit) {
                 SearchBar(
                     modifier =
                         Modifier
@@ -484,7 +545,6 @@ fun DownloadedManagementBody(
                     windowInsets = WindowInsets(0, 0, 0, 0),
                 ) {
                 }
-            }
         }
         Box(modifier = Modifier.weight(1f)) {
             // 已缓存 tab 有自己的空态与列表(tabRows 是'已完成'口径,不作数)
@@ -539,10 +599,10 @@ fun DownloadedManagementBody(
                             ) {
                                 // 通用全选控件(2026-10-01 用户定):行首圆圈+文字两态切换
                                 // (全选↔清空),视觉与行多选圆圈同款;不再是纯文字按钮
-                                // 已缓存 tab 的多选域=缓存歌(与已完成 tab 互不相干)
+                                // 已缓存 tab 的多选域=缓存歌(与已完成 tab 互不相干;搜索态只圈可见行)
                                 val allIds =
                                     if (sectionIsCached) {
-                                        cachedSongs.map { it.videoId }.toSet()
+                                        cachedRows.map { it.videoId }.toSet()
                                     } else {
                                         tabRows.map { it.song.videoId }.toSet()
                                     }
@@ -587,42 +647,19 @@ fun DownloadedManagementBody(
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(bottom = bottomPadding),
                         ) {
-                            // 在途 tab 头:批量操作 pills(暂停全部/继续/重试失败)。
-                            // "下载中 (N)"计数文案已撤(2026-10-02 用户定,计数在磁贴上),
-                            // 无可操作项时整行不出
-                            if (isInProgressTab && (hasPausable || hasPaused || hasFailed)) {
-                                item(key = "header-inflight") {
-                                    Row(
-                                        modifier =
-                                            Modifier
-                                                .fillMaxWidth()
-                                                .padding(horizontal = 15.dp, vertical = 8.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                    ) {
-                                        if (hasPausable) {
-                                            DownloadHeaderPill(text = stringResource(Res.string.download_action_pause_all)) {
-                                                dynamicPlaylistViewModel.pauseAllDownloads()
-                                            }
-                                        }
-                                        if (hasPaused) {
-                                            DownloadHeaderPill(text = stringResource(Res.string.download_action_resume_all)) {
-                                                dynamicPlaylistViewModel.resumeAllDownloads()
-                                            }
-                                        }
-                                        if (hasFailed) {
-                                            DownloadHeaderPill(text = stringResource(Res.string.download_action_retry_failed)) {
-                                                dynamicPlaylistViewModel.retryFailedDownloads()
-                                            }
-                                        }
-                                    }
-                                }
-                            }
                             if (isCachedTab) {
-                                if (cachedSongs.isEmpty()) {
+                                if (cachedRows.isEmpty()) {
                                     item(key = "cached-empty") {
                                         Text(
-                                            text = stringResource(Res.string.cached_empty_hint),
+                                            // 搜索无结果与"真空缓存"分开提示(2026-10-31 搜索接入已缓存 tab)
+                                            text =
+                                                stringResource(
+                                                    if (showSearchBar && query.isNotEmpty()) {
+                                                        Res.string.no_results_found
+                                                    } else {
+                                                        Res.string.cached_empty_hint
+                                                    },
+                                                ),
                                             style = typo().bodyMedium,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
@@ -630,7 +667,7 @@ fun DownloadedManagementBody(
                                         )
                                     }
                                 }
-                                items(cachedSongs, key = { it.videoId }) { song ->
+                                items(cachedRows, key = { it.videoId }) { song ->
                                     CachedSongRow(
                                         song = song,
                                         selectionMode = selectionMode,
@@ -788,24 +825,6 @@ fun DownloadedManagementBody(
         )
     }
 
-}
-
-/** "下载中"节头右侧的操作(用户定稿:纯文字无底色,primary 色提示可点) */
-@Composable
-private fun DownloadHeaderPill(
-    text: String,
-    onClick: () -> Unit,
-) {
-    Text(
-        text = text,
-        style = typo().labelMedium,
-        color = MaterialTheme.colorScheme.primary,
-        modifier =
-            Modifier
-                .clip(CircleShape)
-                .clickable(onClick = onClick)
-                .padding(horizontal = 8.dp, vertical = 4.dp),
-    )
 }
 
 /** 已缓存未下载行(fork 2026-10-28;2026-10-31 用户定:封面占位+行尾移除图标+多选):
