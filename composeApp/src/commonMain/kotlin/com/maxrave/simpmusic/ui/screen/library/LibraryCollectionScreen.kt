@@ -365,7 +365,8 @@ fun DownloadedManagementBody(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 15.dp, vertical = 10.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            // 垂直居中:操作区按钮(32dp)比磁贴(~62dp)矮,不居中会顶在行首
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(modifier = Modifier.weight(1f)) {
                     // 统计直接跟在标题后(2026-10-02 用户定):"已完成 (N)"——只带计数不带容量
                     // (用户复定:容量可能展示不开);空库只显示"已完成"
@@ -388,7 +389,7 @@ fun DownloadedManagementBody(
                     )
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(modifier = Modifier.weight(1f)) {
                     LibraryTilingItem(
                         state = LibraryTilingState.DownloadInProgress,
