@@ -208,6 +208,8 @@ fun App(
 
     val selectedSourceValue by viewModel.selectedSource.collectAsStateWithLifecycle()
     val neteaseLoggedInValue by viewModel.neteaseLoggedIn.collectAsStateWithLifecycle()
+    // 桌面侧栏底部账户钮的头像(当前音源登录账号,库页/混合页同款口径)
+    val sourceAccountThumbnail by viewModel.sourceAccountThumbnail.collectAsStateWithLifecycle()
     val isLiquidGlassEnabled by viewModel.getEnableLiquidGlass().collectAsStateWithLifecycle(DataStoreManager.FALSE)
     // Analytics only makes sense with local tracking on, so its tab follows that setting.
     val isLocalTrackingEnabled by viewModel.getLocalTrackingEnabled().collectAsStateWithLifecycle(DataStoreManager.FALSE)
@@ -762,6 +764,7 @@ fun App(
                                     showMixForYouTab = showMixForYouTab,
                                     selectedSource = runCatching { com.maxrave.domain.source.MusicSource.valueOf(selectedSourceValue) }.getOrDefault(com.maxrave.domain.source.MusicSource.YOUTUBE_MUSIC),
                                     neteaseLoggedIn = neteaseLoggedInValue,
+                                    accountAvatar = sourceAccountThumbnail.takeIf { it.isNotBlank() },
                                     onSourceSelected = { source ->
                                         if (selectedSourceValue != source.name) {
                                             // 同 rail:切源不停播,跳主页+刷新;切换成功才导航

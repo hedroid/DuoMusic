@@ -74,10 +74,12 @@ import com.maxrave.simpmusic.ui.icon.FormatListBulleted
 import com.maxrave.simpmusic.ui.icon.LeftPanelClose
 import com.maxrave.simpmusic.ui.icon.LeftPanelOpen
 import com.maxrave.simpmusic.ui.icon.LibraryMusic
+import com.maxrave.simpmusic.ui.icon.NeteaseCloudMusic
 import com.maxrave.simpmusic.ui.icon.PushPin
 import com.maxrave.simpmusic.ui.icon.Search
 import com.maxrave.simpmusic.ui.icon.SimpIcons
 import com.maxrave.simpmusic.ui.icon.TrendingUp
+import com.maxrave.simpmusic.ui.icon.YouTubeMusic
 import com.maxrave.simpmusic.ui.icon.VolumeUp
 import com.maxrave.domain.source.MusicSource
 import com.maxrave.simpmusic.ui.navigation.destination.library.LibraryDynamicPlaylistDestination
@@ -112,6 +114,7 @@ import simpmusic.composeapp.generated.resources.podcast
 import simpmusic.composeapp.generated.resources.podcasts
 import simpmusic.composeapp.generated.resources.recents
 import simpmusic.composeapp.generated.resources.search_in_your_library
+import simpmusic.composeapp.generated.resources.netease
 import simpmusic.composeapp.generated.resources.your_library
 import kotlin.reflect.KClass
 
@@ -131,9 +134,12 @@ fun DesktopSidebar(
     showAnalyticsTab: Boolean,
     showMixForYouTab: Boolean,
     modifier: Modifier = Modifier,
-    // fork:长按 Search 切音源(与底栏/横屏 rail 同款交互,上游 sidebar 无此能力)
+    // fork:底部账户钮=桌面切源入口(用户 2026-10-31 定案,Spotify 同款模式;原长按
+    // Search 方案被否——鼠标长按不自然且不可发现)
     selectedSource: MusicSource = MusicSource.YOUTUBE_MUSIC,
     neteaseLoggedIn: Boolean = false,
+    /** 当前音源登录账号头像(SharedViewModel.sourceAccountThumbnail 口径),空=品牌图标兜底 */
+    accountAvatar: String? = null,
     onSourceSelected: (MusicSource) -> Unit = { _ -> },
     viewModel: LibrarySidebarViewModel = koinViewModel(),
     reloadDestinationIfNeeded: (KClass<*>) -> Unit = { _ -> },
@@ -232,28 +238,14 @@ fun DesktopSidebar(
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             navScreens.forEach { screen ->
-                var showSourceMenu by remember { mutableStateOf(false) }
-                Box {
-                    SidebarNavRow(
-                        backdrop = backdrop,
-                        label = stringResource(screen.title),
-                        selected = selectedIndex == screen.ordinal,
-                        collapsed = collapsed,
-                        onClick = { selectTab(screen) },
-                        // fork:长按 Search 弹音源菜单
-                        onLongClick = if (screen == BottomNavScreen.Search) ({ showSourceMenu = true }) else null,
-                        icon = screen.icon,
-                    )
-                    if (screen == BottomNavScreen.Search) {
-                        SourceSwitchMenu(
-                            expanded = showSourceMenu,
-                            onDismiss = { showSourceMenu = false },
-                            selectedSource = selectedSource,
-                            neteaseLoggedIn = neteaseLoggedIn,
-                            onSourceSelected = onSourceSelected,
-                        )
-                    }
-                }
+                SidebarNavRow(
+                    backdrop = backdrop,
+                    label = stringResource(screen.title),
+                    selected = selectedIndex == screen.ordinal,
+                    collapsed = collapsed,
+                    onClick = { selectTab(screen) },
+                    icon = screen.icon,
+                )
             }
             HorizontalDivider(
                 Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
@@ -343,6 +335,63 @@ fun DesktopSidebar(
                 }
                 item { Spacer(Modifier.height(8.dp)) }
             }
+            // fork:底部账户钮——桌面切源入口。常驻可发现(头像即"当前在哪个源"),
+            // 点开菜单二选一;未登录侧点击由 switchSource 统一 toast 引导。
+            var showAccountMenu by remember { mutableStateOf(false) }
+            HorizontalDivider(
+                Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+            )
+            Box(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp)) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(24.dp))
+                        .clickable { showAccountMenu = true }
+                        .padding(horizontal = if (collapsed) 0.dp else 10.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = if (collapsed) Arrangement.Center else Arrangement.spacedBy(12.dp),
+                ) {
+                    val isNetease = selectedSource == MusicSource.NETEASE
+                    if (!accountAvatar.isNullOrBlank()) {
+                        AsyncImage(
+                            model = accountAvatar,
+                            contentDescription = null,
+                            modifier = Modifier.size(32.dp).clip(CircleShape),
+                        )
+                    } else {
+                        // 未登录(或头像未取到):当前源品牌图标兜底,同样表达"现在在哪个源"
+                        Box(
+                            Modifier.size(32.dp).clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = if (isNetease) SimpIcons.NeteaseCloudMusic else SimpIcons.YouTubeMusic,
+                                contentDescription = null,
+                                tint = if (isNetease) NeteaseBrandRed else YouTubeBrandRed,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                    }
+                    if (!collapsed) {
+                        Text(
+                            text = if (isNetease) stringResource(Res.string.netease) else "YouTube Music",
+                            style = typo().bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                SourceSwitchMenu(
+                    expanded = showAccountMenu,
+                    onDismiss = { showAccountMenu = false },
+                    selectedSource = selectedSource,
+                    neteaseLoggedIn = neteaseLoggedIn,
+                    onSourceSelected = onSourceSelected,
+                )
+            }
         }
     }
 }
@@ -389,7 +438,6 @@ private fun SidebarNavRow(
     selected: Boolean,
     collapsed: Boolean,
     onClick: () -> Unit,
-    onLongClick: (() -> Unit)? = null,
     icon: @Composable () -> Unit,
 ) {
     val color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
@@ -399,13 +447,7 @@ private fun SidebarNavRow(
             .then(if (collapsed) Modifier.size(48.dp) else Modifier.fillMaxWidth().height(48.dp))
             .then(if (selected) Modifier.liquidGlass(backdrop, RoundedCornerShape(24.dp), highlight = SidebarGlassRim) else Modifier)
             .clip(RoundedCornerShape(24.dp))
-            .then(
-                if (onLongClick != null) {
-                    Modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick)
-                } else {
-                    Modifier.clickable(onClick = onClick)
-                },
-            )
+            .clickable(onClick = onClick)
             .padding(horizontal = if (collapsed) 0.dp else 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = if (collapsed) Arrangement.Center else Arrangement.spacedBy(16.dp),
