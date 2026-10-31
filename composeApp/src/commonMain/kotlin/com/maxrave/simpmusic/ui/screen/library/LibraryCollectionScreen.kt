@@ -1,8 +1,13 @@
 package com.maxrave.simpmusic.ui.screen.library
 
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.Crossfade
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.background
@@ -373,6 +378,14 @@ fun DownloadedManagementBody(
                 Spacer(modifier = Modifier.weight(1f))
             }
         }
+        // 磁贴页的屏幕顺序,用于切换滑动方向判定
+        val sectionOrderOf: (DownloadedSection) -> Int = {
+            when (it) {
+                DownloadedSection.Completed -> 0
+                DownloadedSection.Cached -> 1
+                DownloadedSection.InProgress -> 2
+            }
+        }
         val isInProgressTab = downloadedSection == DownloadedSection.InProgress
         val isCachedTab = SHOW_CACHED_TAB && downloadedSection == DownloadedSection.Cached
         // 搜索只作用于"已完成"标签(旧下载页同款判定:标题/任一艺人包含即命中)
@@ -497,11 +510,23 @@ fun DownloadedManagementBody(
                 } else {
                     // 顶栏收起信号:Songs 列表自报(与其它 chip 页同一套口径,
                     // 含几何反馈断路,见 scrollReportingEffect 注释)
-                    // tab 切换过场(2026-10-31 用户定):三个磁贴页互切 Crossfade;
-                    // 列表态各分支独立(滚动位置/LazyListState 不跨 tab 串)
-                    Crossfade(
+                    // tab 切换过场(2026-10-31 用户定,二次改:Crossfade 两页交叠读作
+                    // "闪烁",改方向感知滑动——按磁贴屏幕顺序(已完成→已缓存→下载中)
+                    // 判定来向,整页滑入滑出+淡切,像连续翻页;列表态各分支独立
+                    // (滚动位置/LazyListState 不跨 tab 串)
+                    AnimatedContent(
                         targetState = downloadedSection,
-                        animationSpec = tween(220),
+                        transitionSpec = {
+                            val forward = sectionOrderOf(targetState) > sectionOrderOf(initialState)
+                            val dir = if (forward) 1 else -1
+                            (
+                                slideInHorizontally(tween(280)) { it * dir } +
+                                    fadeIn(tween(200))
+                                ) togetherWith (
+                                slideOutHorizontally(tween(280)) { -it * dir } +
+                                    fadeOut(tween(160))
+                                )
+                        },
                         label = "downloadedSection",
                     ) { section ->
                         val sectionIsCached = SHOW_CACHED_TAB && section == DownloadedSection.Cached
