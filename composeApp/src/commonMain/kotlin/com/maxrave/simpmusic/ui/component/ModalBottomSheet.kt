@@ -5766,13 +5766,14 @@ fun NeteaseCommentsSheet(
                     colors = CardDefaults.cardColors().copy(containerColor = dark.handle),
                     shape = RoundedCornerShape(50),
                 ) {}
-                // 头部行跟随 YT 版:标题+计数同排,关闭钮收右(YT 版同款),下方分割线
+                // 头部行跟随 YT 版形态:标题+计数同排,下方分割线。
+                // 关闭叉号已按用户要求移除(2026-11-02,与 YT 版同步)——下拉拖拽条或点遮罩关闭
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .padding(start = 20.dp, end = 8.dp, top = 6.dp),
+                            .padding(start = 20.dp, end = 20.dp, top = 6.dp),
                 ) {
                     Text(
                         text = stringResource(Res.string.comment_label),
@@ -5786,12 +5787,6 @@ fun NeteaseCommentsSheet(
                             style = typo().bodyMedium,
                             color = dark.subtitle,
                         )
-                    }
-                    Spacer(modifier = Modifier.weight(1f))
-                    IconButton(onClick = {
-                        coroutineScope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
-                    }) {
-                        Icon(imageVector = SimpIcons.Close, contentDescription = null, tint = dark.content)
                     }
                 }
                 // 热门/最新排序切换:热门=服务端精华热评一次拉全,最新=offset 翻页

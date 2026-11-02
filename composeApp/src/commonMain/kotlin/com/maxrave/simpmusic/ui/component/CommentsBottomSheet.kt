@@ -188,9 +188,11 @@ fun CommentsBottomSheet(
                             shape = RoundedCornerShape(50),
                         ) {}
                         Spacer(modifier = Modifier.height(6.dp))
+                        // 头部行:标题+计数同排。关闭叉号已按用户要求移除(2026-11-02)——
+                        // 下拉拖拽条或点遮罩关闭
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp),
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
                         ) {
                             Text(
                                 text = stringResource(Res.string.comments),
@@ -201,12 +203,6 @@ fun CommentsBottomSheet(
                             if (count != null && uiState.status == CommentsStatus.LOADED) {
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(text = count, style = typo().bodyMedium, color = colors.subtitle)
-                            }
-                            Spacer(modifier = Modifier.weight(1f))
-                            IconButton(onClick = {
-                                scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
-                            }) {
-                                Icon(imageVector = SimpIcons.Close, contentDescription = null, tint = colors.content)
                             }
                         }
                         HorizontalDivider(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp), thickness = 1.dp)
