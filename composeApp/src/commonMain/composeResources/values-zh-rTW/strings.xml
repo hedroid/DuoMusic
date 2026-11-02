@@ -1285,4 +1285,35 @@
     <string name="collapse_your_library">收合媒體庫</string>
     <string name="expand_your_library">展開媒體庫</string>
     <string name="category">分類</string>
+    <string name="add_lyrics">加入歌詞</string>
+    <string name="add_lyrics_placeholder">[00:12.30] 第一行歌詞</string>
+    <string name="add_lyrics_hint"><![CDATA[每行開頭加上 [01:23.45] 這樣的時間。在每個詞前面放 <01:23.45> 即可逐詞同步。]]></string>
+    <plurals name="add_lyrics_lines">
+        <item quantity="other">%1$d 行</item>
+    </plurals>
+    <plurals name="add_lyrics_problems">
+        <item quantity="other">%1$d 個問題</item>
+    </plurals>
+    <string name="add_lyrics_line">第 %1$d 行</string>
+    <string name="add_lyrics_no_time">請在行首加上 [01:23.45] 這樣的時間</string>
+    <string name="add_lyrics_bad_time">%1$s 不是有效的時間</string>
+    <string name="add_lyrics_bad_word_time">%1$s 不是有效的逐詞時間</string>
+    <string name="add_lyrics_word_time_backwards">%1$s 處逐詞時間倒退</string>
+    <string name="add_lyrics_repeated_word_line">帶逐詞時間的行只能有一個行時間</string>
+    <string name="add_lyrics_bad_offset">偏移必須是整毫秒，如 [offset:+250]</string>
+    <string name="add_lyrics_no_timed_lines">至少加入一行帶時間的歌詞</string>
+    <string name="recognize_song">識別歌曲</string>
+    <string name="recognize_listening">正在聆聽…</string>
+    <string name="recognize_listening_hint">把手機靠近音源</string>
+    <string name="recognize_identifying">正在識別…</string>
+    <string name="recognize_find">在 DuoMusic 中尋找</string>
+    <string name="recognize_listen_again">重新聆聽</string>
+    <string name="recognize_no_match">未識別到符合的歌曲</string>
+    <string name="recognize_no_match_hint">靠近音源再試一次</string>
+    <string name="recognize_failed">無法識別這首歌曲</string>
+    <string name="recognize_failed_hint">請檢查網路連線後再試</string>
+    <string name="recognize_try_again">重試</string>
+    <string name="recognize_mic_needed">需要麥克風權限</string>
+    <string name="recognize_mic_hint">DuoMusic 會聆聽幾秒鐘，找出你附近正在播放的歌曲</string>
+    <string name="recognize_allow_mic">允許使用麥克風</string>
 </resources>
