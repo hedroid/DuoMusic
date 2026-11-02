@@ -427,6 +427,19 @@ fun App(
                         }
                     }
 
+                    // simpmusic://recognize — the Quick Settings tile (Android only): Search with the
+                    // song recognition sheet open.
+                    "recognize" -> {
+                        if (isAppLinkAvailable(appPath, null, localTrackingOn, youTubeLoggedIn)) {
+                            viewModel.requestSongRecognition(true)
+                            // Single top: already on Search, that screen opens the sheet. A second
+                            // copy would race the one leaving for the request.
+                            navController.navigate(SearchDestination) { launchSingleTop = true }
+                        } else {
+                            viewModel.makeToast(getString(Res.string.this_link_is_not_supported))
+                        }
+                    }
+
                     else -> {
                         viewModel.makeToast(getString(Res.string.this_link_is_not_supported))
                     }

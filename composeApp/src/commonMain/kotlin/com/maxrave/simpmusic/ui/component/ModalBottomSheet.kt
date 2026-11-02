@@ -169,6 +169,7 @@ import com.maxrave.simpmusic.extension.greyScale
 import com.maxrave.simpmusic.viewModel.LibraryMutation
 import com.maxrave.simpmusic.viewModel.LibraryMutationBus
 import com.maxrave.simpmusic.ui.icon.AccessAlarm
+import com.maxrave.simpmusic.ui.icon.ThumbDownOutline
 import com.maxrave.simpmusic.ui.icon.LinkOff
 import com.maxrave.simpmusic.ui.icon.Search
 import com.maxrave.simpmusic.ui.icon.Add
@@ -267,6 +268,10 @@ import simpmusic.composeapp.generated.resources.cancel_download_message
 import simpmusic.composeapp.generated.resources.cancel_download_confirm
 import simpmusic.composeapp.generated.resources.remove_download_title
 import simpmusic.composeapp.generated.resources.remove_download_message
+import simpmusic.composeapp.generated.resources.add_lyrics
+import simpmusic.composeapp.generated.resources.dislike_on_youtube
+import simpmusic.composeapp.generated.resources.disliked
+import simpmusic.composeapp.generated.resources.disliking
 import simpmusic.composeapp.generated.resources.add_to_a_playlist
 import simpmusic.composeapp.generated.resources.add_to_queue
 import simpmusic.composeapp.generated.resources.add_to_queue_disabled_endless
@@ -1818,6 +1823,17 @@ fun NowPlayingBottomSheet(
     onCloudDiskSongInfoChanged: ((Boolean) -> Unit)? = null,
     // 需要让宿主页面立即响应点赞状态变化时传入(例如红心歌单取消红心后剔除歌曲)
     onLikeChanged: ((Boolean) -> Unit)? = null,
+    /** Set when opened from the "Cached" list: adds a row that drops the song from the player cache. */
+    onRemoveFromCache: (() -> Unit)? = null,
+    /** Set while the song playing has no lyrics: adds Add lyrics under Main Lyrics Provider. */
+    onAddLyrics: (() -> Unit)? = null,
+    /**
+     * The now-playing track's YouTube dislike state, set only by the Now Playing screen (where the
+     * rating is fetched) and only while signed in to YouTube; null hides the Dislike action.
+     */
+    youTubeDislike: YouTubeDislikeState? = null,
+    /** Called with the videoId of the track this sheet shows. */
+    onYouTubeDislike: (videoId: String) -> Unit = {},
     /** Set when opened from a queue row: adds that row's move and delete actions at the top. */
     /** Set when opened from a queue row: adds that row's move and delete actions at the top. */
     queuePosition: QueuePosition? = null,
@@ -2534,6 +2550,20 @@ fun NowPlayingBottomSheet(
                             if (!isPodcastEpisode) onLikeChanged?.invoke(liked)
                         },
                     )
+                    if (youTubeDislike != null) {
+                        ActionButton(
+                            icon = SimpIcons.ThumbDownOutline,
+                            text =
+                                when (youTubeDislike) {
+                                    YouTubeDislikeState.DISLIKE -> Res.string.dislike_on_youtube
+                                    YouTubeDislikeState.DISLIKING -> Res.string.disliking
+                                    YouTubeDislikeState.DISLIKED -> Res.string.disliked
+                                },
+                            enable = youTubeDislike == YouTubeDislikeState.DISLIKE,
+                        ) {
+                            onYouTubeDislike(uiState.songUIState.videoId)
+                        }
+                    }
 
                     // 播客节目不提供下载(2026-10-01 用户定):"下载/删除下载"两行隐藏。
                     // 只按行自身 neteaseProgramId 判定——不能用队列哨兵:播客队列播放期间
@@ -2906,6 +2936,15 @@ fun NowPlayingBottomSheet(
                             ) {
                                 mainLyricsProvider = true
                             }
+                        }
+                    }
+                    if (onAddLyrics != null) {
+                        ActionButton(
+                            icon = SimpIcons.Edit,
+                            text = Res.string.add_lyrics,
+                        ) {
+                            hideModalBottomSheet()
+                            onAddLyrics()
                         }
                     }
                     Crossfade(targetState = setSleepTimerEnable) {

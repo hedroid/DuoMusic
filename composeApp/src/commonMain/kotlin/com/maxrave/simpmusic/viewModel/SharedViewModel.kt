@@ -1471,6 +1471,15 @@ class SharedViewModel(
         _libraryTabRequest.value = tab
     }
 
+    // The song recognition sheet asked for from outside Search (simpmusic://recognize, the Quick
+    // Settings tile); Search opens it the next time it composes and clears the request.
+    private val _songRecognitionRequest = MutableStateFlow(false)
+    val songRecognitionRequest: StateFlow<Boolean> = _songRecognitionRequest.asStateFlow()
+
+    fun requestSongRecognition(requested: Boolean) {
+        _songRecognitionRequest.value = requested
+    }
+
     fun putString(
         key: String,
         value: String,
@@ -1587,9 +1596,27 @@ class SharedViewModel(
                         track.videoId,
                         lyricsData,
                     )
+                } else if (_nowPlayingState.value?.songEntity?.videoId == track.videoId) {
+                    // The end of every provider and of the offline cache: the one place the app
+                    // knows this song has no lyrics, which is what offers Add lyrics.
+                    _nowPlayingScreenData.update { it.copy(lyricsNotFound = true) }
                 }
             }
         }
+    }
+
+    /**
+     * Lyrics typed into Add lyrics take the offline lyrics' path: [updateLyrics] caches and shows
+     * them, and contributes them when Help build lyrics database is on. The cache write of its own
+     * keeps them for a song that ended while they were being typed, which [updateLyrics] skips.
+     */
+    fun saveUserLyrics(
+        videoId: String,
+        lyrics: Lyrics,
+    ) {
+        updateLyrics(videoId, (timeline.value.total / 1000).toInt(), lyrics, false, LyricsProvider.OFFLINE)
+        insertLyrics(lyrics.toLyricsEntity(videoId))
+        viewModelScope.launch { getAITranslationLyrics(videoId, lyrics) }
     }
 
     fun loadSharedMediaItem(videoId: String) {
@@ -2330,6 +2357,9 @@ class SharedViewModel(
         // A live broadcast has nothing to sync lyrics to — the "duration" mpv reports for it is only
         // its seek window — so no provider is asked. Every caller comes through here.
         if (LiveStreamRegistry.isLive(song.videoId)) return
+        // A fetch in flight is not "no lyrics": switching the provider re-fetches the same song, and
+        // Add lyrics offered meanwhile could be saved over the lyrics the new provider finds.
+        _nowPlayingScreenData.update { it.copy(lyricsNotFound = false) }
         viewModelScope.launch {
             val videoId = song.videoId
             log("Get Lyrics From Format for $videoId", LogLevel.WARN)
@@ -3678,6 +3708,8 @@ data class NowPlayingScreenData(
      * 永远留在屏上。
      */
     val lyricsVideoId: String? = null,
+    /** Every provider and the offline cache came back empty for this song; offers Add lyrics. */
+    val lyricsNotFound: Boolean = false,
     val songInfoData: SongInfoEntity? = null,
     /** 网易歌详情卡数据(艺人/专辑/热评),与 songInfoData 按源互斥 */
     val neteaseSongData: NeteaseSongInfoEntity? = null,

@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CardDefaults
@@ -82,6 +83,7 @@ import com.maxrave.simpmusic.expect.ui.MediaPlayerView
 import com.maxrave.simpmusic.expect.ui.MediaPlayerViewWithSubtitle
 import com.maxrave.simpmusic.expect.ui.toImageBitmap
 import com.maxrave.simpmusic.extension.parseTimestampToMilliseconds
+import com.maxrave.simpmusic.extension.mouseDragScroll
 import com.maxrave.simpmusic.extension.smoothScrimBrush
 import com.maxrave.simpmusic.getPlatform
 import com.maxrave.simpmusic.ui.component.AIBadge
@@ -1041,7 +1043,12 @@ internal fun ExpressiveCollapsedToolbar(
                                             align = Alignment.CenterVertically,
                                         ),
                             )
-                            LazyRow(verticalAlignment = Alignment.CenterVertically) {
+                            val artistRowState = rememberLazyListState()
+                            LazyRow(
+                                modifier = Modifier.mouseDragScroll(artistRowState),
+                                state = artistRowState,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
                                 item {
                                     AnimatedVisibility(visible = state.displayIsExplicit) {
                                         ExplicitBadge(

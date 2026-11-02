@@ -51,6 +51,7 @@ import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -122,6 +123,7 @@ import com.maxrave.simpmusic.expect.ui.toImageBitmap
 import com.maxrave.simpmusic.extension.elapsedLabel
 import com.maxrave.simpmusic.extension.formatDuration
 import com.maxrave.simpmusic.extension.lengthLabel
+import com.maxrave.simpmusic.extension.mouseDragScroll
 import com.maxrave.simpmusic.extension.getColorFromPalette
 import com.maxrave.simpmusic.extension.getScreenSizeInfo
 import com.maxrave.simpmusic.extension.isElementVisible
@@ -1717,7 +1719,12 @@ fun NowPlayingContentSpotify(
                                                 align = Alignment.CenterVertically,
                                             ),
                                 )
-                                LazyRow(verticalAlignment = Alignment.CenterVertically) {
+                                val artistRowState = rememberLazyListState()
+                                LazyRow(
+                                    modifier = Modifier.mouseDragScroll(artistRowState),
+                                    state = artistRowState,
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
                                     item {
                                         AnimatedVisibility(
                                             visible = state.displayIsExplicit,
@@ -1911,8 +1918,10 @@ internal fun NowPlayingTrackInfoRow(
                 )
             }
             Spacer(modifier = Modifier.height(3.dp))
+            val artistRowState = rememberLazyListState()
             LazyRow(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().mouseDragScroll(artistRowState),
+                state = artistRowState,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 item(state.displayIsExplicit) {
