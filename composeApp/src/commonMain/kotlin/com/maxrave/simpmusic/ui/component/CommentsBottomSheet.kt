@@ -126,7 +126,9 @@ fun CommentsBottomSheet(
     viewModel: CommentsViewModel = koinViewModel(),
 ) {
     val colors = rememberSurfaceDarkColors()
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+    // skipPartiallyExpanded=true:打开即全屏,与网易评论页同款(2026-11-02 用户反馈;
+    // false 会让 YT 版先停在半屏档,要再上滑一次才铺满)
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
     val uriHandler = LocalUriHandler.current
     val localDensity = LocalDensity.current
