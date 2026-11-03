@@ -169,6 +169,7 @@ import com.maxrave.simpmusic.extension.greyScale
 import com.maxrave.simpmusic.viewModel.LibraryMutation
 import com.maxrave.simpmusic.viewModel.LibraryMutationBus
 import com.maxrave.simpmusic.ui.icon.AccessAlarm
+import com.maxrave.simpmusic.ui.utils.normalizedContains
 import com.maxrave.simpmusic.ui.icon.ThumbDownOutline
 import com.maxrave.simpmusic.ui.icon.LinkOff
 import com.maxrave.simpmusic.ui.icon.Search
@@ -4150,7 +4151,7 @@ fun AddToPlaylistModalBottomSheet(
                             if (playlistKeyword.isEmpty()) {
                                 visibleYouTubePlaylists
                             } else {
-                                visibleYouTubePlaylists.filter { it.title.contains(playlistKeyword, ignoreCase = true) }
+                                visibleYouTubePlaylists.filter { normalizedContains(it.title, playlistKeyword) }
                             }
                         }
                     val shownNeteasePlaylists =
@@ -4158,7 +4159,7 @@ fun AddToPlaylistModalBottomSheet(
                             if (playlistKeyword.isEmpty()) {
                                 visibleNeteasePlaylists
                             } else {
-                                visibleNeteasePlaylists.filter { it.title.contains(playlistKeyword, ignoreCase = true) }
+                                visibleNeteasePlaylists.filter { normalizedContains(it.title, playlistKeyword) }
                             }
                         }
                     if (selectedLibrary == 1 || selectedLibrary == 2) {

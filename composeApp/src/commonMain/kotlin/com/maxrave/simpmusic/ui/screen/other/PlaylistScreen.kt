@@ -110,6 +110,7 @@ import com.maxrave.simpmusic.ui.component.SearchBarExit
 import com.maxrave.simpmusic.ui.component.SearchBarEnter
 import com.maxrave.simpmusic.ui.component.rememberHolderPainter
 import com.maxrave.simpmusic.ui.utils.toHiResArtworkUrl
+import com.maxrave.simpmusic.ui.utils.matchesQuery
 import com.maxrave.common.NETEASE_CLOUD_DISK_PLAYLIST_ID
 import com.maxrave.simpmusic.expect.readCloudUploadArtwork
 import com.maxrave.simpmusic.expect.ui.multiFilePickerResult
@@ -263,10 +264,7 @@ fun PlaylistScreen(
             if (query.isEmpty() || !showSearchBar) {
                 tracks
             } else {
-                tracks.filter {
-                    it.title.contains(query, ignoreCase = true) ||
-                        it.artists?.joinToString(", ")?.contains(query, ignoreCase = true) == true
-                }
+                tracks.filter { matchesQuery(it.title, it.artists?.map { artist -> artist.name }, query) }
             }
         }
     }

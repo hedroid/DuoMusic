@@ -85,6 +85,7 @@ import com.maxrave.simpmusic.expect.ui.PlatformBackdrop
 import com.maxrave.simpmusic.expect.ui.layerBackdrop
 import com.maxrave.simpmusic.expect.ui.rememberBackdrop
 import com.maxrave.simpmusic.extension.barBlurStyle
+import com.maxrave.simpmusic.ui.utils.normalizedContains
 import com.maxrave.simpmusic.extension.mouseDragScroll
 import com.maxrave.simpmusic.ui.icon.Close
 import com.maxrave.simpmusic.ui.icon.FormatListBulleted
@@ -225,7 +226,7 @@ fun DesktopSidebar(
     val shown =
         remember(libraryItems, filter, alphabetical, activeQuery) {
             libraryItems
-                .filter { (filter == null || it.kind == filter) && it.title.contains(activeQuery, ignoreCase = true) }
+                .filter { (filter == null || it.kind == filter) && normalizedContains(it.title, activeQuery) }
                 .let { list -> if (alphabetical) list.sortedBy { it.title.lowercase() } else list.sortedByDescending { it.addedAt } }
         }
     val pinned =
@@ -274,7 +275,7 @@ fun DesktopSidebar(
             contentPadding = PaddingValues(top = with(LocalDensity.current) { headerHeightPx.toDp() }, bottom = 80.dp),
         ) {
             pinned.forEachIndexed { index, collection ->
-                if (pinnedTitles[index].contains(activeQuery, ignoreCase = true)) {
+                if (normalizedContains(pinnedTitles[index], activeQuery)) {
                     item(key = "pinned_${collection.type.toStringParams()}") {
                         SidebarLibraryRow(
                             title = pinnedTitles[index],

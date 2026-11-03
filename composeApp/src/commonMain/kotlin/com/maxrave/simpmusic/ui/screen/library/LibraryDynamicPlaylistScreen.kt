@@ -58,6 +58,8 @@ import com.maxrave.simpmusic.ui.component.SearchBarEnter
 import com.maxrave.simpmusic.ui.component.AddToPlaylistModalBottomSheet
 import com.maxrave.simpmusic.ui.component.ArtistFullWidthItems
 import com.maxrave.simpmusic.ui.component.EndOfPage
+import com.maxrave.simpmusic.ui.utils.matchesQuery
+import com.maxrave.simpmusic.ui.utils.normalizedContains
 import com.maxrave.simpmusic.ui.component.NowPlayingBottomSheet
 import com.maxrave.simpmusic.ui.component.PlaylistFullWidthItems
 import com.maxrave.simpmusic.ui.component.RippleIconButton
@@ -184,7 +186,7 @@ fun LibraryDynamicPlaylistScreen(
 
     LaunchedEffect(query) {
         tempFavorite = favorite.filter { it.matches(query) }
-        tempFollowed = followed.filter { it.name.contains(query, ignoreCase = true) }
+        tempFollowed = followed.filter { normalizedContains(it.name, query) }
         tempMostPlayed = mostPlayed.filter { it.matches(query) }
         tempDownloaded = downloaded.filter { it.matches(query) }
         tempMonthlyRecap = monthlyRecap.filter { it.matches(query) }
@@ -195,7 +197,7 @@ fun LibraryDynamicPlaylistScreen(
                 ?: emptyList()
         tempTopArtists =
             analyticsUIState.topArtists.data
-                ?.filter { it.second.name.contains(query, ignoreCase = true) }
+                ?.filter { normalizedContains(it.second.name, query) }
                 ?: emptyList()
         tempTopAlbums =
             analyticsUIState.topAlbums.data
@@ -1019,12 +1021,6 @@ private fun topListSubtitle(type: LibraryDynamicPlaylistType): String? {
  * [artists] is a converted `List<String>`, so every entry is checked — a featured artist matches
  * as readily as the lead.
  */
-private fun matchesQuery(
-    title: String,
-    artists: List<String>?,
-    query: String,
-): Boolean =
-    title.contains(query, ignoreCase = true) ||
-        artists?.any { it.contains(query, ignoreCase = true) } == true
+// matchesQuery 已收编 ui/utils/SearchNormalize.kt(全仓共用,2026-11-03)
 
 private fun SongEntity.matches(query: String): Boolean = matchesQuery(title, artistName, query)

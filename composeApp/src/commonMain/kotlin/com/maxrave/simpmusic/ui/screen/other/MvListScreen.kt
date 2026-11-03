@@ -99,6 +99,7 @@ import com.maxrave.simpmusic.extension.barBlurStyle
 import com.maxrave.simpmusic.extension.getScreenSizeInfo
 import com.maxrave.simpmusic.extension.toImmersiveBackground
 import com.maxrave.simpmusic.ui.utils.toHiResArtworkUrl
+import com.maxrave.simpmusic.ui.utils.matchesQuery
 import com.maxrave.simpmusic.ui.component.ActionButton
 import com.maxrave.simpmusic.ui.component.BatchDownloadConfirmDialog
 import com.maxrave.simpmusic.ui.component.CenterLoadingBox
@@ -218,10 +219,7 @@ fun MvListScreen(
         if (query.isEmpty() || !showSearchBar) {
             mvs
         } else {
-            mvs.filter {
-                it.title.contains(query, ignoreCase = true) ||
-                    it.artists?.joinToString(", ")?.contains(query, ignoreCase = true) == true
-            }
+            mvs.filter { matchesQuery(it.title, it.artists?.map { artist -> artist.name }, query) }
         }
 
     // 近底触发下一页(剩 8 行内);翻页失败后被 loadMoreFailed 挡住,改由页脚"重试"驱动。

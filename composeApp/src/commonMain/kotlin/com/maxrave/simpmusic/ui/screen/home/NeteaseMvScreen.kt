@@ -91,6 +91,7 @@ import com.maxrave.simpmusic.ui.icon.SimpIcons
 import com.maxrave.simpmusic.ui.screen.other.ImmersiveMvHeader
 import com.maxrave.simpmusic.ui.theme.typo
 import com.maxrave.simpmusic.ui.utils.toHiResArtworkUrl
+import com.maxrave.simpmusic.ui.utils.matchesQuery
 import com.maxrave.simpmusic.viewModel.NeteaseMvGridSource
 import com.maxrave.simpmusic.viewModel.NeteaseMvViewModel
 import com.maxrave.simpmusic.viewModel.NeteaseRadarViewModel
@@ -325,10 +326,7 @@ fun NeteaseArtistVideosScreen(
         if (query.isEmpty() || !showSearchBar) {
             mvs
         } else {
-            mvs.filter {
-                it.title.contains(query, ignoreCase = true) ||
-                    it.artists?.joinToString(", ")?.contains(query, ignoreCase = true) == true
-            }
+            mvs.filter { matchesQuery(it.title, it.artists?.map { artist -> artist.name }, query) }
         }
 
     // 沉浸头调色板(MvListScreen 同配方:首条封面位图→palette→渐隐底色,防滚动回收重放);

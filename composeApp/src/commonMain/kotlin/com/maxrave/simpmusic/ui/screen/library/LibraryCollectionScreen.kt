@@ -79,6 +79,7 @@ import com.maxrave.domain.utils.toTrack
 import com.maxrave.simpmusic.extension.copy
 import com.maxrave.simpmusic.extension.scrollReportingEffect
 import com.maxrave.simpmusic.ui.component.EndOfPage
+import com.maxrave.simpmusic.ui.utils.matchesQuery
 import com.maxrave.simpmusic.ui.component.GridLibraryPlaylist
 import com.maxrave.simpmusic.ui.component.LibraryTilingItem
 import com.maxrave.simpmusic.ui.component.LibraryTilingState
@@ -1059,41 +1060,6 @@ private fun CreateLocalPlaylistSheet(
     }
 }
 
-/**
- * 搜索归一(2026-11-03,"明明在列表里却搜不到"的修复):两侧同款折叠后按普通子串比对——
- * ①全角→半角闭式映射(U+FF01-FF5E 减 0xFEE0 覆盖 ！？（）ＡＢＣ 全部),中文 IME 打出的
- * 全角括号/冒号与库里的半角逐码点不等,是搜不上的最大来源;②NBSP/全角空格→普通空格、
- * 零宽字符剔除(YT 标题常见);③小写。commonMain 无 java.text,全部闭式映射双端可用。
- */
-private fun normalizeForSearch(text: String): String =
-    buildString(text.length) {
-        for (ch in text) {
-            when (val c = ch.code) {
-                0xA0, 0x3000, 0xFEFF -> append(' ')
-                in 0x200B..0x200D -> Unit
-                in 0xFF01..0xFF5E -> append(c - 0xFEE0)
-                else -> append(c)
-            }
-        }
-    }.trim().lowercase()
-
-/**
- * "已完成/已缓存"标签搜索的命中判定(与旧下载页同款):标题或任一艺人包含即命中——
- * 人们找"某歌手的全部歌"不比找单曲少,只搜标题看起来像坏了。
- * 2026-11-03 增补:①两侧先归一(见 [normalizeForSearch]);②多艺人歌行上显示的是
- * joinToString 的联合串,按显示原文搜"A, B"也要能命中(此前只逐个艺人比对)。
- */
-private fun matchesQuery(
-    title: String,
-    artists: List<String>?,
-    query: String,
-): Boolean {
-    val q = normalizeForSearch(query)
-    if (q.isEmpty()) return true
-    if (normalizeForSearch(title).contains(q)) return true
-    val list = artists ?: return false
-    return list.any { normalizeForSearch(it).contains(q) } ||
-        normalizeForSearch(list.joinToString(", ")).contains(q)
-}
+// 搜索归一与命中判定已收编 ui/utils/SearchNormalize.kt(matchesQuery 全仓共用,2026-11-03)
 
 private fun SongEntity.matches(query: String): Boolean = matchesQuery(title, artistName, query)
