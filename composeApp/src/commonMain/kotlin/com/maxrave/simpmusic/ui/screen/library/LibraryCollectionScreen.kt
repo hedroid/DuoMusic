@@ -526,7 +526,9 @@ fun DownloadedManagementBody(
                             SearchBarDefaults.InputField(
                                 query = query,
                                 onQueryChange = { query = it },
-                                onSearch = { showSearchBar = false },
+                                // 回车保持搜索态(2026-11-03):收起=取消过滤,列表弹回全量,
+                                // 读作"搜不到";过滤只随 X 钮/切 tab 清词退出
+                                onSearch = { },
                                 expanded = showSearchBar,
                                 onExpandedChange = { showSearchBar = it },
                                 placeholder = {
@@ -667,22 +669,27 @@ fun DownloadedManagementBody(
                                             textAlign = TextAlign.Center,
                                         )
                                     }
-                                }
-                                items(cachedRows, key = { it.videoId }) { song ->
-                                    CachedSongRow(
-                                        song = song,
-                                        selectionMode = selectionMode,
-                                        isSelected = song.videoId in selectedIds,
-                                        onToggle = {
-                                            selectedIds =
-                                                if (song.videoId in selectedIds) selectedIds - song.videoId else selectedIds + song.videoId
-                                        },
-                                        onEnterSelection = {
-                                            selectionMode = true
-                                            selectedIds = setOf(song.videoId)
-                                        },
-                                        onRemove = { removeCachedTarget = song.videoId to (song.title ?: "") },
-                                    )
+                                } else {
+                                    items(cachedRows, key = { it.videoId }) { song ->
+                                        CachedSongRow(
+                                            song = song,
+                                            selectionMode = selectionMode,
+                                            isSelected = song.videoId in selectedIds,
+                                            onToggle = {
+                                                selectedIds =
+                                                    if (song.videoId in selectedIds) selectedIds - song.videoId else selectedIds + song.videoId
+                                            },
+                                            onEnterSelection = {
+                                                selectionMode = true
+                                                selectedIds = setOf(song.videoId)
+                                            },
+                                            onRemove = { removeCachedTarget = song.videoId to (song.title ?: "") },
+                                        )
+                                    }
+                                    // 页尾与"已完成/下载中"同款收尾(EndOfPage 页脚;contentPadding 已含
+                                    // 底栏,不带增量)。缺它时底部只剩底栏锁定预留区,读作一大片空白
+                                    // (2026-11-03 用户反馈)
+                                    item { EndOfPage(includeBottomBarPadding = false) }
                                 }
                             } else {
                             items(tabRows, key = { it.song.videoId }) { row ->
@@ -1053,15 +1060,40 @@ private fun CreateLocalPlaylistSheet(
 }
 
 /**
- * "已完成"标签搜索的命中判定(与旧下载页同款):标题或任一艺人包含即命中——
+ * 搜索归一(2026-11-03,"明明在列表里却搜不到"的修复):两侧同款折叠后按普通子串比对——
+ * ①全角→半角闭式映射(U+FF01-FF5E 减 0xFEE0 覆盖 ！？（）ＡＢＣ 全部),中文 IME 打出的
+ * 全角括号/冒号与库里的半角逐码点不等,是搜不上的最大来源;②NBSP/全角空格→普通空格、
+ * 零宽字符剔除(YT 标题常见);③小写。commonMain 无 java.text,全部闭式映射双端可用。
+ */
+private fun normalizeForSearch(text: String): String =
+    buildString(text.length) {
+        for (ch in text) {
+            when (val c = ch.code) {
+                0xA0, 0x3000, 0xFEFF -> append(' ')
+                in 0x200B..0x200D -> Unit
+                in 0xFF01..0xFF5E -> append(c - 0xFEE0)
+                else -> append(c)
+            }
+        }
+    }.trim().lowercase()
+
+/**
+ * "已完成/已缓存"标签搜索的命中判定(与旧下载页同款):标题或任一艺人包含即命中——
  * 人们找"某歌手的全部歌"不比找单曲少,只搜标题看起来像坏了。
+ * 2026-11-03 增补:①两侧先归一(见 [normalizeForSearch]);②多艺人歌行上显示的是
+ * joinToString 的联合串,按显示原文搜"A, B"也要能命中(此前只逐个艺人比对)。
  */
 private fun matchesQuery(
     title: String,
     artists: List<String>?,
     query: String,
-): Boolean =
-    title.contains(query, ignoreCase = true) ||
-        artists?.any { it.contains(query, ignoreCase = true) } == true
+): Boolean {
+    val q = normalizeForSearch(query)
+    if (q.isEmpty()) return true
+    if (normalizeForSearch(title).contains(q)) return true
+    val list = artists ?: return false
+    return list.any { normalizeForSearch(it).contains(q) } ||
+        normalizeForSearch(list.joinToString(", ")).contains(q)
+}
 
 private fun SongEntity.matches(query: String): Boolean = matchesQuery(title, artistName, query)
