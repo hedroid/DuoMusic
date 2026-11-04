@@ -488,7 +488,6 @@ fun LibraryScreen(
                 val sharedVm: SharedViewModel = koinInject()
                 DownloadedManagementBody(
                     topPadding = headerHeight,
-                    bottomPadding = lockedBottomPadding,
                     navController = navController,
                     viewModel = viewModel,
                     dynamicPlaylistViewModel = dynamicViewModel,

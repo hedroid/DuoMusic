@@ -237,7 +237,6 @@ fun LibraryCollectionScreen(
             LibraryChipType.DOWNLOADED_PLAYLIST -> {
                 DownloadedManagementBody(
                     topPadding = contentPadding.calculateTopPadding(),
-                    bottomPadding = contentPadding.calculateBottomPadding(),
                     navController = navController,
                     viewModel = viewModel,
                     dynamicPlaylistViewModel = dynamicPlaylistViewModel,
@@ -280,7 +279,6 @@ fun LibraryCollectionScreen(
 @Composable
 fun DownloadedManagementBody(
     topPadding: Dp,
-    bottomPadding: Dp,
     navController: NavController,
     viewModel: LibraryViewModel,
     dynamicPlaylistViewModel: LibraryDynamicPlaylistViewModel,
@@ -649,7 +647,9 @@ fun DownloadedManagementBody(
                         LazyColumn(
                             state = songsListState,
                             modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(bottom = bottomPadding),
+                            // 底部预留不进 contentPadding(2026-11-04):锁定峰值会多留 ~84dp 空白
+                            // (深滚时底栏已折叠),由列表尾部的活页脚 EndOfPage() 按实时底栏高度
+                            // 贴住迷你条——与歌单/专辑等详情页同款形态
                         ) {
                             if (isCachedTab) {
                                 if (cachedRows.isEmpty()) {
@@ -725,7 +725,7 @@ fun DownloadedManagementBody(
                                 )
                             }
                             }
-                            item { EndOfPage(includeBottomBarPadding = false) }
+                            item { EndOfPage() }
                         }
                         }
                     }
