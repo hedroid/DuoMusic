@@ -163,7 +163,7 @@ internal inline fun <reified T> GridLibraryPlaylist(
                     start = contentPadding.calculateStartPadding(layoutDirection) + LibraryGridDefaults.horizontalPadding,
                     top = contentPadding.calculateTopPadding() + 4.dp,
                     end = contentPadding.calculateEndPadding(layoutDirection) + LibraryGridDefaults.horizontalPadding,
-                    bottom = contentPadding.calculateBottomPadding() + 8.dp,
+                    bottom = 8.dp,
                 )
             // A header counts as content: a tab whose list is empty but whose header is the
             // point of the tab must not fall through to the empty text and hide it.
@@ -330,10 +330,9 @@ internal inline fun <reified T> GridLibraryPlaylist(
                     }
 
                     item(span = { GridItemSpan(maxLineSpan) }) {
-                        // 网格 contentPadding 已含调用方 scaffold 底栏让位(bottom=+8dp),
-                        // 页尾不能再叠一次(2026-09-28 审计:双叠=混合页/Wrapped/排行榜等
-                        // 底部空白过大的根因)
-                        EndOfPage(includeBottomBarPadding = false)
+                        // 活页脚(2026-11-04):按实时底栏高度贴住迷你条,清场全归页尾,
+                        // 列表 contentPadding.bottom 恒 0——不再锁定预留(详情页同款形态)
+                        EndOfPage()
                     }
                 }
             } else if (data is LocalResource.Loading) {

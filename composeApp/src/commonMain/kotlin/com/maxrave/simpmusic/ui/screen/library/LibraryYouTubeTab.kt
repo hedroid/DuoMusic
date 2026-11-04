@@ -169,7 +169,7 @@ internal fun LibraryYouTubeTab(
                         start = contentPadding.calculateStartPadding(layoutDirection) + LibraryGridDefaults.horizontalPadding,
                         top = contentPadding.calculateTopPadding() + 4.dp,
                         end = contentPadding.calculateEndPadding(layoutDirection) + LibraryGridDefaults.horizontalPadding,
-                        bottom = contentPadding.calculateBottomPadding() + 8.dp,
+                        bottom = 8.dp,
                     )
                 LazyVerticalGrid(
                     columns = GridCells.Adaptive(minSize = LibraryGridDefaults.minTileSize),
@@ -255,7 +255,7 @@ internal fun LibraryYouTubeTab(
                     }
 
                     item(span = { GridItemSpan(maxLineSpan) }, key = "yt_end") {
-                        EndOfPage(includeBottomBarPadding = false)
+                        EndOfPage()
                     }
                 }
             }

@@ -203,14 +203,11 @@ fun LibraryCollectionScreen(
             )
         },
     ) { scaffoldPadding ->
-        // 底部留白锁定展开态底栏高度(与库页 lockedBottomPadding 同理):液态玻璃底栏
-        // 随滚动收展形变,若列表 contentPadding.bottom 跟随,贴底位置每次形变都重钳制
-        // →上报→底栏再形变,自持振荡;锁定后形变不扰动列表几何
-        var lockedBottomPadding by remember { mutableStateOf(0.dp) }
-        lockedBottomPadding = maxOf(lockedBottomPadding, innerPadding.calculateBottomPadding())
+        // 底部清场交给列表尾部的活页脚 EndOfPage()(2026-11-04,与库页 chip 页同款);
+        // contentPadding.bottom 恒 0,底栏形变不扰动列表几何
         val contentPadding =
             scaffoldPadding.copy(
-                bottom = lockedBottomPadding,
+                bottom = 0.dp,
             )
         when (pageType) {
             LibraryChipType.LOCAL_PLAYLIST -> {

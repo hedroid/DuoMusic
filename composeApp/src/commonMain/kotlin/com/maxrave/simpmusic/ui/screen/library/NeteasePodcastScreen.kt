@@ -146,7 +146,7 @@ fun NeteasePodcastScreen(
             contentPadding =
                 PaddingValues(
                     top = innerPadding.calculateTopPadding(),
-                    bottom = innerPadding.calculateBottomPadding() + 8.dp,
+                    bottom = 8.dp,
                 ),
         ) {
             // 分类浏览 chips(点击=进分类电台列表页)
@@ -358,8 +358,7 @@ fun NeteasePodcastScreen(
             }
 
             item(key = "podcast_end") {
-                // contentPadding 已含 scaffold 底栏让位,页尾不双叠(同两云 tab 口径)
-                EndOfPage(includeBottomBarPadding = false)
+                EndOfPage()
             }
         }
     }

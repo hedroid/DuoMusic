@@ -711,8 +711,8 @@ private val ScrollDirectionFlipThreshold = 20.dp
  * 常落在同一 item 内(拿不到 index 变化=零上报,底栏/标题卡死在上一个方向),且
  * snapshotFlow 对 index 跳变做 conflated 后方向推导会读到陈旧 previous(2026-10-03
  * 实测"下滚后迷你条不再沉到导航行"两案)。防振荡不靠吞报告,靠切断几何燃料:各
- * chip 列表底部 padding 锁定展开态高度(见 LibraryScreen lockedBottomPadding),底栏
- * 形变不再改列表几何。index<=1 视作在顶(各页原口径,位置驱动不吃迟滞)。深处保存态
+ * chip 列表 contentPadding.bottom 恒 0,底部清场归列表尾部活页脚 EndOfPage()
+ * (2026-11-04,旧锁定预留方案已退役),底栏形变不再改列表滚动钳制几何。index<=1 视作在顶(各页原口径,位置驱动不吃迟滞)。深处保存态
  * 恢复时首帧 index==previous、offset 相等→上报 false(收起),与 CR-30"深处首帧上报
  * 即 false=正确语义"一致。
  *
