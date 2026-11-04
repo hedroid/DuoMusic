@@ -670,27 +670,25 @@ fun DownloadedManagementBody(
                                             textAlign = TextAlign.Center,
                                         )
                                     }
-                                } else {
-                                    items(cachedRows, key = { it.videoId }) { song ->
-                                        CachedSongRow(
-                                            song = song,
-                                            selectionMode = selectionMode,
-                                            isSelected = song.videoId in selectedIds,
-                                            onToggle = {
-                                                selectedIds =
-                                                    if (song.videoId in selectedIds) selectedIds - song.videoId else selectedIds + song.videoId
-                                            },
-                                            onEnterSelection = {
-                                                selectionMode = true
-                                                selectedIds = setOf(song.videoId)
-                                            },
-                                            onRemove = { removeCachedTarget = song.videoId to (song.title ?: "") },
-                                        )
-                                    }
-                                    // 页尾与"已完成/下载中"同款收尾(EndOfPage 页脚;contentPadding 已含
-                                    // 底栏,不带增量)。缺它时底部只剩底栏锁定预留区,读作一大片空白
-                                    // (2026-11-03 用户反馈)
-                                    item { EndOfPage(includeBottomBarPadding = false) }
+                                }
+                                // 页尾:列表尾部的 EndOfPage 在 LazyColumn 层恒渲染(下方 if/else 之外),
+                                // 已缓存 tab 同样吃它,这里不再另加(2026-11-04 修双 credit:分支内再
+                                // 加一个会与恒渲染页脚连排,88dp 一个正好叠出两个 copywriter)
+                                items(cachedRows, key = { it.videoId }) { song ->
+                                    CachedSongRow(
+                                        song = song,
+                                        selectionMode = selectionMode,
+                                        isSelected = song.videoId in selectedIds,
+                                        onToggle = {
+                                            selectedIds =
+                                                if (song.videoId in selectedIds) selectedIds - song.videoId else selectedIds + song.videoId
+                                        },
+                                        onEnterSelection = {
+                                            selectionMode = true
+                                            selectedIds = setOf(song.videoId)
+                                        },
+                                        onRemove = { removeCachedTarget = song.videoId to (song.title ?: "") },
+                                    )
                                 }
                             } else {
                             items(tabRows, key = { it.song.videoId }) { row ->
